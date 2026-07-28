@@ -61,7 +61,7 @@ function getRandomWeaponKey() {
     return `${types[Math.floor(Math.random() * types.length)]}_${rarity.toLowerCase()}`;
 }
 
-// ⏰ 10초마다 보스가 모든 플레이어를 5씩 공격!
+// ⏰ 10초마다 보스가 모든 플레이어 체력을 5씩 깎음
 setInterval(() => {
     let updated = false;
     Object.values(gameState.players).forEach(p => {
@@ -82,7 +82,7 @@ io.on('connection', (socket) => {
         hp: 100,
         maxHp: 100,
         gold: 500,
-        totalDamage: 0, // 랭킹용 누적 데미지
+        totalDamage: 0,
         inventory: [],
         equippedIndex: null,
         usedCoupons: []
@@ -105,8 +105,6 @@ io.on('connection', (socket) => {
         if (!p || p.hp <= 0) return;
         let eq = p.equippedIndex !== null ? p.inventory[p.equippedIndex] : null;
         let baseAtk = eq ? (eq.atk * (1 + (eq.enhance || 0) * 0.4)) : 10;
-        
-        // ⚔️ 조작된 추가 공격력이 있다면 반영 (없으면 기본 공격력)
         let dmg = Math.round(baseAtk + (p.bonusAtk || 0));
 
         gameState.boss.currentHp -= dmg;
@@ -175,7 +173,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 👑 GM 관제 센터 조작 기능 (공격력 조작, 랭킹 조작 등 포함)
     socket.on('adminAction', (data) => {
         const { action, payload } = data;
         if (action === 'spawnBoss') {
@@ -185,22 +182,8 @@ io.on('connection', (socket) => {
         if (action === 'killBoss') gameState.boss.currentHp = 0;
         if (action === 'giveGold') { const t = gameState.players[payload.targetId]; if(t) t.gold += payload.amount; }
         if (action === 'giveMythic') { const t = gameState.players[payload.targetId]; if(t && t.inventory.length < 36) t.inventory.push({ ...WEAPON_DB.knife_mythic, id: Date.now(), enhance: 0 }); }
-        
-        // ⚡ 공격력 조작 기능 추가
-        if (action === 'boostAtk') { 
-            const t = gameState.players[payload.targetId]; 
-            if(t) {
-                t.bonusAtk = (t.bonusAtk || 0) + payload.amount;
-            } 
-        }
-        // 🏆 랭킹(누적 데미지) 조작 기능 추가
-        if (action === 'setRankScore') { 
-            const t = gameState.players[payload.targetId]; 
-            if(t) {
-                t.totalDamage = payload.score;
-            } 
-        }
-
+        if (action === 'boostAtk') { const t = gameState.players[payload.targetId]; if(t) t.bonusAtk = (t.bonusAtk || 0) + payload.amount; }
+        if (action === 'setRankScore') { const t = gameState.players[payload.targetId]; if(t) t.totalDamage = payload.score; }
         io.emit('updateState', gameState);
     });
 
