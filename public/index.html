@@ -2,31 +2,32 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>아이들 보스 레이드</title>
+    <title>아이들 보스 레이드 - 플레이어</title>
     <style>
         body { font-family: sans-serif; background: #1e1e1e; color: #fff; text-align: center; margin: 0; padding: 20px; }
-        .box { background: #2d2d2d; padding: 15px; margin: 10px auto; width: 350px; border-radius: 8px; }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #ff4757; color: white; border: none; border-radius: 5px; }
+        .box { background: #2d2d2d; padding: 15px; margin: 10px auto; width: 360px; border-radius: 8px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #ff4757; color: white; border: none; border-radius: 5px; margin: 5px; }
         button:hover { background: #ff6b81; }
         .inv-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; margin-top: 10px; }
-        .slot { background: #3d3d3d; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 12px; border-radius: 4px; }
+        .slot { background: #3d3d3d; height: 45px; display: flex; align-items: center; justify-content: center; font-size: 12px; border-radius: 4px; border: 1px solid #444; }
     </style>
 </head>
 <body>
-    <h1>⚔️ 보스 레이드</h1>
+    <h1>⚔️ 방치형 보스 레이드</h1>
+    
     <div class="box">
         <h3 id="boss-name">보스 이름</h3>
         <p>HP: <span id="boss-hp">0</span> / <span id="boss-max-hp">0</span></p>
-        <button onclick="attackBoss()">⚔️ 공격하기</button>
+        <button onclick="attackBoss()">⚔️ 공격하기 (+150G)</button>
     </div>
 
     <div class="box">
-        <h3>💰 내 정보</h3>
-        <p>골드: <span id="player-gold">0</span> G</p>
+        <h3>💰 플레이어 재화</h3>
+        <p>보유 골드: <span id="player-gold">0</span> G</p>
         <button onclick="doGacha()">🎲 무기 뽑기 (1,000G)</button>
     </div>
 
-    <div class="box" style="width: 400px;">
+    <div class="box" style="width: 420px;">
         <h3>🎒 인벤토리 (36칸)</h3>
         <div id="inventory-grid" class="inv-grid"></div>
     </div>
@@ -39,18 +40,14 @@
         function doGacha() { socket.emit('gacha'); }
 
         socket.on('updateState', (state) => {
-            // 보스 정보 갱신
             document.getElementById('boss-name').innerText = state.boss.name;
             document.getElementById('boss-hp').innerText = state.boss.currentHp;
             document.getElementById('boss-max-hp').innerText = state.boss.maxHp;
 
-            // 내 정보 갱신 (첫 번째 플레이어 기준 테스트)
-            const myId = socket.id;
-            const me = state.players[myId];
+            const me = state.players[socket.id];
             if (me) {
                 document.getElementById('player-gold').innerText = me.gold;
 
-                // 인벤토리 36칸 렌더링
                 const grid = document.getElementById('inventory-grid');
                 grid.innerHTML = '';
                 for (let i = 0; i < state.maxInventorySlots; i++) {
@@ -58,8 +55,8 @@
                     slotDiv.className = 'slot';
                     const item = me.inventory[i];
                     if (item) {
-                        slotDiv.innerText = item.icon;
-                        slotDiv.title = `${item.name} (${item.rarity})`;
+                        slotDiv.innerHTML = `<span>${item.icon}</span>`;
+                        slotDiv.title = `${item.name} [${item.rarity}]`;
                     } else {
                         slotDiv.style.color = '#777';
                         slotDiv.innerText = i + 1;
