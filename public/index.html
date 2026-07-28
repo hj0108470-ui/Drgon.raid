@@ -2,71 +2,178 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>아이들 보스 레이드 - 플레이어</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>실시간 멀티 방치형 보스 레이드</title>
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
     <style>
-        body { font-family: sans-serif; background: #1e1e1e; color: #fff; text-align: center; margin: 0; padding: 20px; }
-        .box { background: #2d2d2d; padding: 15px; margin: 10px auto; width: 360px; border-radius: 8px; }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #ff4757; color: white; border: none; border-radius: 5px; margin: 5px; }
-        button:hover { background: #ff6b81; }
-        .inv-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; margin-top: 10px; }
-        .slot { background: #3d3d3d; height: 45px; display: flex; align-items: center; justify-content: center; font-size: 12px; border-radius: 4px; border: 1px solid #444; }
+        body { font-family: sans-serif; background: #0f1016; color: #fff; text-align: center; margin: 0; padding: 10px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        .card { background: #1a1c23; border-radius: 12px; padding: 15px; margin-bottom: 12px; border: 1px solid #2a2e3d; }
+        .boss-card { border: 2px solid #e74c3c; }
+        .boss-icon { font-size: 65px; margin: 5px 0; }
+        .hp-bar-bg { background: #333; height: 22px; border-radius: 11px; overflow: hidden; margin: 10px 0; }
+        .hp-bar-fill { background: #e74c3c; height: 100%; width: 100%; transition: width 0.2s; }
+        .btn { background: #e67e22; border: none; padding: 14px; color: #fff; font-size: 16px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; }
+        .btn-gacha { background: #8e44ad; margin-top: 5px; }
+        .inventory-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; margin-top: 10px; }
+        .slot { background: #222530; border: 1px solid #3a3f52; height: 50px; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; cursor: pointer; }
+        .slot.equipped { border-color: #f1c40f; background: #3d3512; }
+        .ranking-list { text-align: left; font-size: 13px; max-height: 120px; overflow-y: auto; margin: 0; padding-left: 15px; }
+        .modal { display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 100; }
+        .modal-content { background: #222530; padding: 20px; border-radius: 10px; width: 280px; border: 1px solid #555; }
+        input { padding: 8px; border-radius: 4px; border: 1px solid #444; background: #111; color: #fff; width: 80%; margin-bottom: 10px; }
     </style>
 </head>
 <body>
-    <h1>⚔️ 방치형 보스 레이드</h1>
-    
-    <div class="box">
-        <h3 id="boss-name">보스 이름</h3>
-        <p>HP: <span id="boss-hp">0</span> / <span id="boss-max-hp">0</span></p>
-        <button onclick="attackBoss()">⚔️ 공격하기 (+150G)</button>
+    <!-- 🏷️ 최초 접속 시 닉네임 설정 모달 -->
+    <div id="nicknameModal" class="modal">
+        <div class="modal-content">
+            <h3 style="color:#f1c40f;">✨ 용사 닉네임 설정</h3>
+            <p style="font-size: 12px; color: #aaa;">랭킹에 표시될 이름을 입력해주세요!</p>
+            <input type="text" id="nicknameInput" placeholder="닉네임 입력 (최대 12글자)" maxlength="12">
+            <button class="btn" style="padding: 10px;" onclick="saveNickname()">확인</button>
+        </div>
     </div>
 
-    <div class="box">
-        <h3>💰 플레이어 재화</h3>
-        <p>보유 골드: <span id="player-gold">0</span> G</p>
-        <button onclick="doGacha()">🎲 무기 뽑기 (1,000G)</button>
+    <div class="container">
+        <!-- 🏆 실시간 랭킹판 -->
+        <div class="card" style="border: 2px solid #f1c40f;">
+            <h3 style="margin: 0 0 8px 0; color: #f1c40f;">🏆 실시간 데미지 랭킹</h3>
+            <ol id="rankingList" class="ranking-list"></ol>
+        </div>
+
+        <div class="card boss-card">
+            <div id="bossIcon" class="boss-icon">⚔️</div>
+            <h2 id="bossName">🔄 서버 연결 중...</h2>
+            <div class="hp-bar-bg"><div id="bossHpFill" class="hp-bar-fill"></div></div>
+            <p id="bossHpText">0 / 0</p>
+            <button class="btn" onclick="attack()">⚔️ 공격하기</button>
+        </div>
+        
+        <div class="card">
+            <h3>🎰 무기 상점</h3>
+            <button class="btn btn-gacha" onclick="gacha()">🎲 무기 뽑기 (1,000G)</button>
+        </div>
+
+        <div class="card">
+            <h3>🛡️ 내 정보</h3>
+            <p>닉네임: <strong id="myName" style="color:#f1c40f;">-</strong> <button style="font-size:10px; padding:2px 6px;" onclick="openNicknameModal()">변경</button></p>
+            <p>❤️ HP: <span id="myHp">100</span>/100 | 💰 골드: <span id="myGold">500</span> G</p>
+            <div>
+                <input type="text" id="couponInput" placeholder="쿠폰 입력" style="width: 60%; margin-bottom: 0;">
+                <button style="padding:8px;" onclick="useCoupon()">사용</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>🎒 무기고 (36칸)</h3>
+            <div class="inventory-grid" id="inventoryGrid"></div>
+        </div>
     </div>
 
-    <div class="box" style="width: 420px;">
-        <h3>🎒 인벤토리 (36칸)</h3>
-        <div id="inventory-grid" class="inv-grid"></div>
+    <div id="fullModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3 style="color:#e74c3c;">⚠️ 인벤토리 가득 참!</h3>
+            <p id="dropItemText"></p>
+            <button class="btn" onclick="closeModal()">확인</button>
+        </div>
     </div>
 
-    <script src="/socket.io/socket.io.js"></script>
     <script>
-        const socket = io();
+        const socket = io({ transports: ['websocket', 'polling'] });
+        let myId = null;
 
-        function attackBoss() { socket.emit('attack'); }
-        function doGacha() { socket.emit('gacha'); }
+        socket.on('connect', () => { myId = socket.id; });
+
+        function saveNickname() {
+            const name = document.getElementById('nicknameInput').value.trim();
+            if (!name) {
+                alert('닉네임을 입력해주세요!');
+                return;
+            }
+            socket.emit('setNickname', name);
+            document.getElementById('nicknameModal').style.display = 'none';
+        }
+
+        function openNicknameModal() {
+            document.getElementById('nicknameModal').style.display = 'flex';
+        }
 
         socket.on('updateState', (state) => {
-            document.getElementById('boss-name').innerText = state.boss.name;
-            document.getElementById('boss-hp').innerText = state.boss.currentHp;
-            document.getElementById('boss-max-hp').innerText = state.boss.maxHp;
+            if (!state || !state.boss) return;
 
-            const me = state.players[socket.id];
+            const bossParts = state.boss.name.split(' ');
+            if (bossParts.length >= 2) {
+                document.getElementById('bossIcon').innerText = bossParts[0];
+                document.getElementById('bossName').innerText = bossParts.slice(1).join(' ');
+            } else {
+                document.getElementById('bossIcon').innerText = '👾';
+                document.getElementById('bossName').innerText = state.boss.name;
+            }
+
+            const bossHpPct = (state.boss.currentHp / state.boss.maxHp) * 100;
+            document.getElementById('bossHpFill').style.width = Math.max(0, bossHpPct) + '%';
+            document.getElementById('bossHpText').innerText = Math.max(0, state.boss.currentHp) + ' / ' + state.boss.maxHp;
+            
+            // 🏆 실시간 랭킹판 렌더링
+            const rankingList = document.getElementById('rankingList');
+            rankingList.innerHTML = '';
+            const sortedPlayers = Object.values(state.players).sort((a, b) => (b.totalDamage || 0) - (a.totalDamage || 0));
+            sortedPlayers.slice(0, 5).forEach((p, index) => {
+                const li = document.createElement('li');
+                const isMe = p.id === myId ? ' (나)' : '';
+                li.innerText = `${p.name}${isMe} - ${p.totalDamage || 0} 데미지`;
+                rankingList.appendChild(li);
+            });
+
+            const me = state.players[myId];
             if (me) {
-                document.getElementById('player-gold').innerText = me.gold;
-
-                const grid = document.getElementById('inventory-grid');
+                document.getElementById('myName').innerText = me.name;
+                document.getElementById('myHp').innerText = me.hp;
+                document.getElementById('myGold').innerText = me.gold;
+                const grid = document.getElementById('inventoryGrid');
                 grid.innerHTML = '';
-                for (let i = 0; i < state.maxInventorySlots; i++) {
-                    const slotDiv = document.createElement('div');
-                    slotDiv.className = 'slot';
+                for (let i = 0; i < 36; i++) {
+                    const slot = document.createElement('div');
+                    slot.className = 'slot';
                     const item = me.inventory[i];
                     if (item) {
-                        slotDiv.innerHTML = `<span>${item.icon}</span>`;
-                        slotDiv.title = `${item.name} [${item.rarity}]`;
-                    } else {
-                        slotDiv.style.color = '#777';
-                        slotDiv.innerText = i + 1;
-                    }
-                    grid.appendChild(slotDiv);
+                        if (me.equippedIndex === i) slot.classList.add('equipped');
+                        slot.innerHTML = '<div>' + item.icon + '</div><div>+' + (item.enhance||0) + '</div>';
+                        slot.onclick = () => showItemMenu(i, item);
+                    } else { slot.innerText = '빈칸'; }
+                    grid.appendChild(slot);
                 }
             }
         });
 
-        socket.on('notify', (msg) => { alert(msg); });
+        function attack() { socket.emit('attack'); }
+        function gacha() { socket.emit('drawGacha'); }
+        function useCoupon() {
+            const code = document.getElementById('couponInput').value.trim();
+            if (code) socket.emit('useCoupon', code);
+        }
+        
+        socket.on('couponResult', (res) => alert(res.message));
+        socket.on('gachaResult', (res) => {
+            if (!res.success) alert(res.message);
+            else alert('🎉 획득: ' + res.weapon.icon + ' [' + res.weapon.rarity + '] ' + res.weapon.name);
+        });
+        socket.on('enhanceResult', (res) => alert(res.message));
+        socket.on('itemObtained', (data) => {
+            if (data.full) {
+                document.getElementById('dropItemText').innerText = '가방 포화로 드랍 실패: ' + data.weapon.name;
+                document.getElementById('fullModal').style.display = 'flex';
+            } else { alert('👑 막타 보상 획득: ' + data.weapon.name); }
+        });
+        
+        function closeModal() { document.getElementById('fullModal').style.display = 'none'; }
+        function showItemMenu(index, item) {
+            const act = prompt('[' + item.name + ' +' + (item.enhance||0) + ']\n1. 장착/해제\n2. 강화 (' + ((item.enhance+1)*500) + 'G)\n3. 판매 (' + item.sellPrice + 'G)');
+            if (act === '1') socket.emit('equipItem', index);
+            if (act === '2') socket.emit('enhanceItem', index);
+            if (act === '3') socket.emit('sellItem', index);
+        }
     </script>
 </body>
 </html>
