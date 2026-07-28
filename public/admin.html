@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>👑 GM 관제 센터</title>
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <style>
+        body { font-family: sans-serif; background: #0b0c10; color: #66fcf1; padding: 15px; }
+        .btn-gm { background: #45a29e; border: none; color: #fff; padding: 8px; margin: 3px; border-radius: 4px; cursor: pointer; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; color: #fff; }
+        th, td { border: 1px solid #45a29e; padding: 8px; text-align: center; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <h2>👑 GM 관제 센터</h2>
+    <div style="background:#1f2833; padding:12px; border-radius:8px;">
+        <p>현재 보스: <strong id="bossStatus">-</strong></p>
+        <button class="btn-gm" onclick="spawnBoss('pig')">🐷 꿀신 소환</button>
+        <button class="btn-gm" onclick="spawnBoss('goliath')">🗿 골리앗 소환</button>
+        <button class="btn-gm" onclick="spawnBoss('iraso')">🦖 이라소 소환</button>
+        <button class="btn-gm" onclick="spawnBoss('dragon')">🐉 드래곤 소환</button>
+        <button class="btn-gm" style="background:#c0392b;" onclick="killBoss()">💥 보스 즉사</button>
+    </div>
+    <table>
+        <thead><tr><th>ID</th><th>HP</th><th>골드</th><th>인벤</th><th>관리</th></tr></thead>
+        <tbody id="playerTable"></tbody>
+    </table>
+    <script>
+        const socket = io({ transports: ['websocket', 'polling'] });
+        socket.on('updateState', (state) => {
+            if(!state || !state.boss) return;
+            document.getElementById('bossStatus').innerText = state.boss.name + ' (' + state.boss.currentHp + '/' + state.boss.maxHp + ')';
+            const tbody = document.getElementById('playerTable');
+            tbody.innerHTML = '';
+            Object.values(state.players).forEach(p => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = '<td>' + p.id.substring(0, 5) + '</td><td>' + p.hp + '</td><td>' + p.gold + 'G</td><td>' + p.inventory.length + '/36</td>' +
+                    '<td><button class="btn-gm" onclick="giveGold(\'' + p.id + '\')">+1만G</button><button class="btn-gm" onclick="giveMythic(\'' + p.id + '\')">신화템</button></td>';
+                tbody.appendChild(tr);
+            });
+        });
+        function spawnBoss(type) { socket.emit('adminAction', { action: 'spawnBoss', payload: type }); }
+        function killBoss() { socket.emit('adminAction', { action: 'killBoss' }); }
+        function giveGold(id) { socket.emit('adminAction', { action: 'giveGold', payload: { targetId: id, amount: 10000 } }); }
+        function giveMythic(id) { socket.emit('adminAction', { action: 'giveMythic', payload: { targetId: id } }); }
+    </script>
+</body>
+</html>
