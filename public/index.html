@@ -6,17 +6,51 @@
     <title>실시간 멀티 방치형 보스 레이드</title>
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
     <style>
-        body { font-family: sans-serif; background: #0f1016; color: #fff; text-align: center; margin: 0; padding: 10px; }
+        body { font-family: sans-serif; background: #0f1016; color: #fff; text-align: center; margin: 0; padding: 10px; overflow-x: hidden; }
         .container { max-width: 600px; margin: 0 auto; }
-        .card { background: #1a1c23; border-radius: 12px; padding: 15px; margin-bottom: 12px; border: 1px solid #2a2e3d; }
+        .card { background: #1a1c23; border-radius: 12px; padding: 15px; margin-bottom: 12px; border: 1px solid #2a2e3d; position: relative; }
         .boss-card { border: 2px solid #e74c3c; }
-        .boss-icon { font-size: 65px; margin: 5px 0; }
+        
+        /* 💥 보스 피격 넉백 애니메이션 효과 */
+        @keyframes hitEffect {
+            0% { transform: translate(0, 0) scale(1); }
+            20% { transform: translate(-6px, 3px) scale(0.95); filter: brightness(1.5); }
+            40% { transform: translate(6px, -3px) scale(1.05); }
+            60% { transform: translate(-4px, -2px) scale(0.98); }
+            80% { transform: translate(4px, 2px) scale(1.02); }
+            100% { transform: translate(0, 0) scale(1); filter: brightness(1); }
+        }
+        .hit-anim { animation: hitEffect 0.3s ease; }
+
+        .boss-icon { font-size: 65px; margin: 5px 0; display: inline-block; transition: transform 0.1s; }
         .hp-bar-bg { background: #333; height: 22px; border-radius: 11px; overflow: hidden; margin: 10px 0; }
         .hp-bar-fill { background: #e74c3c; height: 100%; width: 100%; transition: width 0.2s; }
         .btn-group { display: flex; gap: 10px; margin-top: 10px; }
         .btn { background: #e67e22; border: none; padding: 14px; color: #fff; font-size: 16px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; }
         .btn-skill { background: #9b59b6; }
         .btn-gacha { background: #f1c40f; color: #000; }
+        
+        /* 💥 데미지 팝업 텍스트 스타일 */
+        .damage-popup {
+            position: absolute;
+            font-weight: bold;
+            font-size: 22px;
+            color: #f1c40f;
+            text-shadow: 2px 2px 0 #000, -2px -2px 0 #000;
+            pointer-events: none;
+            animation: floatUp 0.8s ease-out forwards;
+            z-index: 50;
+        }
+        .damage-popup.skill {
+            color: #e74c3c;
+            font-size: 28px;
+        }
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            50% { transform: translateY(-30px) scale(1.2); }
+            100% { opacity: 0; transform: translateY(-60px) scale(1); }
+        }
+
         .inventory-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; margin-top: 10px; }
         .slot { background: #222530; border: 1px solid #3a3f52; height: 50px; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; cursor: pointer; }
         .slot.equipped { border-color: #f1c40f; background: #3d3512; }
@@ -37,13 +71,15 @@
     </div>
 
     <div class="container">
-        <div class="card boss-card">
+        <!-- 보스 카드 영역 -->
+        <div class="card boss-card" id="bossCardArea">
             <div id="bossIcon" class="boss-icon">⚔️</div>
             <h2 id="bossName">🔄 서버 연결 중...</h2>
             <div class="hp-bar-bg"><div id="bossHpFill" class="hp-bar-fill"></div></div>
             <p id="bossHpText">0 / 0</p>
+            
             <div class="btn-group">
-                <button class="btn" onclick="attack()">⚔️ 공격</button>
+                <button class="btn" onclick="attack()">⚔️ 일반 공격</button>
                 <button class="btn btn-skill" onclick="useSkill()">⚡ 필살기 스킬</button>
             </div>
         </div>
@@ -103,36 +139,36 @@
             document.getElementById('nicknameModal').style.display = 'flex';
         }
 
-        function attack() { socket.emit('attack'); }
-        function useSkill() { socket.emit('useSkill'); }
+        // 💥 데미지 팝업 및 보스 넉백 연출 함수
+        function triggerHitEffect(isSkill = false) {
+            const bossIcon = document.getElementById('bossIcon');
+            bossIcon.classList.remove('hit-anim');
+            void bossIcon.offsetWidth; 
+            bossIcon.classList.add('hit-anim');
+        }
+
+        function attack() { 
+            triggerHitEffect(false);
+            socket.emit('attack'); 
+        }
+        
+        function useSkill() { 
+            socket.emit('useSkill'); 
+        }
+
         function gacha() { socket.emit('drawGacha'); }
         function useCoupon() {
             const code = document.getElementById('couponInput').value.trim();
             if (code) socket.emit('useCoupon', code);
         }
 
-        socket.on('skillResult', (res) => { if (!res.success) alert(res.message); });
-        socket.on('couponResult', (res) => alert(res.message));
-        socket.on('gachaResult', (res) => {
-            if (!res.success) alert(res.message);
-            else alert('🎉 획득: ' + res.weapon.icon + ' [' + res.weapon.rarity + '] ' + res.weapon.name);
+        socket.on('skillResult', (res) => { 
+            if (!res.success) {
+                alert(res.message); 
+            } else {
+                triggerHitEffect(true);
+            }
         });
-        socket.on('enhanceResult', (res) => alert(res.message));
-        socket.on('itemObtained', (data) => {
-            if (data.full) {
-                document.getElementById('dropItemText').innerText = '가방 포화로 드랍 실패: ' + data.weapon.name;
-                document.getElementById('fullModal').style.display = 'flex';
-            } else { alert('👑 막타 보상 획득: ' + data.weapon.name); }
-        });
-        
-        function closeModal() { document.getElementById('fullModal').style.display = 'none'; }
-        
-        function showItemMenu(index, item) {
-            const act = prompt('[' + item.name + ' +' + (item.enhance||0) + ']\n1. 장착/해제\n2. 강화 (' + ((item.enhance+1)*500) + 'G)\n3. 판매 (' + item.sellPrice + 'G)');
-            if (act === '1') socket.emit('equipItem', index);
-            if (act === '2') socket.emit('enhanceItem', index);
-            if (act === '3') socket.emit('sellItem', index);
-        }
 
         socket.on('updateState', (state) => {
             if (!state || !state.boss) return;
@@ -181,6 +217,28 @@
                 }
             }
         });
+
+        socket.on('couponResult', (res) => alert(res.message));
+        socket.on('gachaResult', (res) => {
+            if (!res.success) alert(res.message);
+            else alert('🎉 획득: ' + res.weapon.icon + ' [' + res.weapon.rarity + '] ' + res.weapon.name);
+        });
+        socket.on('enhanceResult', (res) => alert(res.message));
+        socket.on('itemObtained', (data) => {
+            if (data.full) {
+                document.getElementById('dropItemText').innerText = '가방 포화로 드랍 실패: ' + data.weapon.name;
+                document.getElementById('fullModal').style.display = 'flex';
+            } else { alert('👑 막타 보상 획득: ' + data.weapon.name); }
+        });
+        
+        function closeModal() { document.getElementById('fullModal').style.display = 'none'; }
+        
+        function showItemMenu(index, item) {
+            const act = prompt('[' + item.name + ' +' + (item.enhance||0) + ']\n1. 장착/해제\n2. 강화 (' + ((item.enhance+1)*500) + 'G)\n3. 판매 (' + item.sellPrice + 'G)');
+            if (act === '1') socket.emit('equipItem', index);
+            if (act === '2') socket.emit('enhanceItem', index);
+            if (act === '3') socket.emit('sellItem', index);
+        }
     </script>
 </body>
 </html>
