@@ -11,6 +11,19 @@
         .main-container { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 420px; }
         .panel { background: #1f2833; padding: 15px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); position: relative; box-sizing: border-box; width: 100%; }
         .boss-panel { text-align: center; background: #0b0c10; border: 2px solid #45a29e; }
+        
+        /* 🦖 보스 위아래 둥실둥실 움직이는 애니메이션 & 대형 크기 */
+        @keyframes bossFloat {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-8px); }
+            100% { transform: translateY(0px); }
+        }
+        .boss-avatar { font-size: 55px; margin: 5px 0; display: inline-block; animation: bossFloat 2.5s ease-in-out infinite; }
+        .boss-name-text { font-size: 20px; font-weight: bold; margin: 0 0 5px 0; color: #66fcf1; }
+
+        /* ✨ 스킬 칸 스타일 */
+        .skill-box { background: rgba(69, 162, 158, 0.15); border: 1px solid #45a29e; border-radius: 6px; padding: 8px; margin: 8px 0; text-align: center; font-size: 13px; }
+
         .hp-bar-bg { background: #333; height: 22px; border-radius: 11px; overflow: hidden; margin: 10px 0; }
         .hp-bar-fill { background: #e74c3c; height: 100%; width: 100%; transition: width 0.2s; }
         button { background: #45a29e; border: none; color: #fff; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; margin: 4px 0; width: 100%; transition: 0.2s; font-size: 14px; }
@@ -21,8 +34,8 @@
         .rank-list { font-size: 12px; text-align: left; padding: 0; list-style: none; margin: 5px 0 0 0; }
         .rank-list li { padding: 3px 0; border-bottom: 1px solid #333; }
         
-        /* 스킬 이펙트 & 필드 드랍 스타일 */
-        #effectOverlay { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); font-weight: bold; font-size: 16px; pointer-events: none; transition: 0.3s; opacity: 0; text-shadow: 0 0 5px #000; }
+        /* 타격 이펙트 & 필드 드랍 스타일 */
+        #effectOverlay { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); font-weight: bold; font-size: 16px; pointer-events: none; transition: 0.3s; opacity: 0; text-shadow: 0 0 5px #000; z-index: 10; }
         .field-drop-box { background: rgba(231, 76, 60, 0.2); border: 1px dashed #e74c3c; padding: 8px; margin-top: 10px; border-radius: 6px; text-align: center; }
         .drop-item-btn { background: #e67e22; font-size: 11px; padding: 4px 8px; width: auto; display: inline-block; }
     </style>
@@ -35,7 +48,16 @@
         <!-- 1. 보스 전투 패널 (상단) -->
         <div class="panel boss-panel">
             <div id="effectOverlay">✨ 스킬 발동!</div>
-            <h2 id="bossName" style="margin: 5px 0; font-size: 18px;">보스 이름</h2>
+            
+            <!-- 보스 아바타 및 이름 (대형화 + 상하 무빙) -->
+            <div id="bossAvatar" class="boss-avatar">🐷</div>
+            <div id="bossName" class="boss-name-text">꿀신</div>
+
+            <!-- ✨ 스킬 칸 추가 -->
+            <div class="skill-box">
+                ⚡ 장착 중인 스킬: <span id="currentSkillName" style="color: #f1c40f; font-weight: bold;">없음 (기본 공격)</span>
+            </div>
+
             <div class="hp-bar-bg"><div id="bossHpFill" class="hp-bar-fill"></div></div>
             <p id="bossHpText" style="font-weight: bold; font-size: 14px; margin: 5px 0;">0 / 0</p>
             <button id="attackBtn" style="background:#e74c3c; font-size:15px; padding:12px;" onclick="attackBoss()">🗡️ 공격하기</button>
@@ -98,11 +120,29 @@
             myData = state.players[socket.id];
             if (!myData) return;
 
-            // 보스 정보 갱신
-            document.getElementById('bossName').innerText = state.boss.name;
+            // 보스 정보 및 이모지 분리 갱신
+            const fullBossName = state.boss.name; // 예: "🐷 꿀신"
+            const parts = fullBossName.split(' ');
+            if (parts.length >= 2) {
+                document.getElementById('bossAvatar').innerText = parts[0];
+                document.getElementById('bossName').innerText = parts.slice(1).join(' ');
+            } else {
+                document.getElementById('bossAvatar').innerText = '👾';
+                document.getElementById('bossName').innerText = fullBossName;
+            }
+
             const hpPercent = Math.max(0, (state.boss.currentHp / state.boss.maxHp) * 100);
             document.getElementById('bossHpFill').style.width = hpPercent + '%';
             document.getElementById('bossHpText').innerText = `${state.boss.currentHp.toLocaleString()} / ${state.boss.maxHp.toLocaleString()}`;
+
+            // 장착 중인 무기 스킬 정보 표시
+            const skillNameSpan = document.getElementById('currentSkillName');
+            if (myData.equippedIndex !== null && myData.inventory[myData.equippedIndex]) {
+                const eqItem = myData.inventory[myData.equippedIndex];
+                skillNameSpan.innerText = `${eqItem.skillName || '기본 공격'} (${eqItem.name})`;
+            } else {
+                skillNameSpan.innerText = '없음 (기본 주먹질)';
+            }
 
             // 내 정보 갱신
             document.getElementById('pName').innerText = myData.name;
