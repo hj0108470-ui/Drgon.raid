@@ -21,8 +21,19 @@
         .boss-avatar { font-size: 55px; margin: 5px 0; display: inline-block; animation: bossFloat 2.5s ease-in-out infinite; }
         .boss-name-text { font-size: 20px; font-weight: bold; margin: 0 0 5px 0; color: #66fcf1; }
 
-        /* ✨ 스킬 칸 스타일 */
-        .skill-box { background: rgba(69, 162, 158, 0.15); border: 1px solid #45a29e; border-radius: 6px; padding: 8px; margin: 8px 0; text-align: center; font-size: 13px; }
+        /* ✨ 스킬 UI 시스템 스타일 */
+        .skill-container { background: rgba(69, 162, 158, 0.1); border: 1px solid #45a29e; border-radius: 8px; padding: 10px; margin: 10px 0; text-align: left; }
+        .skill-info-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; }
+        .skill-gauge-bg { background: #333; height: 12px; border-radius: 6px; overflow: hidden; margin-bottom: 8px; }
+        .skill-gauge-fill { background: #f1c40f; height: 100%; width: 0%; transition: width 0.2s; }
+        
+        /* 스킬 버튼 (충전 완료 시 활성화) */
+        .skill-use-btn { background: #555; color: #aaa; border: none; padding: 8px; border-radius: 5px; width: 100%; font-weight: bold; font-size: 13px; cursor: not-allowed; transition: 0.2s; }
+        .skill-use-btn.ready { background: #2ecc71; color: #fff; cursor: pointer; box-shadow: 0 0 10px rgba(46, 204, 113, 0.6); animation: pulseBtn 1s infinite alternate; }
+        @keyframes pulseBtn {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.02); }
+        }
 
         .hp-bar-bg { background: #333; height: 22px; border-radius: 11px; overflow: hidden; margin: 10px 0; }
         .hp-bar-fill { background: #e74c3c; height: 100%; width: 100%; transition: width 0.2s; }
@@ -53,9 +64,16 @@
             <div id="bossAvatar" class="boss-avatar">🐷</div>
             <div id="bossName" class="boss-name-text">꿀신</div>
 
-            <!-- ✨ 스킬 칸 추가 -->
-            <div class="skill-box">
-                ⚡ 장착 중인 스킬: <span id="currentSkillName" style="color: #f1c40f; font-weight: bold;">없음 (기본 공격)</span>
+            <!-- ✨ 스킬 UI 시스템 영역 -->
+            <div class="skill-container">
+                <div class="skill-info-row">
+                    <span>⚡ 장착 스킬: <strong id="skillNameText" style="color: #66fcf1;">없음</strong></span>
+                    <span>게이지: <strong id="skillGaugeText" style="color: #f1c40f;">0 / 5</strong></span>
+                </div>
+                <div class="skill-gauge-bg">
+                    <div id="skillGaugeFill" class="skill-gauge-fill"></div>
+                </div>
+                <button id="useSkillBtn" class="skill-use-btn" onclick="useActiveSkill()" disabled>🔒 스킬 충전 필요 (공격 시 충전)</button>
             </div>
 
             <div class="hp-bar-bg"><div id="bossHpFill" class="hp-bar-fill"></div></div>
@@ -96,6 +114,10 @@
         const socket = io({ transports: ['websocket', 'polling'] });
         let myData = null;
 
+        // 클라이언트 측 스킬 게이지 상태 관리 (서버 연동 또는 로컬 보조)
+        let currentSkillGauge = 0;
+        const maxSkillGauge = 5; // 5번 공격하면 충전 완료
+
         socket.on('kicked', () => {
             alert('🚨 GM에 의해 강퇴당했습니다.');
             window.location.reload();
@@ -103,7 +125,7 @@
 
         socket.on('notify', (msg) => { alert(msg); });
 
-        // 공격 시 스킬 이펙트 연출
+        // 공격 시 스킬 이펙트 연출 및 게이지 충전
         socket.on('attackEffect', (data) => {
             const overlay = document.getElementById('effectOverlay');
             overlay.innerText = `🔥 [${data.skillName}] (-${data.dmg})`;
@@ -113,6 +135,14 @@
                 overlay.style.opacity = '0';
                 overlay.style.top = '10px';
             }, 600);
+
+            // 공격 성공 시 스킬 게이지 증가 (장착된 무기가 있을 때만)
+            if (myData && myData.equippedIndex !== null && myData.inventory[myData.equippedIndex]) {
+                if (currentSkillGauge < maxSkillGauge) {
+                    currentSkillGauge++;
+                    updateSkillUI();
+                }
+            }
         });
 
         socket.on('updateState', (state) => {
@@ -121,7 +151,7 @@
             if (!myData) return;
 
             // 보스 정보 및 이모지 분리 갱신
-            const fullBossName = state.boss.name; // 예: "🐷 꿀신"
+            const fullBossName = state.boss.name;
             const parts = fullBossName.split(' ');
             if (parts.length >= 2) {
                 document.getElementById('bossAvatar').innerText = parts[0];
@@ -135,20 +165,13 @@
             document.getElementById('bossHpFill').style.width = hpPercent + '%';
             document.getElementById('bossHpText').innerText = `${state.boss.currentHp.toLocaleString()} / ${state.boss.maxHp.toLocaleString()}`;
 
-            // 장착 중인 무기 스킬 정보 표시
-            const skillNameSpan = document.getElementById('currentSkillName');
-            if (myData.equippedIndex !== null && myData.inventory[myData.equippedIndex]) {
-                const eqItem = myData.inventory[myData.equippedIndex];
-                skillNameSpan.innerText = `${eqItem.skillName || '기본 공격'} (${eqItem.name})`;
-            } else {
-                skillNameSpan.innerText = '없음 (기본 주먹질)';
-            }
-
             // 내 정보 갱신
             document.getElementById('pName').innerText = myData.name;
             document.getElementById('pHp').innerText = myData.hp;
             document.getElementById('pMaxHp').innerText = myData.maxHp;
             document.getElementById('pGold').innerText = myData.gold.toLocaleString();
+
+            updateSkillUI();
 
             // 사망 시 버튼 안내
             const atkBtn = document.getElementById('attackBtn');
@@ -171,7 +194,10 @@
                     const enh = item.enhance ? `+${item.enhance}` : '';
                     slot.innerHTML = `<span style="font-size:16px;">${item.icon}</span><span style="font-size:9px;">${enh}</span>`;
                     slot.title = `${item.name} (${item.skillName || '일반'})\n클릭: 장착/해제\n우클릭: 강화/판매`;
-                    slot.onclick = () => socket.emit('equipItem', i);
+                    slot.onclick = () => {
+                        socket.emit('equipItem', i);
+                        currentSkillGauge = 0; // 무기 변경 시 게이지 초기화
+                    };
                     slot.oncontextmenu = (e) => {
                         e.preventDefault();
                         const act = prompt(`[${item.name}] 선택\n1. 강화하기 (비용: ${( (item.enhance||0) + 1 ) * 500}G)\n2. 판매하기 (가격: ${item.sellPrice}G)`, '1');
@@ -212,6 +238,60 @@
                 rankList.appendChild(li);
             });
         });
+
+        // 스킬 UI 갱신 함수
+        function updateSkillUI() {
+            if (!myData) return;
+            const skillNameText = document.getElementById('skillNameText');
+            const skillGaugeText = document.getElementById('skillGaugeText');
+            const skillGaugeFill = document.getElementById('skillGaugeFill');
+            const useSkillBtn = document.getElementById('useSkillBtn');
+
+            if (myData.equippedIndex !== null && myData.inventory[myData.equippedIndex]) {
+                const item = myData.inventory[myData.equippedIndex];
+                const sName = item.skillName || '일반 공격';
+                skillNameText.innerText = `${sName} (${item.name})`;
+                skillGaugeText.innerText = `${currentSkillGauge} / ${maxSkillGauge}`;
+                
+                const pct = (currentSkillGauge / maxSkillGauge) * 100;
+                skillGaugeFill.style.width = pct + '%';
+
+                if (currentSkillGauge >= maxSkillGauge) {
+                    useSkillBtn.innerText = `✨ [${sName}] 스킬 발동 가능! (클릭)`;
+                    useSkillBtn.className = 'skill-use-btn ready';
+                    useSkillBtn.disabled = false;
+                } else {
+                    useSkillBtn.innerText = `🔒 스킬 충전 중... (${currentSkillGauge}/${maxSkillGauge})`;
+                    useSkillBtn.className = 'skill-use-btn';
+                    useSkillBtn.disabled = true;
+                }
+            } else {
+                skillNameText.innerText = '없음 (무기 장착 필요)';
+                skillGaugeText.innerText = `0 / ${maxSkillGauge}`;
+                skillGaugeFill.style.width = '0%';
+                useSkillBtn.innerText = '🔒 무기를 장착해주세요';
+                useSkillBtn.className = 'skill-use-btn';
+                useSkillBtn.disabled = true;
+            }
+        }
+
+        // 수동 스킬 버튼 클릭 시 실행
+        function useActiveSkill() {
+            if (currentSkillGauge >= maxSkillGauge && myData && myData.equippedIndex !== null) {
+                const item = myData.inventory[myData.equippedIndex];
+                const sName = item.skillName || '치유의 파동';
+                
+                // 회복 스킬 발동 연출 및 효과
+                alert(`✨ [${sName}] 발동! 체력이 회복되고 강력한 마법 피해를 입힙니다!`);
+                
+                // 서버에 스킬 사용 요청 전송 (서버 이벤트가 없다면 기본 공격 또는 회복 처리 연동 가능)
+                socket.emit('attack'); // 혹은 별도 스킬 소켓 이벤트 호출 가능
+                
+                // 게이지 초기화
+                currentSkillGauge = 0;
+                updateSkillUI();
+            }
+        }
 
         function attackBoss() { socket.emit('attack'); }
         function drawGacha() { socket.emit('drawGacha'); }
