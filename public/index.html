@@ -113,10 +113,8 @@
     <script>
         const socket = io({ transports: ['websocket', 'polling'] });
         let myData = null;
-
-        // 클라이언트 측 스킬 게이지 상태 관리 (서버 연동 또는 로컬 보조)
         let currentSkillGauge = 0;
-        const maxSkillGauge = 5; // 5번 공격하면 충전 완료
+        const maxSkillGauge = 5; // 공격 5회 시 스킬 충전 완료
 
         socket.on('kicked', () => {
             alert('🚨 GM에 의해 강퇴당했습니다.');
@@ -136,7 +134,7 @@
                 overlay.style.top = '10px';
             }, 600);
 
-            // 공격 성공 시 스킬 게이지 증가 (장착된 무기가 있을 때만)
+            // 장착 중인 무기가 있을 때만 게이지 증가 (최대 5)
             if (myData && myData.equippedIndex !== null && myData.inventory[myData.equippedIndex]) {
                 if (currentSkillGauge < maxSkillGauge) {
                     currentSkillGauge++;
@@ -196,7 +194,7 @@
                     slot.title = `${item.name} (${item.skillName || '일반'})\n클릭: 장착/해제\n우클릭: 강화/판매`;
                     slot.onclick = () => {
                         socket.emit('equipItem', i);
-                        currentSkillGauge = 0; // 무기 변경 시 게이지 초기화
+                        currentSkillGauge = 0; // 무기 교체 시 게이지 초기화
                     };
                     slot.oncontextmenu = (e) => {
                         e.preventDefault();
@@ -249,7 +247,7 @@
 
             if (myData.equippedIndex !== null && myData.inventory[myData.equippedIndex]) {
                 const item = myData.inventory[myData.equippedIndex];
-                const sName = item.skillName || '일반 공격';
+                const sName = item.skillName || '특수 스킬';
                 skillNameText.innerText = `${sName} (${item.name})`;
                 skillGaugeText.innerText = `${currentSkillGauge} / ${maxSkillGauge}`;
                 
@@ -275,20 +273,11 @@
             }
         }
 
-        // 수동 스킬 버튼 클릭 시 실행
+        // 수동 스킬 버튼 클릭 시 서버로 요청 전송
         function useActiveSkill() {
             if (currentSkillGauge >= maxSkillGauge && myData && myData.equippedIndex !== null) {
-                const item = myData.inventory[myData.equippedIndex];
-                const sName = item.skillName || '치유의 파동';
-                
-                // 회복 스킬 발동 연출 및 효과
-                alert(`✨ [${sName}] 발동! 체력이 회복되고 강력한 마법 피해를 입힙니다!`);
-                
-                // 서버에 스킬 사용 요청 전송 (서버 이벤트가 없다면 기본 공격 또는 회복 처리 연동 가능)
-                socket.emit('attack'); // 혹은 별도 스킬 소켓 이벤트 호출 가능
-                
-                // 게이지 초기화
-                currentSkillGauge = 0;
+                socket.emit('useSkill');
+                currentSkillGauge = 0; // 게이지 초기화
                 updateSkillUI();
             }
         }
