@@ -22,37 +22,31 @@ const BOSS_LIST = [
     { name: '🐉 드래곤', maxHp: 100000, currentHp: 100000 }
 ];
 
-// ⚔️ 4가지 타입(검, 활, 방패, 힐) 무기 데이터베이스
 const WEAPON_DB = {
-    // 1. 검 (Knife)
     knife_common: { name: '녹슨 도살도', type: 'knife', rarity: 'Common', atk: 15, sellPrice: 50, icon: '🔪' },
     knife_rare: { name: '혈각의 서사도', type: 'knife', rarity: 'Rare', atk: 45, sellPrice: 250, icon: '🗡️' },
     knife_epic: { name: '흑염의 사도검', type: 'knife', rarity: 'Epic', atk: 120, sellPrice: 2500, icon: '🗡️🔥' },
     knife_legendary: { name: '피빛의 소울리퍼', type: 'knife', rarity: 'Legendary', atk: 380, sellPrice: 10000, icon: '⚔️🩸' },
     knife_mythic: { name: '심연의 핏빛 멸살검', type: 'knife', rarity: 'Mythic', atk: 1500, sellPrice: 100000, icon: '🗡️💀' },
 
-    // 2. 활 (Bow)
     bow_common: { name: '부러진 나무활', type: 'bow', rarity: 'Common', atk: 14, sellPrice: 50, icon: '🏹' },
     bow_rare: { name: '정밀한 사냥꾼의 활', type: 'bow', rarity: 'Rare', atk: 42, sellPrice: 250, icon: '🏹✨' },
     bow_epic: { name: '폭풍의 질풍궁', type: 'bow', rarity: 'Epic', atk: 115, sellPrice: 2500, icon: '🏹🌪️' },
     bow_legendary: { name: '태양의 엘븐 롱보우', type: 'bow', rarity: 'Legendary', atk: 360, sellPrice: 10000, icon: '🏹☀️' },
     bow_mythic: { name: '천공을 꿰뚫는 스나이퍼', type: 'bow', rarity: 'Mythic', atk: 1450, sellPrice: 100000, icon: '🏹💫' },
 
-    // 3. 방패 (Shield)
     shield_common: { name: '나무 냄비뚜껑', type: 'shield', rarity: 'Common', atk: 8, sellPrice: 50, icon: '🛡️' },
     shield_rare: { name: '수호자의 가디언 실드', type: 'shield', rarity: 'Rare', atk: 25, sellPrice: 250, icon: '🛡️✨' },
     shield_epic: { name: '불멸의 가고일 방패', type: 'shield', rarity: 'Epic', atk: 70, sellPrice: 2500, icon: '🛡️🗿' },
     shield_legendary: { name: '성기사의 천상 실드', type: 'shield', rarity: 'Legendary', atk: 220, sellPrice: 10000, icon: '🛡️👑' },
     shield_mythic: { name: '신성한 절대자의 결계', type: 'shield', rarity: 'Mythic', atk: 900, sellPrice: 100000, icon: '🛡️❇️' },
 
-    // 4. 힐 / 마법 (Staff)
     staff_common: { name: '빛 바랜 나뭇가지', type: 'staff', rarity: 'Common', atk: 10, sellPrice: 50, icon: '🪄' },
     staff_rare: { name: '견습 메딕의 지팡이', type: 'staff', rarity: 'Rare', atk: 32, sellPrice: 250, icon: '🪄💖' },
     staff_epic: { name: '정령의 생명 지팡이', type: 'staff', rarity: 'Epic', atk: 90, sellPrice: 2500, icon: '🪄🌿' },
     staff_legendary: { name: '대현자의 홀', type: 'staff', rarity: 'Legendary', atk: 280, sellPrice: 10000, icon: '🪄🔮' },
     staff_mythic: { name: '태초의 세라핌 스태프', type: 'staff', rarity: 'Mythic', atk: 1100, sellPrice: 100000, icon: '🪄✨' },
 
-    // 히든 쿠폰 아이템
     hidden_hong: { name: '홍인준의 뱃살 방패', type: 'shield_special', rarity: 'Mythic', atk: 1600, sellPrice: 100000, icon: '🐷🛡️' }
 };
 
@@ -66,9 +60,7 @@ let gameState = {
     players: {}
 };
 
-// 🎲 각 무기 타입별 25% + 등급 확률 결정 함수
 function getRandomWeaponKey() {
-    // 1단계: 등급 결정 (Common, Rare, Epic, Legendary, Mythic)
     const randRarity = Math.random();
     let rarity = 'Common';
     if (randRarity < 0.001) rarity = 'Mythic';
@@ -77,14 +69,12 @@ function getRandomWeaponKey() {
     else if (randRarity < 0.300) rarity = 'Rare';
     else rarity = 'Common';
 
-    // 2단계: 4가지 타입 (검, 활, 방패, 힐) 중 정확히 25% 확률로 선택
     const types = ['knife', 'bow', 'shield', 'staff'];
     const chosenType = types[Math.floor(Math.random() * types.length)];
-
     return `${chosenType}_${rarity.toLowerCase()}`;
 }
 
-// ⏰ 10초마다 보스가 모든 플레이어 체력을 5씩 깎음
+// ⏰ 10초마다 보스가 모든 플레이어 체력을 깎음 (사망 시 0 고정)
 setInterval(() => {
     let updated = false;
     Object.values(gameState.players).forEach(p => {
@@ -120,20 +110,15 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('drawGacha', () => {
-        const p = gameState.players[socket.id];
-        if (!p || p.gold < 1000 || p.inventory.length >= 36) return;
-        p.gold -= 1000;
-        const wKey = getRandomWeaponKey();
-        const w = { ...WEAPON_DB[wKey], id: Date.now() + Math.random(), enhance: 0 };
-        p.inventory.push(w);
-        socket.emit('gachaResult', { success: true, weapon: w });
-        io.emit('updateState', gameState);
-    });
-
+    // 💡 체력이 0일 때 공격하면 부활하도록 수정 (죽으면 안 때려지는 버그 해결)
     socket.on('attack', () => {
         const p = gameState.players[socket.id];
-        if (!p || p.hp <= 0) return;
+        if (!p) return;
+        
+        if (p.hp <= 0) {
+            p.hp = p.maxHp; // 체력이 0이면 풀피로 부활하며 공격 허용
+        }
+
         let eq = p.equippedIndex !== null ? p.inventory[p.equippedIndex] : null;
         let baseAtk = eq ? (eq.atk * (1 + (eq.enhance || 0) * 0.4)) : 10;
         let dmg = Math.round(baseAtk + (p.bonusAtk || 0));
@@ -153,6 +138,17 @@ io.on('connection', (socket) => {
             }
             gameState.boss = { ...BOSS_LIST[Math.floor(Math.random() * BOSS_LIST.length)] };
         }
+        io.emit('updateState', gameState);
+    });
+
+    socket.on('drawGacha', () => {
+        const p = gameState.players[socket.id];
+        if (!p || p.gold < 1000 || p.inventory.length >= 36) return;
+        p.gold -= 1000;
+        const wKey = getRandomWeaponKey();
+        const w = { ...WEAPON_DB[wKey], id: Date.now() + Math.random(), enhance: 0 };
+        p.inventory.push(w);
+        socket.emit('gachaResult', { success: true, weapon: w });
         io.emit('updateState', gameState);
     });
 
@@ -200,7 +196,6 @@ io.on('connection', (socket) => {
 
             if (p.gold >= cost) {
                 p.gold -= cost;
-
                 let successChance = Math.max(15, 100 - (currentLevel * 7.5)); 
                 const roll = Math.random() * 100;
 
@@ -215,6 +210,7 @@ io.on('connection', (socket) => {
         }
     });
 
+    // 👑 어드민 무기 지급 기능 추가
     socket.on('adminAction', (data) => {
         const { action, payload } = data;
         if (action === 'spawnBoss') {
@@ -226,6 +222,18 @@ io.on('connection', (socket) => {
         if (action === 'giveMythic') { const t = gameState.players[payload.targetId]; if(t && t.inventory.length < 36) t.inventory.push({ ...WEAPON_DB.knife_mythic, id: Date.now(), enhance: 0 }); }
         if (action === 'boostAtk') { const t = gameState.players[payload.targetId]; if(t) t.bonusAtk = (t.bonusAtk || 0) + payload.amount; }
         if (action === 'setRankScore') { const t = gameState.players[payload.targetId]; if(t) t.totalDamage = payload.score; }
+        
+        // 특정 무기 종류 및 등급 지정 지급
+        if (action === 'giveSpecificWeapon') {
+            const t = gameState.players[payload.targetId];
+            if (t && t.inventory.length < 36) {
+                const key = `${payload.weaponType}_${payload.rarity}`;
+                if (WEAPON_DB[key]) {
+                    t.inventory.push({ ...WEAPON_DB[key], id: Date.now() + Math.random(), enhance: 0 });
+                }
+            }
+        }
+
         io.emit('updateState', gameState);
     });
 
