@@ -2,160 +2,67 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>👑 GM 관제 센터</title>
-    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <title>어드민 모니터링 패널</title>
     <style>
-        body { font-family: sans-serif; background: #0b0c10; color: #66fcf1; padding: 15px; }
-        .btn-gm { background: #45a29e; border: none; color: #fff; padding: 6px 10px; margin: 2px; border-radius: 4px; cursor: pointer; font-size: 11px; }
-        .btn-kick { background: #c0392b; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; color: #fff; }
-        th, td { border: 1px solid #45a29e; padding: 8px; text-align: center; font-size: 12px; }
-        tr:hover { background-color: rgba(69, 162, 158, 0.1); }
-        
-        #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; }
-        .modal-content { background: #1f2833; padding: 20px; border-radius: 8px; width: 500px; max-height: 80vh; overflow-y: auto; border: 2px solid #66fcf1; }
-        .inv-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 15px; }
-        .inv-slot { background: #0b0c10; border: 1px solid #45a29e; height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; border-radius: 4px; position: relative; cursor: pointer; }
-        .inv-slot:hover { border-color: #e74c3c; }
+        body { font-family: sans-serif; background: #111; color: #fff; padding: 20px; text-align: center; }
+        .admin-box { background: #222; padding: 20px; border-radius: 8px; max-width: 500px; margin: auto; }
+        .inventory-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 15px; }
+        .admin-inv-slot { background: #333; height: 50px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; border-radius: 4px; }
+        .admin-inv-slot.filled { background: #2c3e50; border: 1px solid #3498db; }
+        .admin-inv-slot.empty { color: #666; }
     </style>
 </head>
 <body>
-    <h2>👑 GM 관제 센터</h2>
-    <div style="background:#1f2833; padding:12px; border-radius:8px;">
-        <p>현재 보스: <strong id="bossStatus">-</strong></p>
-        <button class="btn-gm" onclick="spawnBoss('pig')">🐷 꿀신 소환</button>
-        <button class="btn-gm" onclick="spawnBoss('goliath')">🗿 골리앗 소환</button>
-        <button class="btn-gm" onclick="spawnBoss('iraso')">🦖 이라소 소환</button>
-        <button class="btn-gm" onclick="spawnBoss('dragon')">🐉 드래곤 소환</button>
-        <button class="btn-gm" style="background:#c0392b;" onclick="killBoss()">💥 보스 즉사</button>
-    </div>
-    <table>
-        <thead>
-            <tr>
-                <th>닉네임</th>
-                <th>HP</th>
-                <th>골드</th>
-                <th>누적 데미지</th>
-                <th>인벤 (클릭시 열림)</th>
-                <th>GM 치트 / 조작</th>
-            </tr>
-        </thead>
-        <tbody id="playerTable"></tbody>
-    </table>
-
-    <div id="modal">
-        <div class="modal-content">
-            <h3 id="modalTitle">용사 인벤토리</h3>
-            <p style="font-size: 11px; color: #a2a8d3;">아이템을 클릭하면 <strong>강제 삭제</strong>됩니다.</p>
-            <div class="inv-grid" id="modalInvGrid"></div>
-            <br>
-            <button class="btn-gm" style="width: 100%; background: #555;" onclick="closeModal()">닫기</button>
-        </div>
+    <div class="admin-box">
+        <h2>🛠️ 어드민 인벤토리 모니터링</h2>
+        <div id="admin-inventory-status">상태 로딩 중...</div>
+        <div id="admin-inventory-slots" class="inventory-grid"></div>
     </div>
 
+    <script src="/socket.io/socket.io.js"></script>
     <script>
-        const socket = io({ transports: ['websocket', 'polling'] });
-        let latestState = null;
-        let selectedUserId = null;
+        const socket = io();
+        const MAX_SLOTS = 36;
 
         socket.on('updateState', (state) => {
-            if(!state || !state.boss) return;
-            latestState = state;
-            document.getElementById('bossStatus').innerText = state.boss.name + ' (' + state.boss.currentHp.toLocaleString() + '/' + state.boss.maxHp.toLocaleString() + ')';
+            const players = Object.values(state.players);
+            if (players.length === 0) {
+                document.getElementById('admin-inventory-status').innerText = '접속 중인 플레이어가 없습니다.';
+                return;
+            }
             
-            const tbody = document.getElementById('playerTable');
-            tbody.innerHTML = '';
-            Object.values(state.players).forEach(p => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${p.name}</td>
-                    <td>${p.hp}</td>
-                    <td>${p.gold.toLocaleString()}G</td>
-                    <td>${(p.totalDamage || 0).toLocaleString()}</td>
-                    <td><button class="btn-gm" onclick="openInventory('${p.id}')">인벤보기 (${p.inventory.length}/36)</button></td>
-                    <td>
-                        <button class="btn-gm" onclick="giveGold('${p.id}')">+1만G</button>
-                        <button class="btn-gm" style="background:#27ae60;" onclick="giveCustomWeapon('${p.id}')">무기지급</button>
-                        <button class="btn-gm" style="background:#e67e22;" onclick="boostAtk('${p.id}')">공+500</button>
-                        <button class="btn-gm" style="background:#8e44ad;" onclick="setRankScore('${p.id}')">랭킹조작</button>
-                        <button class="btn-gm btn-kick" onclick="kickPlayer('${p.id}', '${p.name}')">킥(강퇴)</button>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
+            // 첫 번째 접속 유저의 인벤토리 상태 모니터링
+            const targetPlayer = players[0]; 
+            const inventory = targetPlayer.inventory || [];
+            
+            const container = document.getElementById('admin-inventory-slots');
+            container.innerHTML = '';
 
-            if (selectedUserId && latestState.players[selectedUserId]) {
-                renderModalInventory(latestState.players[selectedUserId]);
-            }
-        });
+            let emptyCount = 0;
 
-        function spawnBoss(type) { socket.emit('adminAction', { action: 'spawnBoss', payload: type }); }
-        function killBoss() { socket.emit('adminAction', { action: 'killBoss' }); }
-        function giveGold(id) { socket.emit('adminAction', { action: 'giveGold', payload: { targetId: id, amount: 10000 } }); }
-        function boostAtk(id) { socket.emit('adminAction', { action: 'boostAtk', payload: { targetId: id, amount: 500 } }); }
-        
-        function setRankScore(id) {
-            const score = prompt('조작할 누적 데미지 점수를 입력하세요:', '999999');
-            if (score !== null) {
-                socket.emit('adminAction', { action: 'setRankScore', payload: { targetId: id, score: parseInt(score) || 0 } });
-            }
-        }
+            for (let i = 0; i < MAX_SLOTS; i++) {
+                const slotDiv = document.createElement('div');
+                const item = inventory[i];
 
-        function giveCustomWeapon(id) {
-            const typeInput = prompt('무기 종류 입력 (knife, bow, shield, staff):', 'knife');
-            if (!['knife', 'bow', 'shield', 'staff'].includes(typeInput)) return;
-            const rarityInput = prompt('등급 입력 (common, rare, epic, legendary, mythic):', 'mythic');
-            const rarities = ['common', 'rare', 'epic', 'legendary', 'mythic'];
-            if (!rarities.includes((rarityInput || '').toLowerCase())) return;
-            socket.emit('adminAction', {
-                action: 'giveSpecificWeapon',
-                payload: { targetId: id, weaponType: typeInput, rarity: rarityInput.toLowerCase() }
-            });
-        }
-
-        function kickPlayer(id, name) {
-            if (confirm(`정말 [${name}] 유저를 강퇴하시겠습니까?`)) {
-                socket.emit('adminAction', { action: 'kickPlayer', payload: { targetId: id } });
-            }
-        }
-
-        function openInventory(id) {
-            selectedUserId = id;
-            const p = latestState.players[id];
-            if (!p) return;
-            document.getElementById('modalTitle').innerText = `${p.name}의 인벤토리`;
-            renderModalInventory(p);
-            document.getElementById('modal').style.display = 'flex';
-        }
-
-        function renderModalInventory(p) {
-            const grid = document.getElementById('modalInvGrid');
-            grid.innerHTML = '';
-            for (let i = 0; i < 36; i++) {
-                const item = p.inventory[i];
-                const slot = document.createElement('div');
-                slot.className = 'inv-slot';
                 if (item) {
-                    const enhText = item.enhance ? `+${item.enhance}` : '';
-                    slot.innerHTML = `<span style="font-size:18px;">${item.icon}</span><span style="font-size:9px; color:#fff;">${enhText}</span>`;
-                    slot.title = `${item.name} (${item.skillName || ''})\n클릭시 삭제`;
-                    slot.onclick = () => {
-                        if (confirm(`[${item.name}] 아이템을 삭제하시겠습니까?`)) {
-                            socket.emit('adminAction', {
-                                action: 'adminRemoveItem',
-                                payload: { targetId: selectedUserId, itemIndex: i }
-                            });
-                        }
-                    };
+                    slotDiv.className = 'admin-inv-slot filled';
+                    slotDiv.innerHTML = `<span>${item.icon}</span><span>${item.rarity}</span>`;
+                } else {
+                    slotDiv.className = 'admin-inv-slot empty';
+                    slotDiv.innerHTML = `<span>${i + 1}</span>`;
+                    emptyCount++;
                 }
-                grid.appendChild(slot);
+                container.appendChild(slotDiv);
             }
-        }
 
-        function closeModal() {
-            document.getElementById('modal').style.display = 'none';
-            selectedUserId = null;
-        }
+            // ✨ 인벤토리 오류 해결: 빈 슬롯 개수(emptyCount)를 기반으로 정확하게 가득 참 여부 판정
+            const statusText = document.getElementById('admin-inventory-status');
+            const usedSlots = MAX_SLOTS - emptyCount;
+            const isReallyFull = usedSlots >= MAX_SLOTS;
+            
+            statusText.innerHTML = `사용 중인 칸: ${usedSlots} / ${MAX_SLOTS} | 빈 슬롯: ${emptyCount}개 <br>` +
+                `상태: <span style="color: ${isReallyFull ? '#ff4d4d' : '#2ed573'}">${isReallyFull ? '인벤토리 가득 참' : '여유 있음'}</span>`;
+        });
     </script>
 </body>
 </html>
