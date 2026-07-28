@@ -19,16 +19,15 @@ app.get('/admin', (req, res) => {
 // 1. 보스 목록 (체력 10.5배 상향 적용)
 // -------------------------------------------------------------
 const BOSS_LIST = [
-    { name: '🐷 꿀신', maxHp: 157500, currentHp: 157500 },     // 15,000 * 10.5
-    { name: '🗿 골리앗', maxHp: 367500, currentHp: 367500 },   // 35,000 * 10.5
-    { name: '🦖 이라소', maxHp: 840000, currentHp: 840000 },   // 80,000 * 10.5
-    { name: '🐉 드래곤', maxHp: 2100000, currentHp: 2100000 }  // 200,000 * 10.5
+    { name: '🐷 꿀신', maxHp: 157500, currentHp: 157500 },     // 15,000 * 10.5[span_0](start_span)[span_0](end_span)
+    { name: '🗿 골리앗', maxHp: 367500, currentHp: 367500 },   // 35,000 * 10.5[span_1](start_span)[span_1](end_span)
+    { name: '🦖 이라소', maxHp: 840000, currentHp: 840000 },   // 80,000 * 10.5[span_2](start_span)[span_2](end_span)
+    { name: '🐉 드래곤', maxHp: 2100000, currentHp: 2100000 }  // 200,000 * 10.5[span_3](start_span)[span_3](end_span)
 ];
 
 // -------------------------------------------------------------
-// 2. 무기 및 아이템 DB (지팡이 계열 힐량 및 targets 설정 반영)
-// - 힐량: 최하위(Common) 10, 등급당 +5씩 증가 (Common: 10, Rare: 15, Epic: 20, Legendary: 25, Mythic: 30)
-// - 신화(Mythic) 등급 지팡이는 최대 2명 힐 가능 (targets: 2)
+// 2. 무기 및 아이템 DB (지팡이 힐/대상 수, 방패 무적 스킬 지속 시간 설정)
+// - 방패 스킬 지속 시간 (shieldDuration): Common(10초) 기준 등급별 증가
 // -------------------------------------------------------------
 const WEAPON_DB = {
     knife_common: { name: '녹슨 도살도', type: 'knife', rarity: 'Common', atk: 10, sellPrice: 50, icon: '🔪' },
@@ -37,11 +36,12 @@ const WEAPON_DB = {
     knife_legendary: { name: '피빛의 소울리퍼', type: 'knife', rarity: 'Legendary', atk: 140, sellPrice: 10000, icon: '⚔️🩸' },
     knife_mythic: { name: '심연의 핏빛 멸살검', type: 'knife', rarity: 'Mythic', atk: 350, sellPrice: 100000, icon: '🗡️💀' },
 
-    shield_common: { name: '나무 냄비뚜껑', type: 'shield', rarity: 'Common', atk: 6, sellPrice: 50, icon: '🛡️' },
-    shield_rare: { name: '수호자의 가디언 실드', type: 'shield', rarity: 'Rare', atk: 18, sellPrice: 250, icon: '🛡️✨' },
-    shield_epic: { name: '불멸의 가고일 방패', type: 'shield', rarity: 'Epic', atk: 45, sellPrice: 2500, icon: '🛡️🗿' },
-    shield_legendary: { name: '성기사의 천상 실드', type: 'shield', rarity: 'Legendary', atk: 100, sellPrice: 10000, icon: '🛡️👑' },
-    shield_mythic: { name: '신성한 절대자의 결계', type: 'shield', rarity: 'Mythic', atk: 250, sellPrice: 100000, icon: '🛡️❇️' },
+    // 방패 (무적 스킬 계열: shieldDuration 초 단위, 5초 쿨타임 적용)
+    shield_common: { name: '나무 냄비뚜껑', type: 'shield', rarity: 'Common', atk: 6, shieldDuration: 10, sellPrice: 50, icon: '🛡️' },
+    shield_rare: { name: '수호자의 가디언 실드', type: 'shield', rarity: 'Rare', atk: 18, shieldDuration: 12, sellPrice: 250, icon: '🛡️✨' },
+    shield_epic: { name: '불멸의 가고일 방패', type: 'shield', rarity: 'Epic', atk: 45, shieldDuration: 14, sellPrice: 2500, icon: '🛡️🗿' },
+    shield_legendary: { name: '성기사의 천상 실드', type: 'shield', rarity: 'Legendary', atk: 100, shieldDuration: 16, sellPrice: 10000, icon: '🛡️👑' },
+    shield_mythic: { name: '신성한 절대자의 결계', type: 'shield', rarity: 'Mythic', atk: 250, shieldDuration: 20, sellPrice: 100000, icon: '🛡️❇️' },
 
     bow_common: { name: '굽은 나무활', type: 'bow', rarity: 'Common', atk: 8, sellPrice: 50, icon: '🏹' },
     bow_rare: { name: '사냥꾼의 숏보우', type: 'bow', rarity: 'Rare', atk: 22, sellPrice: 250, icon: '🏹✨' },
@@ -49,14 +49,14 @@ const WEAPON_DB = {
     bow_legendary: { name: '천둥의 스톰브링어', type: 'bow', rarity: 'Legendary', atk: 125, sellPrice: 10000, icon: '🏹⚡' },
     bow_mythic: { name: '태양의 신궁 아폴론', type: 'bow', rarity: 'Mythic', atk: 300, sellPrice: 100000, icon: '🏹🌌' },
 
-    // 지팡이 (힐 템)
+    // 지팡이 (힐 템: 등급별 힐량 10, 15, 20, 25, 30 및 신화 2명 타겟)[span_4](start_span)[span_4](end_span)
     staff_common: { name: '새싹의 허브 지팡이', type: 'staff', rarity: 'Common', atk: 4, heal: 10, targets: 1, sellPrice: 50, icon: '🌿' },
     staff_rare: { name: '축복의 성수 지팡이', type: 'staff', rarity: 'Rare', atk: 12, heal: 15, targets: 1, sellPrice: 250, icon: '💧✨' },
     staff_epic: { name: '요정의 생명 지팡이', type: 'staff', rarity: 'Epic', atk: 35, heal: 20, targets: 1, sellPrice: 2500, icon: '🔮🌿' },
     staff_legendary: { name: '세라핌의 치유 지팡이', type: 'staff', rarity: 'Legendary', atk: 80, heal: 25, targets: 1, sellPrice: 10000, icon: '🌟💖' },
     staff_mythic: { name: '세계수의 영원한 생명', type: 'staff', rarity: 'Mythic', atk: 200, heal: 30, targets: 2, sellPrice: 100000, icon: '🌌✨' },
 
-    hidden_hong: { name: '홍인준의 뱃살 방패', type: 'shield', rarity: 'Mythic', atk: 600, sellPrice: 100000, icon: '🐷🛡️' }
+    hidden_hong: { name: '홍인준의 뱃살 방패', type: 'shield', rarity: 'Mythic', atk: 600, shieldDuration: 25, sellPrice: 100000, icon: '🐷🛡️' }
 };
 
 const COUPONS = {
@@ -107,24 +107,33 @@ function calculateDamage(p) {
 }
 
 // -------------------------------------------------------------
-// 3. 사망 버그 수정 및 부활 처리 루프
+// 3. 사망 버그 수정, 즉시 부활 및 무기 드랍 루프
 // -------------------------------------------------------------
 setInterval(() => {
     let updated = false;
+    let now = Date.now();
     Object.values(gameState.players).forEach(p => {
-        if (p.hp > 0) {
-            p.hp = Math.max(0, p.hp - 5);
+        // 방패 무적 상태 체크 해제
+        if (p.isInvincible && now > p.invincibleUntil) {
+            p.isInvincible = false;
             updated = true;
+        }
+
+        if (p.hp > 0) {
+            // 무적 상태가 아닐 때만 틱 데미지 감소
+            if (!p.isInvincible) {
+                p.hp = Math.max(0, p.hp - 5);
+                updated = true;
+            }
             
-            // 사망 시 처리 (버그 방지 및 무기 드랍)
+            // 사망 시 처리 (장착 무기 드랍 및 즉시 부활)[span_5](start_span)[span_5](end_span)
             if (p.hp === 0) {
-                // 1. 장착 중인 무기 버리기 (삭제)
                 if (p.equippedIndex !== null && p.inventory[p.equippedIndex]) {
                     p.inventory.splice(p.equippedIndex, 1);
                     p.equippedIndex = null;
                 }
-                // 2. 즉시 부활 처리 (클릭 안 됨 및 무한 사망 락 방지)
-                p.hp = p.maxHp;
+                p.hp = p.maxHp; // 즉시 부활[span_6](start_span)[span_6](end_span)
+                updated = true;
             }
         }
     });
@@ -143,6 +152,8 @@ io.on('connection', (socket) => {
         equippedIndex: null,
         usedCoupons: [],
         lastSkillTime: 0,
+        isInvincible: false,
+        invincibleUntil: 0,
         partyId: null
     };
     io.emit('updateState', gameState);
@@ -178,28 +189,30 @@ io.on('connection', (socket) => {
     });
 
     // -------------------------------------------------------------
-    // 4. 힐 템 스킬: 유저 선택 창 연동 및 힐량/대상 수 적용 로직
-    // data.targetIds로 선택된 유저 ID 배열을 받으며, 본인 포함 가능
+    // 4. 무기별 스킬 분기 처리 (지팡이 힐 vs 방패 무적 적용)
     // -------------------------------------------------------------
     socket.on('useSkill', (data) => {
         const p = gameState.players[socket.id];
         if (!p || p.hp <= 0) return;
         const now = Date.now();
-        if (now - (p.lastSkillTime || 0) < 5000) {
-            socket.emit('skillResult', { success: false, message: '⏳ 스킬 쿨타임 중입니다!' });
-            return;
-        }
-        p.lastSkillTime = now;
-
+        
         let eq = p.equippedIndex !== null ? p.inventory[p.equippedIndex] : null;
         let weaponType = eq ? eq.type : 'none';
         let rarityMul = eq ? getRarityMultiplier(eq.rarity) : 1.0;
         let baseAtk = eq ? eq.atk : 10;
 
+        // 방패 쿨타임: 무적 지속시간 + 5초 대기 시간 검증
+        let currentCooldown = (weaponType === 'shield') ? ((eq.shieldDuration || 10) + 5) * 1000 : 5000;
+        if (now - (p.lastSkillTime || 0) < currentCooldown) {
+            socket.emit('skillResult', { success: false, message: '⏳ 스킬 쿨타임 중입니다!' });
+            return;
+        }
+        p.lastSkillTime = now;
+
         if (weaponType === 'staff') {
-            // 지팡이 힐 스킬: 전달받은 대상 목록(targetIds) 혹은 기본 본인 선택
+            // 지팡이 힐 스킬 (등급별 힐량 및 타겟 수 적용)[span_7](start_span)[span_7](end_span)
             let targetIds = (data && data.targetIds && Array.isArray(data.targetIds)) ? data.targetIds : [socket.id];
-            let maxTargets = eq.targets || 1; // 신화 등급은 2명, 나머지 1명
+            let maxTargets = eq.targets || 1; 
             let validTargets = targetIds.slice(0, maxTargets);
 
             let healBase = eq.heal || 10;
@@ -215,7 +228,6 @@ io.on('connection', (socket) => {
             });
 
             if (healedNames.length === 0) {
-                // 유효한 타겟이 없다면 시전자 본인에게 힐
                 p.hp = Math.min(p.maxHp, p.hp + totalHealAmt);
                 healedNames.push(p.name);
             }
@@ -224,10 +236,13 @@ io.on('connection', (socket) => {
             socket.emit('skillResult', { success: true, message: `🌿 [치유의 파동] 발동! [${healedNames.join(', ')}] 체력 ${totalHealAmt} 회복!` });
 
         } else if (weaponType === 'shield') {
-            let healAmt = Math.round((baseAtk * 1.5 * rarityMul) + 100);
-            p.hp = Math.min(p.maxHp, p.hp + healAmt);
+            // 방패 무적 스킬 (등급별 지속 시간 적용, 이후 5초 쿨타임)
+            let durationSec = eq.shieldDuration || 10;
+            p.isInvincible = true;
+            p.invincibleUntil = now + (durationSec * 1000);
             p.gold += 25;
-            socket.emit('skillResult', { success: true, message: `🛡️ [절대 방벽] 발동! 내 체력 ${healAmt} 회복!` });
+            socket.emit('skillResult', { success: true, message: `🛡️ [절대 방벽] 발동! ${durationSec}초 동안 무적 상태가 됩니다!` });
+
         } else if (weaponType === 'bow') {
             let skillDmg = Math.round((baseAtk * rarityMul * 2.2) + (p.bonusAtk || 0));
             gameState.boss.currentHp -= skillDmg;
