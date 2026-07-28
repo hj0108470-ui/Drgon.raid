@@ -10,7 +10,7 @@ const io = new Server(server);
 app.use(express.static(path.join(__dirname, 'public')));
 
 // -------------------------------------------------------------
-// 1. 무기 및 아이템 데이터베이스 (지팡이 계열 힐 기능 포함)
+// 1. 무기 및 아이템 데이터베이스 (지팡이 힐 기능 포함)
 // -------------------------------------------------------------
 const WEAPON_DB = {
     // 단검 계열
@@ -34,9 +34,9 @@ const WEAPON_DB = {
     'bow_legendary': { name: '천둥의 스톰브링어', icon: '🏹⚡', type: 'weapon', rarity: 'Legendary', atk: 120, sellPrice: 3500 },
     'bow_mythic': { name: '태양의 신궁 아폴론', icon: '🏹🌌', type: 'weapon', rarity: 'Mythic', atk: 300, sellPrice: 12000 },
 
-    // 지팡이 계열 (힐 템: Common 10, Rare 15, Epic 20, Legendary 25, Mythic 30 [최대 2명])
+    // 지팡이 계열 (힐 템: Common 10 ~ Mythic 30 [최대 2명])
     'staff_common': { name: '새싹의 허브 지팡이', icon: '🌿', type: 'staff', rarity: 'Common', atk: 3, heal: 10, targets: 1, sellPrice: 60 },
-    'staff_rare': { name: '축복의 성수 지팡이', icon: '💧✨', type: 'staff', rarity: 'Staff', atk: 10, heal: 15, targets: 1, sellPrice: 220 },
+    'staff_rare': { name: '축복의 성수 지팡이', icon: '💧✨', type: 'staff', rarity: 'Rare', atk: 10, heal: 15, targets: 1, sellPrice: 220 },
     'staff_epic': { name: '요정의 생명 지팡이', icon: '🔮🌿', type: 'staff', rarity: 'Epic', atk: 25, heal: 20, targets: 1, sellPrice: 900 },
     'staff_legendary': { name: '세라핌의 치유 지팡이', icon: '🌟💖', type: 'staff', rarity: 'Legendary', atk: 60, heal: 25, targets: 1, sellPrice: 3500 },
     'staff_mythic': { name: '세계수의 영원한 생명', icon: '🌌✨', type: 'staff', rarity: 'Mythic', atk: 150, heal: 30, targets: 2, sellPrice: 12000 },
@@ -46,7 +46,7 @@ const WEAPON_DB = {
 };
 
 // -------------------------------------------------------------
-// 2. 보스 데이터 (체력 10.5배 적용)
+// 2. 보스 데이터 (체력 10.5배 적용 및 보상 골드 추가)
 // -------------------------------------------------------------
 const BOSS_LIST = [
     { key: 'pig', name: '🐷 꿀신', maxHp: 52500, currentHp: 52500, rewardGold: 3000 },
@@ -62,7 +62,7 @@ let gameState = {
     parties: {}
 };
 
-// 리딤 쿠폰 코드 목록
+// 리딤 쿠폰 목록
 const COUPONS = {
     'WCDI26070123': { type: 'gold', amount: 1000 },
     'Fiwndq9': { type: 'item', key: 'hidden_hong' },
@@ -71,7 +71,7 @@ const COUPONS = {
     'HIJPIG12': { type: 'item', key: 'hidden_hong' }
 };
 
-// 가챠 풀 (지팡이 포함)
+// 가챠 풀
 const GACHA_POOL = [
     { key: 'knife_common', weight: 40 }, { key: 'shield_common', weight: 40 }, { key: 'bow_common', weight: 40 }, { key: 'staff_common', weight: 40 },
     { key: 'knife_rare', weight: 20 }, { key: 'shield_rare', weight: 20 }, { key: 'bow_rare', weight: 20 }, { key: 'staff_rare', weight: 20 },
@@ -96,12 +96,11 @@ function getRandomWeapon() {
 }
 
 // -------------------------------------------------------------
-// 3. 소켓 통신 및 게임 로직 처리
+// 3. 소켓 통신 및 게임 로직
 // -------------------------------------------------------------
 io.on('connection', (socket) => {
     console.log(`용사 접속: ${socket.id}`);
 
-    // 신규 플레이어 초기화
     gameState.players[socket.id] = {
         id: socket.id,
         name: `용사_${socket.id.substring(0, 4)}`,
@@ -114,14 +113,12 @@ io.on('connection', (socket) => {
         partyId: null
     };
 
-    // 초기 지급용 단검 1개 장착
     const starterWeapon = { ...WEAPON_DB['knife_common'], id: Date.now() + Math.random(), enhance: 0 };
     gameState.players[socket.id].inventory[0] = starterWeapon;
     gameState.players[socket.id].equippedIndex = 0;
 
     broadcastState();
 
-    // 닉네임 설정
     socket.on('setNickname', (name) => {
         if (gameState.players[socket.id]) {
             gameState.players[socket.id].name = name.substring(0, 12);
@@ -129,7 +126,7 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 일반 공격
+    // ⚔️ 일반 공격 데미지 계산 수정 (기본 10 + 무기 공격력 + 강화당 +3)
     socket.on('attack', () => {
         const player = gameState.players[socket.id];
         if (!player || player.hp <= 0) return;
@@ -143,16 +140,15 @@ io.on('connection', (socket) => {
         applyDamageToBoss(socket.id, dmg);
     });
 
-    // 스킬 버튼 클릭 (무기 타입에 따른 분기: 일반 공격 vs 힐 스킬)
+    // ⚡ 스킬 공격 / 힐 분기 처리 수정
     socket.on('useSkill', (data) => {
         const player = gameState.players[socket.id];
         if (!player || player.hp <= 0) return;
 
-        // 지팡이(힐 템)를 장착한 경우 힐 대상 선택 처리
+        // 지팡이 장착 시 힐 스킬
         if (player.equippedIndex !== null && player.inventory[player.equippedIndex]) {
             const w = player.inventory[player.equippedIndex];
             if (w.type === 'staff') {
-                // 클라이언트가 보낸 타겟 ID 배열 처리 (없으면 본인 힐)
                 const targetIds = (data && data.targetIds && Array.isArray(data.targetIds)) ? data.targetIds : [socket.id];
                 const maxTargets = w.targets || 1;
                 const validTargets = targetIds.slice(0, maxTargets);
@@ -168,16 +164,15 @@ io.on('connection', (socket) => {
             }
         }
 
-        // 일반 무기 스킬 (강한 데미지)
+        // 일반 무기 스킬 (기본 30 + 무기 공격력 및 강화 반영)
         let dmg = 30;
         if (player.equippedIndex !== null && player.inventory[player.equippedIndex]) {
             const w = player.inventory[player.equippedIndex];
-            dmg += ((w.atk || 0) + ((w.enhance || 0) * 3)) * 2;
+            dmg += ((w.atk || 0) + ((w.enhance || 0) * 3)) * 1.5;
         }
-        applyDamageToBoss(socket.id, dmg);
+        applyDamageToBoss(socket.id, Math.floor(dmg));
     });
 
-    // 가챠 뽑기
     socket.on('drawGacha', () => {
         const player = gameState.players[socket.id];
         if (!player || player.hp <= 0) return;
@@ -203,27 +198,21 @@ io.on('connection', (socket) => {
             socket.emit('gachaResult', { success: true, weapon: newWeapon });
         } else {
             socket.emit('gachaResult', { success: false, message: '가방(인벤토리)이 가득 찼습니다!' });
-            player.gold += 1000; // 환불
+            player.gold += 1000;
         }
         broadcastState();
     });
 
-    // 아이템 장착 / 해제
     socket.on('equipItem', (index) => {
         const player = gameState.players[socket.id];
         if (!player || player.hp <= 0) return;
 
         if (player.inventory[index]) {
-            if (player.equippedIndex === index) {
-                player.equippedIndex = null; // 해제
-            } else {
-                player.equippedIndex = index; // 장착
-            }
+            player.equippedIndex = (player.equippedIndex === index) ? null : index;
             broadcastState();
         }
     });
 
-    // 아이템 강화
     socket.on('enhanceItem', (index) => {
         const player = gameState.players[socket.id];
         if (!player || player.hp <= 0) return;
@@ -233,7 +222,7 @@ io.on('connection', (socket) => {
 
         const cost = (item.enhance + 1) * 400;
         if (player.gold < cost) {
-            socket.emit('enhanceResult', { success: false, message: `골드가 부족합니다! (필요 골드: ${cost}G)` });
+            socket.emit('enhanceResult', { success: false, message: `골드가 부족합니다! (필요: ${cost}G)` });
             return;
         }
 
@@ -243,7 +232,6 @@ io.on('connection', (socket) => {
         broadcastState();
     });
 
-    // 아이템 판매
     socket.on('sellItem', (index) => {
         const player = gameState.players[socket.id];
         if (!player || player.hp <= 0) return;
@@ -251,29 +239,26 @@ io.on('connection', (socket) => {
         const item = player.inventory[index];
         if (!item) return;
 
-        if (player.equippedIndex === index) {
-            player.equippedIndex = null; // 장착 중인 아이템 판매 시 해제
-        }
+        if (player.equippedIndex === index) player.equippedIndex = null;
 
         player.gold += (item.sellPrice || 50) + ((item.enhance || 0) * 100);
         player.inventory[index] = null;
         broadcastState();
     });
 
-    // 리딤 코드 사용
     socket.on('useCoupon', (code) => {
         const player = gameState.players[socket.id];
         if (!player || player.hp <= 0) return;
 
         const reward = COUPONS[code];
         if (!reward) {
-            socket.emit('couponResult', { success: false, message: '유효하지 않거나 잘못된 쿠폰 코드입니다.' });
+            socket.emit('couponResult', { success: false, message: '유효하지 않은 쿠폰 코드입니다.' });
             return;
         }
 
         if (reward.type === 'gold') {
             player.gold += reward.amount;
-            socket.emit('couponResult', { success: true, message: `🎁 쿠폰 보상 지급: ${reward.amount} 골드!` });
+            socket.emit('couponResult', { success: true, message: `🎁 쿠폰 보상: ${reward.amount} 골드 지급!` });
         } else if (reward.type === 'item') {
             const template = WEAPON_DB[reward.key];
             const newItem = { ...template, id: Date.now() + Math.random(), enhance: 0 };
@@ -286,37 +271,27 @@ io.on('connection', (socket) => {
                 }
             }
             if (placed) {
-                socket.emit('couponResult', { success: true, message: `🎁 쿠폰 보상 지급: [${newItem.name}]!` });
+                socket.emit('couponResult', { success: true, message: `🎁 쿠폰 보상: [${newItem.name}] 지급!` });
             } else {
-                socket.emit('couponResult', { success: false, message: '가방이 가득 차서 쿠폰 아이템을 받을 수 없습니다!' });
+                socket.emit('couponResult', { success: false, message: '가방이 가득 찼습니다!' });
             }
         }
         broadcastState();
     });
 
-    // 파티 시스템
     socket.on('createParty', (partyName) => {
         const player = gameState.players[socket.id];
         if (!player || player.partyId) return;
 
         const partyId = 'party_' + Date.now();
-        gameState.parties[partyId] = {
-            id: partyId,
-            name: partyName,
-            leader: socket.id,
-            members: [socket.id]
-        };
+        gameState.parties[partyId] = { id: partyId, name: partyName, leader: socket.id, members: [socket.id] };
         player.partyId = partyId;
-        socket.emit('partyResult', { success: true, message: '파티가 생성되었습니다!' });
+        socket.emit('partyResult', { success: true, message: '파티 생성 완료!' });
         broadcastState();
     });
 
     socket.on('getPartyList', () => {
-        const list = Object.values(gameState.parties).map(p => ({
-            id: p.id,
-            name: p.name,
-            count: p.members.length
-        }));
+        const list = Object.values(gameState.parties).map(p => ({ id: p.id, name: p.name, count: p.members.length }));
         socket.emit('partyListResult', list);
     });
 
@@ -324,12 +299,12 @@ io.on('connection', (socket) => {
         const player = gameState.players[socket.id];
         const party = gameState.parties[partyId];
         if (!player || player.partyId || !party || party.members.length >= 4) {
-            socket.emit('partyResult', { success: false, message: '파티에 참여할 수 없습니다.' });
+            socket.emit('partyResult', { success: false, message: '참여할 수 없습니다.' });
             return;
         }
         party.members.push(socket.id);
         player.partyId = partyId;
-        socket.emit('partyResult', { success: true, message: `[${party.name}] 파티에 가입했습니다!` });
+        socket.emit('partyResult', { success: true, message: '파티 가입 완료!' });
         broadcastState();
     });
 
@@ -341,37 +316,28 @@ io.on('connection', (socket) => {
         const party = gameState.parties[partyId];
         if (party) {
             party.members = party.members.filter(id => id !== socket.id);
-            if (party.members.length === 0) {
-                delete gameState.parties[partyId];
-            } else if (party.leader === socket.id) {
-                party.leader = party.members[0];
-            }
+            if (party.members.length === 0) delete gameState.parties[partyId];
+            else if (party.leader === socket.id) party.leader = party.members[0];
         }
         player.partyId = null;
-        socket.emit('partyResult', { success: true, message: '파티를 탈퇴했습니다.' });
+        socket.emit('partyResult', { success: true, message: '파티 탈퇴 완료!' });
         broadcastState();
     });
 
-    // 어드민 제어 액션
     socket.on('adminAction', ({ action, payload }) => {
         if (action === 'spawnBoss') {
             const found = BOSS_LIST.find(b => b.key === payload);
-            if (found) {
-                gameState.boss = { ...found, currentHp: found.maxHp };
-                broadcastState();
-            }
+            if (found) { gameState.boss = { ...found, currentHp: found.maxHp }; broadcastState(); }
         } else if (action === 'killBoss') {
             gameState.boss.currentHp = 0;
             checkBossDeath(socket.id);
         } else if (action === 'giveGold') {
             const target = gameState.players[payload.targetId];
             if (target) { target.gold += payload.amount; broadcastState(); }
-        } else if (action === 'boostAtk') {
-            // 어드민 버프 등
         } else if (action === 'giveSpecificWeapon') {
             const target = gameState.players[payload.targetId];
             const template = WEAPON_DB[payload.weaponKey];
-            if (target && template && target.inventory.length === 36) {
+            if (target && template) {
                 for (let i = 0; i < 36; i++) {
                     if (!target.inventory[i]) {
                         target.inventory[i] = { ...template, id: Date.now() + Math.random(), enhance: 0 };
@@ -383,7 +349,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 연결 종료 처리
     socket.on('disconnect', () => {
         const player = gameState.players[socket.id];
         if (player && player.partyId) {
@@ -394,13 +359,12 @@ io.on('connection', (socket) => {
             }
         }
         delete gameState.players[socket.id];
-        console.log(`용사 퇴장: ${socket.id}`);
         broadcastState();
     });
 });
 
 // -------------------------------------------------------------
-// 4. 보스 전투 및 사망/부활 핵심 로직
+// 4. 전투 및 보스 처치 (골드 보상 정상 지급)
 // -------------------------------------------------------------
 function applyDamageToBoss(socketId, dmg) {
     const boss = gameState.boss;
@@ -418,7 +382,15 @@ function applyDamageToBoss(socketId, dmg) {
 }
 
 function checkBossDeath(lastHitSocketId) {
-    // 막타 보상 지급 (랜덤 무기 1개)
+    const currentBossData = BOSS_LIST[currentBossIndex];
+    const rewardGoldAmount = currentBossData.rewardGold || 3000;
+
+    // 💰 보스 처치 시 기여한 모든 플레이어 또는 막타자에게 보상 골드 지급
+    Object.values(gameState.players).forEach(p => {
+        p.gold += rewardGoldAmount; // 모든 유저에게 보스 보상 골드 지급 (또는 막타자에게만 주려면 killer에게만 부여)
+    });
+
+    // 막타 보상 (랜덤 무기)
     const killer = gameState.players[lastHitSocketId];
     if (killer) {
         const rewardItem = getRandomWeapon();
@@ -439,28 +411,24 @@ function checkBossDeath(lastHitSocketId) {
     gameState.boss = { ...nextB, currentHp: nextB.maxHp };
 }
 
-// 주기적인 보스 반격 및 플레이어 사망/부활 처리 루프 (1초 간격)
+// 1초 주기 타이머 (보스 반격 및 사망/부활 처리)
 setInterval(() => {
     let stateChanged = false;
 
     Object.values(gameState.players).forEach(player => {
         if (player.hp > 0) {
-            // 보스의 기본 공격력 (예: 10~15 데미지)
             const bossAtk = 12;
             player.hp -= bossAtk;
             stateChanged = true;
 
-            // 플레이어 사망 시 처리
             if (player.hp <= 0) {
                 player.hp = 0;
-                
-                // 1. 장착 중인 무기 버리기 (사망 패널티)
+                // 사망 시 장착 중인 무기 드랍(삭제)
                 if (player.equippedIndex !== null && player.inventory[player.equippedIndex]) {
                     player.inventory[player.equippedIndex] = null;
                     player.equippedIndex = null;
                 }
-
-                // 2. 즉시 부활 처리 (UI 멈춤 및 락 현상 방지, HP 100% 회복)
+                // 즉시 부활
                 player.hp = player.maxHp;
             }
         }
@@ -479,4 +447,3 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`🚀 서버 실행 중! 포트: ${PORT}`);
 });
-
