@@ -63,12 +63,7 @@
         function killBoss() { socket.emit('adminAction', { action: 'killBoss' }); }
         function giveGold(id) { socket.emit('adminAction', { action: 'giveGold', payload: { targetId: id, amount: 10000 } }); }
         function giveMythic(id) { socket.emit('adminAction', { action: 'giveMythic', payload: { targetId: id } }); }
-        
-        // ⚡ 공격력 조작 버튼 동작
-        function boostAtk(id) { 
-            socket.emit('adminAction', { action: 'boostAtk', payload: { targetId: id, amount: 500 } }); 
-        }
-        // 🏆 랭킹 점수 조작 버튼 동작
+        function boostAtk(id) { socket.emit('adminAction', { action: 'boostAtk', payload: { targetId: id, amount: 500 } }); }
         function setRankScore(id) {
             const score = prompt('조작할 누적 데미지 점수를 입력하세요:', '999999');
             if (score !== null) {
@@ -78,3 +73,4 @@
     </script>
 </body>
 </html>
+
