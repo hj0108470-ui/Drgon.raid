@@ -16,43 +16,43 @@ app.get('/admin', (req, res) => {
 });
 
 const BOSS_LIST = [
-    { name: '🐷 꿀신', maxHp: 12000, currentHp: 12000 },
-    { name: '🗿 골리앗', maxHp: 17000, currentHp: 17000 },
-    { name: '🦖 이라소', maxHp: 50000, currentHp: 50000 },
-    { name: '🐉 드래곤', maxHp: 100000, currentHp: 100000 }
+    { name: '🐷 꿀신', maxHp: 15000, currentHp: 15000 },
+    { name: '🗿 골리앗', maxHp: 35000, currentHp: 35000 },
+    { name: '🦖 이라소', maxHp: 80000, currentHp: 80000 },
+    { name: '🐉 드래곤', maxHp: 200000, currentHp: 200000 }
 ];
 
 const WEAPON_DB = {
-    // 🔪 단검류
-    knife_common: { name: '녹슨 도살도', type: 'knife', rarity: 'Common', atk: 15, sellPrice: 50, icon: '🔪' },
-    knife_rare: { name: '혈각의 서사도', type: 'knife', rarity: 'Rare', atk: 45, sellPrice: 250, icon: '🗡️' },
-    knife_epic: { name: '흑염의 사도검', type: 'knife', rarity: 'Epic', atk: 120, sellPrice: 2500, icon: '🗡️🔥' },
-    knife_legendary: { name: '피빛의 소울리퍼', type: 'knife', rarity: 'Legendary', atk: 380, sellPrice: 10000, icon: '⚔️🩸' },
-    knife_mythic: { name: '심연의 핏빛 멸살검', type: 'knife', rarity: 'Mythic', atk: 1500, sellPrice: 100000, icon: '🗡️💀' },
+    // 🔪 단검류 (치명적인 암살)
+    knife_common: { name: '녹슨 도살도', type: 'knife', rarity: 'Common', atk: 10, sellPrice: 50, icon: '🔪' },
+    knife_rare: { name: '혈각의 서사도', type: 'knife', rarity: 'Rare', atk: 25, sellPrice: 250, icon: '🗡️' },
+    knife_epic: { name: '흑염의 사도검', type: 'knife', rarity: 'Epic', atk: 60, sellPrice: 2500, icon: '🗡️🔥' },
+    knife_legendary: { name: '피빛의 소울리퍼', type: 'knife', rarity: 'Legendary', atk: 140, sellPrice: 10000, icon: '⚔️🩸' },
+    knife_mythic: { name: '심연의 핏빛 멸살검', type: 'knife', rarity: 'Mythic', atk: 350, sellPrice: 100000, icon: '🗡️💀' },
 
-    // 🛡️ 방패류
-    shield_common: { name: '나무 냄비뚜껑', type: 'shield', rarity: 'Common', atk: 8, sellPrice: 50, icon: '🛡️' },
-    shield_rare: { name: '수호자의 가디언 실드', type: 'shield', rarity: 'Rare', atk: 25, sellPrice: 250, icon: '🛡️✨' },
-    shield_epic: { name: '불멸의 가고일 방패', type: 'shield', rarity: 'Epic', atk: 70, sellPrice: 2500, icon: '🛡️🗿' },
-    shield_legendary: { name: '성기사의 천상 실드', type: 'shield', rarity: 'Legendary', atk: 220, sellPrice: 10000, icon: '🛡️👑' },
-    shield_mythic: { name: '신성한 절대자의 결계', type: 'shield', rarity: 'Mythic', atk: 900, sellPrice: 100000, icon: '🛡️❇️' },
+    // 🛡️ 방패류 (철벽 탱커)
+    shield_common: { name: '나무 냄비뚜껑', type: 'shield', rarity: 'Common', atk: 6, sellPrice: 50, icon: '🛡️' },
+    shield_rare: { name: '수호자의 가디언 실드', type: 'shield', rarity: 'Rare', atk: 18, sellPrice: 250, icon: '🛡️✨' },
+    shield_epic: { name: '불멸의 가고일 방패', type: 'shield', rarity: 'Epic', atk: 45, sellPrice: 2500, icon: '🛡️🗿' },
+    shield_legendary: { name: '성기사의 천상 실드', type: 'shield', rarity: 'Legendary', atk: 100, sellPrice: 10000, icon: '🛡️👑' },
+    shield_mythic: { name: '신성한 절대자의 결계', type: 'shield', rarity: 'Mythic', atk: 250, sellPrice: 100000, icon: '🛡️❇️' },
 
-    // 🏹 활류
-    bow_common: { name: '굽은 나무활', type: 'bow', rarity: 'Common', atk: 12, sellPrice: 50, icon: '🏹' },
-    bow_rare: { name: '사냥꾼의 숏보우', type: 'bow', rarity: 'Rare', atk: 38, sellPrice: 250, icon: '🏹✨' },
-    bow_epic: { name: '폭풍의 엘븐 보우', type: 'bow', rarity: 'Epic', atk: 105, sellPrice: 2500, icon: '🎯🔥' },
-    bow_legendary: { name: '천둥의 스톰브링어', type: 'bow', rarity: 'Legendary', atk: 330, sellPrice: 10000, icon: '🏹⚡' },
-    bow_mythic: { name: '태양의 신궁 아폴론', type: 'bow', rarity: 'Mythic', atk: 1350, sellPrice: 100000, icon: '🏹🌌' },
+    // 🏹 활류 (연사 및 딜러)
+    bow_common: { name: '굽은 나무활', type: 'bow', rarity: 'Common', atk: 8, sellPrice: 50, icon: '🏹' },
+    bow_rare: { name: '사냥꾼의 숏보우', type: 'bow', rarity: 'Rare', atk: 22, sellPrice: 250, icon: '🏹✨' },
+    bow_epic: { name: '폭풍의 엘븐 보우', type: 'bow', rarity: 'Epic', atk: 55, sellPrice: 2500, icon: '🎯🔥' },
+    bow_legendary: { name: '천둥의 스톰브링어', type: 'bow', rarity: 'Legendary', atk: 125, sellPrice: 10000, icon: '🏹⚡' },
+    bow_mythic: { name: '태양의 신궁 아폴론', type: 'bow', rarity: 'Mythic', atk: 300, sellPrice: 100000, icon: '🏹🌌' },
 
-    // 🌿 힐/지팡이류
-    staff_common: { name: '새싹의 허브 지팡이', type: 'staff', rarity: 'Common', atk: 5, sellPrice: 50, icon: '🌿' },
-    staff_rare: { name: '축복의 성수 지팡이', type: 'staff', rarity: 'Rare', atk: 18, sellPrice: 250, icon: '💧✨' },
-    staff_epic: { name: '요정의 생명 지팡이', type: 'staff', rarity: 'Epic', atk: 50, sellPrice: 2500, icon: '🔮🌿' },
-    staff_legendary: { name: '세라핌의 치유 지팡이', type: 'staff', rarity: 'Legendary', atk: 160, sellPrice: 10000, icon: '🌟💖' },
-    staff_mythic: { name: '세계수의 영원한 생명', type: 'staff', rarity: 'Mythic', atk: 700, sellPrice: 100000, icon: '🌌✨' },
+    // 🌿 지팡이류 (힐러/서포터)
+    staff_common: { name: '새싹의 허브 지팡이', type: 'staff', rarity: 'Common', atk: 4, sellPrice: 50, icon: '🌿' },
+    staff_rare: { name: '축복의 성수 지팡이', type: 'staff', rarity: 'Rare', atk: 12, sellPrice: 250, icon: '💧✨' },
+    staff_epic: { name: '요정의 생명 지팡이', type: 'staff', rarity: 'Epic', atk: 35, sellPrice: 2500, icon: '🔮🌿' },
+    staff_legendary: { name: '세라핌의 치유 지팡이', type: 'staff', rarity: 'Legendary', atk: 80, sellPrice: 10000, icon: '🌟💖' },
+    staff_mythic: { name: '세계수의 영원한 생명', type: 'staff', rarity: 'Mythic', atk: 200, sellPrice: 100000, icon: '🌌✨' },
 
-    // 🎁 히든 장비 (홍인준 뱃살 방패 - 공격력 2000)
-    hidden_hong: { name: '홍인준의 뱃살 방패', type: 'shield', rarity: 'Mythic', atk: 2000, sellPrice: 100000, icon: '🐷🛡️' }
+    // 🎁 히든 장비
+    hidden_hong: { name: '홍인준의 뱃살 방패', type: 'shield', rarity: 'Mythic', atk: 600, sellPrice: 100000, icon: '🐷🛡️' }
 };
 
 const COUPONS = {
@@ -65,7 +65,8 @@ const COUPONS = {
 
 let gameState = {
     boss: { ...BOSS_LIST[0] },
-    players: {}
+    players: {},
+    parties: {} // 파티 시스템 관리 객체
 };
 
 function getRandomWeaponKey() {
@@ -83,39 +84,31 @@ function getRandomWeaponKey() {
     return `${selectedType}_${rarity.toLowerCase()}`;
 }
 
-// 🌟 등급별 추가 대미지 배율 함수
 function getRarityMultiplier(rarity) {
     switch (rarity) {
-        case 'Mythic': return 3.0;     // 신화: 데미지 3배 폭풍 상향
-        case 'Legendary': return 2.0;  // 전설: 데미지 2배
-        case 'Epic': return 1.5;       // 에픽: 데미지 1.5배
-        case 'Rare': return 1.2;       // 레어: 데미지 1.2배
-        default: return 1.0;           // 일반: 기본
+        case 'Mythic': return 2.5;
+        case 'Legendary': return 1.9;
+        case 'Epic': return 1.4;
+        case 'Rare': return 1.15;
+        default: return 1.0;
     }
 }
 
-// 📐 실제 데미지 계산 공통 함수
-function calculateDamage(p, isSkill = false) {
+// 📐 개선된 합리적 데미지 계산식 (초반 인플레 방지)
+function calculateDamage(p) {
     let eq = p.equippedIndex !== null ? p.inventory[p.equippedIndex] : null;
-    let baseAtk = 10;
+    let baseAtk = 8;
     let rarityMul = 1.0;
 
     if (eq) {
         rarityMul = getRarityMultiplier(eq.rarity);
-        // 장비 기본 공격력 + 강화 보정(+40%씩 증가) * 등급 배율
-        baseAtk = (eq.atk * (1 + (eq.enhance || 0) * 0.4)) * rarityMul;
+        // 장비 ATK + 합적용 강화 보정 (강화당 +15% 증가)
+        baseAtk = (eq.atk * (1 + (eq.enhance || 0) * 0.15)) * rarityMul;
     }
-
-    if (isSkill) {
-        // 필살기: (장비공격력 * 3) + 보너스 공격력 + 고정 500
-        return Math.round((baseAtk * 3) + (p.bonusAtk || 0) + 500);
-    } else {
-        // 일반 공격: 장비공격력 + 보너스 공격력
-        return Math.round(baseAtk + (p.bonusAtk || 0));
-    }
+    return Math.round(baseAtk + (p.bonusAtk || 0));
 }
 
-// ⏰ 10초마다 보스가 모든 플레이어 체력을 5씩 깎음 (사망 시 장착 무기 삭제)
+// ⏰ 10초마다 하드코어 체력 감소 및 사망 처리
 setInterval(() => {
     let updated = false;
     Object.values(gameState.players).forEach(p => {
@@ -124,6 +117,7 @@ setInterval(() => {
             updated = true;
 
             if (p.hp === 0) {
+                // 하드코어 패널티: 사망 시 장착 중인 무기 파괴 삭제!
                 if (p.equippedIndex !== null && p.inventory[p.equippedIndex]) {
                     p.inventory.splice(p.equippedIndex, 1);
                     p.equippedIndex = null;
@@ -131,9 +125,7 @@ setInterval(() => {
             }
         }
     });
-    if (updated) {
-        io.emit('updateState', gameState);
-    }
+    if (updated) io.emit('updateState', gameState);
 }, 10000);
 
 io.on('connection', (socket) => {
@@ -147,13 +139,14 @@ io.on('connection', (socket) => {
         inventory: [],
         equippedIndex: null,
         usedCoupons: [],
-        lastSkillTime: 0
+        lastSkillTime: 0,
+        partyId: null
     };
     io.emit('updateState', gameState);
 
     socket.on('setNickname', (newName) => {
         const p = gameState.players[socket.id];
-        if (p && newName && typeof newName === 'string') {
+        if (p && newName) {
             p.name = newName.trim().substring(0, 12);
             io.emit('updateState', gameState);
         }
@@ -174,26 +167,16 @@ io.on('connection', (socket) => {
         const p = gameState.players[socket.id];
         if (!p || p.hp <= 0) return;
 
-        let dmg = calculateDamage(p, false);
-
+        let dmg = calculateDamage(p);
         gameState.boss.currentHp -= dmg;
         p.totalDamage = (p.totalDamage || 0) + dmg;
         p.gold += 15;
 
-        if (gameState.boss.currentHp <= 0) {
-            const wKey = getRandomWeaponKey();
-            const w = { ...WEAPON_DB[wKey], id: Date.now() + Math.random(), enhance: 0 };
-            if (p.inventory.length < 36) {
-                p.inventory.push(w);
-                socket.emit('itemObtained', { weapon: w, full: false });
-            } else {
-                socket.emit('itemObtained', { weapon: w, full: true });
-            }
-            gameState.boss = { ...BOSS_LIST[Math.floor(Math.random() * BOSS_LIST.length)] };
-        }
+        checkBossKill(p);
         io.emit('updateState', gameState);
     });
 
+    // ⚔️ 무기별 고유 스킬 시스템
     socket.on('useSkill', () => {
         const p = gameState.players[socket.id];
         if (!p || p.hp <= 0) return;
@@ -205,14 +188,56 @@ io.on('connection', (socket) => {
         }
         p.lastSkillTime = now;
 
-        let skillDmg = calculateDamage(p, true);
+        let eq = p.equippedIndex !== null ? p.inventory[p.equippedIndex] : null;
+        let weaponType = eq ? eq.type : 'none';
+        let rarityMul = eq ? getRarityMultiplier(eq.rarity) : 1.0;
+        let baseAtk = eq ? eq.atk : 10;
 
-        gameState.boss.currentHp -= skillDmg;
-        p.totalDamage = (p.totalDamage || 0) + skillDmg;
-        p.gold += 50;
+        // 1. 🌿 지팡이: 힐 스킬
+        if (weaponType === 'staff') {
+            let target = p;
+            let lowestRatio = p.hp / p.maxHp;
+            Object.values(gameState.players).forEach(other => {
+                if (other.hp > 0 && (other.hp / other.maxHp) < lowestRatio) {
+                    lowestRatio = other.hp / other.maxHp;
+                    target = other;
+                }
+            });
+            let healAmt = Math.round((baseAtk * 2 * rarityMul) + 150);
+            target.hp = Math.min(target.maxHp, target.hp + healAmt);
+            p.gold += 30;
+            socket.emit('skillResult', { success: true, message: `🌿 [세계수의 축복] 발동! [${target.name}] 체력 ${healAmt} 회복!` });
+        } 
+        // 2. 🛡️ 방패: 자가 치유 및 보호
+        else if (weaponType === 'shield') {
+            let healAmt = Math.round((baseAtk * 1.5 * rarityMul) + 100);
+            p.hp = Math.min(p.maxHp, p.hp + healAmt);
+            p.gold += 25;
+            socket.emit('skillResult', { success: true, message: `🛡️ [절대 방벽] 발동! 내 체력 ${healAmt} 회복 및 철벽 유지!` });
+        } 
+        // 3. 🏹 활: 연속 저격 스킬 (배율 2.2배)
+        else if (weaponType === 'bow') {
+            let skillDmg = Math.round((baseAtk * rarityMul * 2.2) + (p.bonusAtk || 0));
+            gameState.boss.currentHp -= skillDmg;
+            p.totalDamage += skillDmg;
+            p.gold += 45;
+            socket.emit('skillResult', { success: true, message: `🏹 [스톰 래피드] 폭우의 화살 적중! ${skillDmg} 대미지!` });
+            checkBossKill(p);
+        } 
+        // 4. 🔪 단검 또는 맨손: 그림자 암살 (배율 2.5배)
+        else {
+            let skillDmg = Math.round((baseAtk * rarityMul * 2.5) + (p.bonusAtk || 0));
+            gameState.boss.currentHp -= skillDmg;
+            p.totalDamage += skillDmg;
+            p.gold += 50;
+            socket.emit('skillResult', { success: true, message: `🗡️ [그림자 멸살검] 치명타 적중! ${skillDmg} 대미지!` });
+            checkBossKill(p);
+        }
 
-        socket.emit('skillResult', { success: true, message: `⚡ 필살기 적중! ${skillDmg} 대미지!` });
+        io.emit('updateState', gameState);
+    });
 
+    function checkBossKill(p) {
         if (gameState.boss.currentHp <= 0) {
             const wKey = getRandomWeaponKey();
             const w = { ...WEAPON_DB[wKey], id: Date.now() + Math.random(), enhance: 0 };
@@ -224,6 +249,44 @@ io.on('connection', (socket) => {
             }
             gameState.boss = { ...BOSS_LIST[Math.floor(Math.random() * BOSS_LIST.length)] };
         }
+    }
+
+    // 🏕️ 파티 시스템 관련 소켓 핸들러
+    socket.on('createParty', () => {
+        const p = gameState.players[socket.id];
+        if (!p || p.partyId) return;
+        const partyId = 'party_' + socket.id.substring(0, 4);
+        gameState.parties[partyId] = { leader: socket.id, members: [socket.id] };
+        p.partyId = partyId;
+        io.emit('updateState', gameState);
+    });
+
+    socket.on('joinParty', (partyId) => {
+        const p = gameState.players[socket.id];
+        if (!p || p.partyId || !gameState.parties[partyId]) return;
+        if (gameState.parties[partyId].members.length >= 4) {
+            socket.emit('skillResult', { success: false, message: '⚠️ 파티 정원이 가득 찼습니다 (최대 4인).' });
+            return;
+        }
+        gameState.parties[partyId].members.push(socket.id);
+        p.partyId = partyId;
+        io.emit('updateState', gameState);
+    });
+
+    socket.on('leaveParty', () => {
+        const p = gameState.players[socket.id];
+        if (!p || !p.partyId) return;
+        const partyId = p.partyId;
+        const party = gameState.parties[partyId];
+        if (party) {
+            party.members = party.members.filter(id => id !== socket.id);
+            if (party.members.length === 0) {
+                delete gameState.parties[partyId];
+            } else if (party.leader === socket.id) {
+                party.leader = party.members[0];
+            }
+        }
+        p.partyId = null;
         io.emit('updateState', gameState);
     });
 
@@ -267,18 +330,18 @@ io.on('connection', (socket) => {
         if (p && p.inventory[idx]) {
             const item = p.inventory[idx];
             const currentLevel = item.enhance || 0;
-            const cost = (currentLevel + 1) * 500;
+            const cost = (currentLevel + 1) * 400;
 
             if (p.gold >= cost) {
                 p.gold -= cost;
-                let successChance = Math.max(15, 100 - (currentLevel * 7.5)); 
+                let successChance = Math.max(20, 100 - (currentLevel * 6)); 
                 const roll = Math.random() * 100;
 
                 if (roll <= successChance) {
                     item.enhance = currentLevel + 1;
                     socket.emit('enhanceResult', { success: true, message: `✨ 강화 성공! (+${item.enhance})` });
                 } else {
-                    socket.emit('enhanceResult', { success: false, message: `💥 강화 실패... 골드만 소모되었습니다.` });
+                    socket.emit('enhanceResult', { success: false, message: `💥 강화 실패... 골드가 소모되었습니다.` });
                 }
                 io.emit('updateState', gameState);
             }
@@ -300,6 +363,13 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
+        // 접속 해제 시 파티 정리
+        const p = gameState.players[socket.id];
+        if (p && p.partyId && gameState.parties[p.partyId]) {
+            const party = gameState.parties[p.partyId];
+            party.members = party.members.filter(id => id !== socket.id);
+            if (party.members.length === 0) delete gameState.parties[p.partyId];
+        }
         delete gameState.players[socket.id];
         io.emit('updateState', gameState);
     });
