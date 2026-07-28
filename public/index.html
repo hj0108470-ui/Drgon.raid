@@ -10,6 +10,8 @@
         .container { max-width: 600px; margin: 0 auto; }
         .card { background: #1a1c23; border-radius: 12px; padding: 15px; margin-bottom: 12px; border: 1px solid #2a2e3d; }
         .boss-card { border: 2px solid #e74c3c; }
+        .boss-icon { font-size: 65px; margin: 5px 0; animation: bounce 1s infinite alternate; }
+        @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-5px); } }
         .hp-bar-bg { background: #333; height: 22px; border-radius: 11px; overflow: hidden; margin: 10px 0; }
         .hp-bar-fill { background: #e74c3c; height: 100%; width: 100%; transition: width 0.2s; }
         .btn { background: #e67e22; border: none; padding: 14px; color: #fff; font-size: 16px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; }
@@ -25,6 +27,7 @@
 <body>
     <div class="container">
         <div class="card boss-card">
+            <div id="bossIcon" class="boss-icon">⚔️</div>
             <h2 id="bossName">🔄 서버 연결 중...</h2>
             <div class="hp-bar-bg"><div id="bossHpFill" class="hp-bar-fill"></div></div>
             <p id="bossHpText">0 / 0</p>
@@ -67,7 +70,17 @@
 
         socket.on('updateState', (state) => {
             if (!state || !state.boss) return;
-            document.getElementById('bossName').innerText = state.boss.name;
+            
+            // 보스 이름과 이모티콘 분리 (예: "🐷 꿀신" -> 이모티콘 "🐷", 이름 "꿀신")
+            const bossParts = state.boss.name.split(' ');
+            if (bossParts.length >= 2) {
+                document.getElementById('bossIcon').innerText = bossParts[0];
+                document.getElementById('bossName').innerText = bossParts.slice(1).join(' ');
+            } else {
+                document.getElementById('bossIcon').innerText = '👾';
+                document.getElementById('bossName').innerText = state.boss.name;
+            }
+
             const bossHpPct = (state.boss.currentHp / state.boss.maxHp) * 100;
             document.getElementById('bossHpFill').style.width = Math.max(0, bossHpPct) + '%';
             document.getElementById('bossHpText').innerText = Math.max(0, state.boss.currentHp) + ' / ' + state.boss.maxHp;
@@ -121,3 +134,4 @@
     </script>
 </body>
 </html>
+
