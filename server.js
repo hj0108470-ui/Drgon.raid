@@ -15,13 +15,21 @@ app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
+// -------------------------------------------------------------
+// 1. 보스 목록 (체력 10.5배 상향 적용)
+// -------------------------------------------------------------
 const BOSS_LIST = [
-    { name: '🐷 꿀신', maxHp: 15000, currentHp: 15000 },
-    { name: '🗿 골리앗', maxHp: 35000, currentHp: 35000 },
-    { name: '🦖 이라소', maxHp: 80000, currentHp: 80000 },
-    { name: '🐉 드래곤', maxHp: 200000, currentHp: 200000 }
+    { name: '🐷 꿀신', maxHp: 157500, currentHp: 157500 },     // 15,000 * 10.5
+    { name: '🗿 골리앗', maxHp: 367500, currentHp: 367500 },   // 35,000 * 10.5
+    { name: '🦖 이라소', maxHp: 840000, currentHp: 840000 },   // 80,000 * 10.5
+    { name: '🐉 드래곤', maxHp: 2100000, currentHp: 2100000 }  // 200,000 * 10.5
 ];
 
+// -------------------------------------------------------------
+// 2. 무기 및 아이템 DB (지팡이 계열 힐량 및 targets 설정 반영)
+// - 힐량: 최하위(Common) 10, 등급당 +5씩 증가 (Common: 10, Rare: 15, Epic: 20, Legendary: 25, Mythic: 30)
+// - 신화(Mythic) 등급 지팡이는 최대 2명 힐 가능 (targets: 2)
+// -------------------------------------------------------------
 const WEAPON_DB = {
     knife_common: { name: '녹슨 도살도', type: 'knife', rarity: 'Common', atk: 10, sellPrice: 50, icon: '🔪' },
     knife_rare: { name: '혈각의 서사도', type: 'knife', rarity: 'Rare', atk: 25, sellPrice: 250, icon: '🗡️' },
@@ -41,11 +49,12 @@ const WEAPON_DB = {
     bow_legendary: { name: '천둥의 스톰브링어', type: 'bow', rarity: 'Legendary', atk: 125, sellPrice: 10000, icon: '🏹⚡' },
     bow_mythic: { name: '태양의 신궁 아폴론', type: 'bow', rarity: 'Mythic', atk: 300, sellPrice: 100000, icon: '🏹🌌' },
 
-    staff_common: { name: '새싹의 허브 지팡이', type: 'staff', rarity: 'Common', atk: 4, sellPrice: 50, icon: '🌿' },
-    staff_rare: { name: '축복의 성수 지팡이', type: 'staff', rarity: 'Rare', atk: 12, sellPrice: 250, icon: '💧✨' },
-    staff_epic: { name: '요정의 생명 지팡이', type: 'staff', rarity: 'Epic', atk: 35, sellPrice: 2500, icon: '🔮🌿' },
-    staff_legendary: { name: '세라핌의 치유 지팡이', type: 'staff', rarity: 'Legendary', atk: 80, sellPrice: 10000, icon: '🌟💖' },
-    staff_mythic: { name: '세계수의 영원한 생명', type: 'staff', rarity: 'Mythic', atk: 200, sellPrice: 100000, icon: '🌌✨' },
+    // 지팡이 (힐 템)
+    staff_common: { name: '새싹의 허브 지팡이', type: 'staff', rarity: 'Common', atk: 4, heal: 10, targets: 1, sellPrice: 50, icon: '🌿' },
+    staff_rare: { name: '축복의 성수 지팡이', type: 'staff', rarity: 'Rare', atk: 12, heal: 15, targets: 1, sellPrice: 250, icon: '💧✨' },
+    staff_epic: { name: '요정의 생명 지팡이', type: 'staff', rarity: 'Epic', atk: 35, heal: 20, targets: 1, sellPrice: 2500, icon: '🔮🌿' },
+    staff_legendary: { name: '세라핌의 치유 지팡이', type: 'staff', rarity: 'Legendary', atk: 80, heal: 25, targets: 1, sellPrice: 10000, icon: '🌟💖' },
+    staff_mythic: { name: '세계수의 영원한 생명', type: 'staff', rarity: 'Mythic', atk: 200, heal: 30, targets: 2, sellPrice: 100000, icon: '🌌✨' },
 
     hidden_hong: { name: '홍인준의 뱃살 방패', type: 'shield', rarity: 'Mythic', atk: 600, sellPrice: 100000, icon: '🐷🛡️' }
 };
@@ -97,17 +106,25 @@ function calculateDamage(p) {
     return Math.round(baseAtk + (p.bonusAtk || 0));
 }
 
+// -------------------------------------------------------------
+// 3. 사망 버그 수정 및 부활 처리 루프
+// -------------------------------------------------------------
 setInterval(() => {
     let updated = false;
     Object.values(gameState.players).forEach(p => {
         if (p.hp > 0) {
             p.hp = Math.max(0, p.hp - 5);
             updated = true;
+            
+            // 사망 시 처리 (버그 방지 및 무기 드랍)
             if (p.hp === 0) {
+                // 1. 장착 중인 무기 버리기 (삭제)
                 if (p.equippedIndex !== null && p.inventory[p.equippedIndex]) {
                     p.inventory.splice(p.equippedIndex, 1);
                     p.equippedIndex = null;
                 }
+                // 2. 즉시 부활 처리 (클릭 안 됨 및 무한 사망 락 방지)
+                p.hp = p.maxHp;
             }
         }
     });
@@ -160,7 +177,11 @@ io.on('connection', (socket) => {
         io.emit('updateState', gameState);
     });
 
-    socket.on('useSkill', () => {
+    // -------------------------------------------------------------
+    // 4. 힐 템 스킬: 유저 선택 창 연동 및 힐량/대상 수 적용 로직
+    // data.targetIds로 선택된 유저 ID 배열을 받으며, 본인 포함 가능
+    // -------------------------------------------------------------
+    socket.on('useSkill', (data) => {
         const p = gameState.players[socket.id];
         if (!p || p.hp <= 0) return;
         const now = Date.now();
@@ -176,18 +197,32 @@ io.on('connection', (socket) => {
         let baseAtk = eq ? eq.atk : 10;
 
         if (weaponType === 'staff') {
-            let target = p;
-            let lowestRatio = p.hp / p.maxHp;
-            Object.values(gameState.players).forEach(other => {
-                if (other.hp > 0 && (other.hp / other.maxHp) < lowestRatio) {
-                    lowestRatio = other.hp / other.maxHp;
-                    target = other;
+            // 지팡이 힐 스킬: 전달받은 대상 목록(targetIds) 혹은 기본 본인 선택
+            let targetIds = (data && data.targetIds && Array.isArray(data.targetIds)) ? data.targetIds : [socket.id];
+            let maxTargets = eq.targets || 1; // 신화 등급은 2명, 나머지 1명
+            let validTargets = targetIds.slice(0, maxTargets);
+
+            let healBase = eq.heal || 10;
+            let totalHealAmt = Math.round((healBase * rarityMul) + 20);
+
+            let healedNames = [];
+            validTargets.forEach(tId => {
+                let targetPlayer = gameState.players[tId];
+                if (targetPlayer && targetPlayer.hp > 0) {
+                    targetPlayer.hp = Math.min(targetPlayer.maxHp, targetPlayer.hp + totalHealAmt);
+                    healedNames.push(targetPlayer.name);
                 }
             });
-            let healAmt = Math.round((baseAtk * 2 * rarityMul) + 150);
-            target.hp = Math.min(target.maxHp, target.hp + healAmt);
+
+            if (healedNames.length === 0) {
+                // 유효한 타겟이 없다면 시전자 본인에게 힐
+                p.hp = Math.min(p.maxHp, p.hp + totalHealAmt);
+                healedNames.push(p.name);
+            }
+
             p.gold += 30;
-            socket.emit('skillResult', { success: true, message: `🌿 [세계수의 축복] 발동! [${target.name}] 체력 ${healAmt} 회복!` });
+            socket.emit('skillResult', { success: true, message: `🌿 [치유의 파동] 발동! [${healedNames.join(', ')}] 체력 ${totalHealAmt} 회복!` });
+
         } else if (weaponType === 'shield') {
             let healAmt = Math.round((baseAtk * 1.5 * rarityMul) + 100);
             p.hp = Math.min(p.maxHp, p.hp + healAmt);
@@ -225,7 +260,6 @@ io.on('connection', (socket) => {
         }
     }
 
-    // 파티 생성 (이름 지정)
     socket.on('createParty', (partyName) => {
         const p = gameState.players[socket.id];
         if (!p || p.partyId) return;
@@ -237,7 +271,6 @@ io.on('connection', (socket) => {
         io.emit('updateState', gameState);
     });
 
-    // 파티 목록 요청
     socket.on('getPartyList', () => {
         const list = Object.keys(gameState.parties).map(id => ({
             id: id,
@@ -247,7 +280,6 @@ io.on('connection', (socket) => {
         socket.emit('partyListResult', list);
     });
 
-    // 파티 참여
     socket.on('joinParty', (partyId) => {
         const p = gameState.players[socket.id];
         if (!p || p.partyId || !gameState.parties[partyId]) return;
@@ -262,7 +294,6 @@ io.on('connection', (socket) => {
         io.emit('updateState', gameState);
     });
 
-    // 파티 탈퇴
     socket.on('leaveParty', () => {
         const p = gameState.players[socket.id];
         if (!p || !p.partyId) return;
