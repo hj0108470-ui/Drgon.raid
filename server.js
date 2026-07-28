@@ -89,6 +89,15 @@ io.on('connection', (socket) => {
     };
     io.emit('updateState', gameState);
 
+    // 🏷️ 닉네임 설정 처리
+    socket.on('setNickname', (newName) => {
+        const p = gameState.players[socket.id];
+        if (p && newName && typeof newName === 'string') {
+            p.name = newName.trim().substring(0, 12);
+            io.emit('updateState', gameState);
+        }
+    });
+
     socket.on('drawGacha', () => {
         const p = gameState.players[socket.id];
         if (!p || p.gold < 1000 || p.inventory.length >= 36) return;
@@ -160,14 +169,26 @@ io.on('connection', (socket) => {
         }
     });
 
+    // 🔨 강화 확률 시스템 (+단계가 높을수록 성공 확률 감소)
     socket.on('enhanceItem', (idx) => {
         const p = gameState.players[socket.id];
         if (p && p.inventory[idx]) {
             const item = p.inventory[idx];
-            const cost = (item.enhance + 1) * 500;
+            const currentLevel = item.enhance || 0;
+            const cost = (currentLevel + 1) * 500;
+
             if (p.gold >= cost) {
                 p.gold -= cost;
-                item.enhance = (item.enhance || 0) + 1;
+
+                let successChance = Math.max(15, 100 - (currentLevel * 7.5)); 
+                const roll = Math.random() * 100;
+
+                if (roll <= successChance) {
+                    item.enhance = currentLevel + 1;
+                    socket.emit('enhanceResult', { success: true, message: `✨ 강화 성공! (+${item.enhance})` });
+                } else {
+                    socket.emit('enhanceResult', { success: false, message: `💥 강화 실패... 골드만 소모되었습니다.` });
+                }
                 io.emit('updateState', gameState);
             }
         }
