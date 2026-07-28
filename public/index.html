@@ -2,306 +2,74 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>idle Boss Raid</title>
-    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <title>아이들 보스 레이드</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: #e0e0e0; margin: 0; padding: 10px; display: flex; flex-direction: column; align-items: center; }
-        h1 { font-size: 20px; margin-bottom: 5px; color: #66fcf1; text-align: center; }
-        .main-container { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 420px; }
-        .panel { background: #1f2833; padding: 15px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); position: relative; box-sizing: border-box; width: 100%; }
-        .boss-panel { text-align: center; background: #0b0c10; border: 2px solid #45a29e; }
-        
-        /* 🦖 보스 위아래 둥실둥실 움직이는 애니메이션 & 대형 크기 */
-        @keyframes bossFloat {
-            0% { transform: translateY(0px); }
-            50% { transform: translateY(-8px); }
-            100% { transform: translateY(0px); }
-        }
-        .boss-avatar { font-size: 55px; margin: 5px 0; display: inline-block; animation: bossFloat 2.5s ease-in-out infinite; }
-        .boss-name-text { font-size: 20px; font-weight: bold; margin: 0 0 5px 0; color: #66fcf1; }
-
-        /* ✨ 스킬 UI 시스템 스타일 */
-        .skill-container { background: rgba(69, 162, 158, 0.1); border: 1px solid #45a29e; border-radius: 8px; padding: 10px; margin: 10px 0; text-align: left; }
-        .skill-info-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; }
-        .skill-gauge-bg { background: #333; height: 12px; border-radius: 6px; overflow: hidden; margin-bottom: 8px; }
-        .skill-gauge-fill { background: #f1c40f; height: 100%; width: 0%; transition: width 0.2s; }
-        
-        /* 스킬 버튼 (충전 완료 시 활성화) */
-        .skill-use-btn { background: #555; color: #aaa; border: none; padding: 8px; border-radius: 5px; width: 100%; font-weight: bold; font-size: 13px; cursor: not-allowed; transition: 0.2s; }
-        .skill-use-btn.ready { background: #2ecc71; color: #fff; cursor: pointer; box-shadow: 0 0 10px rgba(46, 204, 113, 0.6); animation: pulseBtn 1s infinite alternate; }
-        @keyframes pulseBtn {
-            0% { transform: scale(1); }
-            100% { transform: scale(1.02); }
-        }
-
-        .hp-bar-bg { background: #333; height: 22px; border-radius: 11px; overflow: hidden; margin: 10px 0; }
-        .hp-bar-fill { background: #e74c3c; height: 100%; width: 100%; transition: width 0.2s; }
-        button { background: #45a29e; border: none; color: #fff; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; margin: 4px 0; width: 100%; transition: 0.2s; font-size: 14px; }
-        button:hover { background: #66fcf1; color: #000; }
-        .inv-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; margin-top: 8px; }
-        .inv-slot { background: #121212; border: 1px solid #45a29e; height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; border-radius: 6px; cursor: pointer; position: relative; }
-        .inv-slot.equipped { border: 2px solid #f1c40f; background: rgba(241, 196, 15, 0.1); }
-        .rank-list { font-size: 12px; text-align: left; padding: 0; list-style: none; margin: 5px 0 0 0; }
-        .rank-list li { padding: 3px 0; border-bottom: 1px solid #333; }
-        
-        /* 타격 이펙트 & 필드 드랍 스타일 */
-        #effectOverlay { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); font-weight: bold; font-size: 16px; pointer-events: none; transition: 0.3s; opacity: 0; text-shadow: 0 0 5px #000; z-index: 10; }
-        .field-drop-box { background: rgba(231, 76, 60, 0.2); border: 1px dashed #e74c3c; padding: 8px; margin-top: 10px; border-radius: 6px; text-align: center; }
-        .drop-item-btn { background: #e67e22; font-size: 11px; padding: 4px 8px; width: auto; display: inline-block; }
+        body { font-family: sans-serif; background: #1e1e1e; color: #fff; text-align: center; margin: 0; padding: 20px; }
+        .box { background: #2d2d2d; padding: 15px; margin: 10px auto; width: 350px; border-radius: 8px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #ff4757; color: white; border: none; border-radius: 5px; }
+        button:hover { background: #ff6b81; }
+        .inv-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; margin-top: 10px; }
+        .slot { background: #3d3d3d; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 12px; border-radius: 4px; }
     </style>
 </head>
 <body>
-
-    <h1>⚔️ 방치형 보스 레이드</h1>
-
-    <div class="main-container">
-        <!-- 1. 보스 전투 패널 (상단) -->
-        <div class="panel boss-panel">
-            <div id="effectOverlay">✨ 스킬 발동!</div>
-            
-            <!-- 보스 아바타 및 이름 (대형화 + 상하 무빙) -->
-            <div id="bossAvatar" class="boss-avatar">🐷</div>
-            <div id="bossName" class="boss-name-text">꿀신</div>
-
-            <!-- ✨ 스킬 UI 시스템 영역 -->
-            <div class="skill-container">
-                <div class="skill-info-row">
-                    <span>⚡ 장착 스킬: <strong id="skillNameText" style="color: #66fcf1;">없음</strong></span>
-                    <span>게이지: <strong id="skillGaugeText" style="color: #f1c40f;">0 / 5</strong></span>
-                </div>
-                <div class="skill-gauge-bg">
-                    <div id="skillGaugeFill" class="skill-gauge-fill"></div>
-                </div>
-                <button id="useSkillBtn" class="skill-use-btn" onclick="useActiveSkill()" disabled>🔒 스킬 충전 필요 (공격 시 충전)</button>
-            </div>
-
-            <div class="hp-bar-bg"><div id="bossHpFill" class="hp-bar-fill"></div></div>
-            <p id="bossHpText" style="font-weight: bold; font-size: 14px; margin: 5px 0;">0 / 0</p>
-            <button id="attackBtn" style="background:#e74c3c; font-size:15px; padding:12px;" onclick="attackBoss()">🗡️ 공격하기</button>
-            
-            <hr style="border-color:#333; margin:12px 0;">
-            <h3 style="margin: 0 0 5px 0; font-size: 14px;">🏆 실시간 데미지 랭킹</h3>
-            <ul id="rankList" class="rank-list"></ul>
-            
-            <!-- 필드 드랍 영역 -->
-            <div id="fieldDropContainer" style="display:none;" class="field-drop-box">
-                <p style="margin:0 0 5px 0; font-size:11px; color:#e74c3c;">🚨 필드에 떨어진 무기!</p>
-                <div id="fieldDropList"></div>
-            </div>
-        </div>
-
-        <!-- 2. 플레이어 정보 & 인벤토리 패널 (하단) -->
-        <div class="panel">
-            <h3 style="margin-top: 0; font-size: 15px;">👤 내 정보</h3>
-            <p style="margin: 4px 0; font-size: 13px;">닉네임: <span id="pName" style="color:#66fcf1;">-</span> <button style="width:auto; padding:2px 6px; font-size:9px;" onclick="changeNickname()">변경</button></p>
-            <p style="margin: 4px 0; font-size: 13px;">체력(HP): <span id="pHp" style="color:#2ecc71;">100</span>/<span id="pMaxHp">100</span></p>
-            <p style="margin: 4px 0; font-size: 13px;">보유 골드: <span id="pGold" style="color:#f1c40f;">500</span> G</p>
-            
-            <button onclick="drawGacha()" style="margin-top: 8px;">🎁 무기 뽑기 (1,000G)</button>
-            
-            <div style="margin-top:8px; display: flex; gap: 5px;">
-                <input type="text" id="couponInput" placeholder="쿠폰 코드 입력" style="flex:1; padding:6px; background:#121212; border:1px solid #45a29e; color:#fff; border-radius:4px; font-size: 12px;">
-                <button style="width:65px; margin:0; padding:6px;" onclick="useCoupon()">사용</button>
-            </div>
-
-            <h4 style="margin:12px 0 4px 0; font-size: 13px;">🎒 인벤토리 (36칸)</h4>
-            <div class="inv-grid" id="invGrid"></div>
-        </div>
+    <h1>⚔️ 보스 레이드</h1>
+    <div class="box">
+        <h3 id="boss-name">보스 이름</h3>
+        <p>HP: <span id="boss-hp">0</span> / <span id="boss-max-hp">0</span></p>
+        <button onclick="attackBoss()">⚔️ 공격하기</button>
     </div>
 
-    <script>
-        const socket = io({ transports: ['websocket', 'polling'] });
-        let myData = null;
-        let currentSkillGauge = 0;
-        const maxSkillGauge = 5; // 공격 5회 시 스킬 충전 완료
+    <div class="box">
+        <h3>💰 내 정보</h3>
+        <p>골드: <span id="player-gold">0</span> G</p>
+        <button onclick="doGacha()">🎲 무기 뽑기 (1,000G)</button>
+    </div>
 
-        socket.on('kicked', () => {
-            alert('🚨 GM에 의해 강퇴당했습니다.');
-            window.location.reload();
+    <div class="box" style="width: 400px;">
+        <h3>🎒 인벤토리 (36칸)</h3>
+        <div id="inventory-grid" class="inv-grid"></div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+
+        function attackBoss() { socket.emit('attack'); }
+        function doGacha() { socket.emit('gacha'); }
+
+        socket.on('updateState', (state) => {
+            // 보스 정보 갱신
+            document.getElementById('boss-name').innerText = state.boss.name;
+            document.getElementById('boss-hp').innerText = state.boss.currentHp;
+            document.getElementById('boss-max-hp').innerText = state.boss.maxHp;
+
+            // 내 정보 갱신 (첫 번째 플레이어 기준 테스트)
+            const myId = socket.id;
+            const me = state.players[myId];
+            if (me) {
+                document.getElementById('player-gold').innerText = me.gold;
+
+                // 인벤토리 36칸 렌더링
+                const grid = document.getElementById('inventory-grid');
+                grid.innerHTML = '';
+                for (let i = 0; i < state.maxInventorySlots; i++) {
+                    const slotDiv = document.createElement('div');
+                    slotDiv.className = 'slot';
+                    const item = me.inventory[i];
+                    if (item) {
+                        slotDiv.innerText = item.icon;
+                        slotDiv.title = `${item.name} (${item.rarity})`;
+                    } else {
+                        slotDiv.style.color = '#777';
+                        slotDiv.innerText = i + 1;
+                    }
+                    grid.appendChild(slotDiv);
+                }
+            }
         });
 
         socket.on('notify', (msg) => { alert(msg); });
-
-        // 공격 시 스킬 이펙트 연출 및 게이지 충전
-        socket.on('attackEffect', (data) => {
-            const overlay = document.getElementById('effectOverlay');
-            overlay.innerText = `🔥 [${data.skillName}] (-${data.dmg})`;
-            overlay.style.opacity = '1';
-            overlay.style.top = '5px';
-            setTimeout(() => {
-                overlay.style.opacity = '0';
-                overlay.style.top = '10px';
-            }, 600);
-
-            // 장착 중인 무기가 있고 쿨타임 중이 아닐 때만 게이지 증가
-            if (myData && myData.equippedIndex !== null && myData.inventory[myData.equippedIndex]) {
-                if ((!myData.skillCoolTime || myData.skillCoolTime <= 0) && currentSkillGauge < maxSkillGauge) {
-                    currentSkillGauge++;
-                    updateSkillUI();
-                }
-            }
-        });
-
-        socket.on('updateState', (state) => {
-            if (!state || !state.boss) return;
-            myData = state.players[socket.id];
-            if (!myData) return;
-
-            // 보스 정보 및 이모지 분리 갱신
-            const fullBossName = state.boss.name;
-            const parts = fullBossName.split(' ');
-            if (parts.length >= 2) {
-                document.getElementById('bossAvatar').innerText = parts[0];
-                document.getElementById('bossName').innerText = parts.slice(1).join(' ');
-            } else {
-                document.getElementById('bossAvatar').innerText = '👾';
-                document.getElementById('bossName').innerText = fullBossName;
-            }
-
-            const hpPercent = Math.max(0, (state.boss.currentHp / state.boss.maxHp) * 100);
-            document.getElementById('bossHpFill').style.width = hpPercent + '%';
-            document.getElementById('bossHpText').innerText = `${state.boss.currentHp.toLocaleString()} / ${state.boss.maxHp.toLocaleString()}`;
-
-            // 내 정보 갱신
-            document.getElementById('pName').innerText = myData.name;
-            document.getElementById('pHp').innerText = myData.hp;
-            document.getElementById('pMaxHp').innerText = myData.maxHp;
-            document.getElementById('pGold').innerText = myData.gold.toLocaleString();
-
-            updateSkillUI();
-
-            // 사망 시 버튼 안내
-            const atkBtn = document.getElementById('attackBtn');
-            if (myData.hp <= 0) {
-                atkBtn.innerText = '💀 부활 및 공격하기';
-                atkBtn.style.background = '#8e44ad';
-            } else {
-                atkBtn.innerText = '🗡️ 공격하기';
-                atkBtn.style.background = '#e74c3c';
-            }
-
-            // 인벤토리 렌더링
-            const grid = document.getElementById('invGrid');
-            grid.innerHTML = '';
-            for (let i = 0; i < 36; i++) {
-                const item = myData.inventory[i];
-                const slot = document.createElement('div');
-                slot.className = 'inv-slot' + (myData.equippedIndex === i ? ' equipped' : '');
-                if (item) {
-                    const enh = item.enhance ? `+${item.enhance}` : '';
-                    slot.innerHTML = `<span style="font-size:16px;">${item.icon}</span><span style="font-size:9px;">${enh}</span>`;
-                    slot.title = `${item.name} (${item.skillName || '일반'})\n클릭: 장착/해제\n우클릭: 강화/판매`;
-                    slot.onclick = () => {
-                        socket.emit('equipItem', i);
-                        currentSkillGauge = 0; // 무기 교체 시 게이지 초기화
-                    };
-                    slot.oncontextmenu = (e) => {
-                        e.preventDefault();
-                        const act = prompt(`[${item.name}] 선택\n1. 강화하기 (비용: ${( (item.enhance||0) + 1 ) * 500}G)\n2. 판매하기 (가격: ${item.sellPrice}G)`, '1');
-                        if (act === '1') socket.emit('enhanceItem', i);
-                        else if (act === '2') socket.emit('sellItem', i);
-                    };
-                }
-                grid.appendChild(slot);
-            }
-
-            // 필드 드랍 렌더링
-            const dropContainer = document.getElementById('fieldDropContainer');
-            const dropList = document.getElementById('fieldDropList');
-            if (state.fieldDrops && state.fieldDrops.length > 0) {
-                dropContainer.style.display = 'block';
-                dropList.innerHTML = '';
-                state.fieldDrops.forEach(drop => {
-                    const div = document.createElement('div');
-                    div.style.margin = '4px 0';
-                    div.style.display = 'flex';
-                    div.style.justifyContent = 'space-between';
-                    div.style.alignItems = 'center';
-                    div.innerHTML = `<span style="font-size:11px;">${drop.weapon.icon} ${drop.weapon.name} (${drop.droppedBy})</span> <button class="drop-item-btn" onclick="socket.emit('pickupDrop', ${drop.id})">줍기</button>`;
-                    dropList.appendChild(div);
-                });
-            } else {
-                dropContainer.style.display = 'none';
-            }
-
-            // 실시간 랭킹 렌더링 (Top 5)
-            const sortedPlayers = Object.values(state.players).sort((a, b) => (b.totalDamage || 0) - (a.totalDamage || 0));
-            const rankList = document.getElementById('rankList');
-            rankList.innerHTML = '';
-            sortedPlayers.slice(0, 5).forEach((p, idx) => {
-                const li = document.createElement('li');
-                const isMe = p.id === socket.id ? ' (나)' : '';
-                li.innerHTML = `<strong>${idx + 1}위</strong> ${p.name}${isMe}: ⚔️ ${(p.totalDamage || 0).toLocaleString()}`;
-                rankList.appendChild(li);
-            });
-        });
-
-        // 스킬 UI 갱신 함수 (쿨타임 반영)
-        function updateSkillUI() {
-            if (!myData) return;
-            const skillNameText = document.getElementById('skillNameText');
-            const skillGaugeText = document.getElementById('skillGaugeText');
-            const skillGaugeFill = document.getElementById('skillGaugeFill');
-            const useSkillBtn = document.getElementById('useSkillBtn');
-
-            if (myData.equippedIndex !== null && myData.inventory[myData.equippedIndex]) {
-                const item = myData.inventory[myData.equippedIndex];
-                const sName = item.skillName || '특수 스킬';
-                skillNameText.innerText = `${sName} (${item.name})`;
-
-                // ✨ 서버에서 받아온 쿨타임이 남아있는 경우
-                if (myData.skillCoolTime && myData.skillCoolTime > 0) {
-                    skillGaugeText.innerText = `쿨타임 중`;
-                    skillGaugeFill.style.width = '0%';
-                    useSkillBtn.innerText = `⏳ 스킬 쿨타임 중... (${myData.skillCoolTime}초 남음)`;
-                    useSkillBtn.className = 'skill-use-btn';
-                    useSkillBtn.disabled = true;
-                    return;
-                }
-
-                skillGaugeText.innerText = `${currentSkillGauge} / ${maxSkillGauge}`;
-                const pct = (currentSkillGauge / maxSkillGauge) * 100;
-                skillGaugeFill.style.width = pct + '%';
-
-                if (currentSkillGauge >= maxSkillGauge) {
-                    useSkillBtn.innerText = `✨ [${sName}] 스킬 발동 가능! (클릭)`;
-                    useSkillBtn.className = 'skill-use-btn ready';
-                    useSkillBtn.disabled = false;
-                } else {
-                    useSkillBtn.innerText = `🔒 스킬 충전 중... (${currentSkillGauge}/${maxSkillGauge})`;
-                    useSkillBtn.className = 'skill-use-btn';
-                    useSkillBtn.disabled = true;
-                }
-            } else {
-                skillNameText.innerText = '없음 (무기 장착 필요)';
-                skillGaugeText.innerText = `0 / ${maxSkillGauge}`;
-                skillGaugeFill.style.width = '0%';
-                useSkillBtn.innerText = '🔒 무기를 장착해주세요';
-                useSkillBtn.className = 'skill-use-btn';
-                useSkillBtn.disabled = true;
-            }
-        }
-
-        // 수동 스킬 버튼 클릭 시 서버로 요청 전송
-        function useActiveSkill() {
-            if (currentSkillGauge >= maxSkillGauge && myData && myData.equippedIndex !== null) {
-                socket.emit('useSkill');
-                currentSkillGauge = 0; // 게이지 초기화
-                updateSkillUI();
-            }
-        }
-
-        function attackBoss() { socket.emit('attack'); }
-        function drawGacha() { socket.emit('drawGacha'); }
-        function changeNickname() {
-            const name = prompt('사용할 닉네임을 입력하세요 (최대 12자):', '');
-            if (name) socket.emit('setNickname', name);
-        }
-        function useCoupon() {
-            const code = document.getElementById('couponInput').value.trim();
-            if (code) socket.emit('useCoupon', code);
-        }
     </script>
 </body>
 </html>
