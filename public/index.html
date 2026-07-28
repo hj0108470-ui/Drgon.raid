@@ -13,8 +13,10 @@
         .boss-icon { font-size: 65px; margin: 5px 0; }
         .hp-bar-bg { background: #333; height: 22px; border-radius: 11px; overflow: hidden; margin: 10px 0; }
         .hp-bar-fill { background: #e74c3c; height: 100%; width: 100%; transition: width 0.2s; }
+        .btn-group { display: flex; gap: 10px; margin-top: 10px; }
         .btn { background: #e67e22; border: none; padding: 14px; color: #fff; font-size: 16px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; }
-        .btn-gacha { background: #8e44ad; margin-top: 5px; }
+        .btn-skill { background: #9b59b6; }
+        .btn-gacha { background: #f1c40f; color: #000; }
         .inventory-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; margin-top: 10px; }
         .slot { background: #222530; border: 1px solid #3a3f52; height: 50px; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; cursor: pointer; }
         .slot.equipped { border-color: #f1c40f; background: #3d3512; }
@@ -25,7 +27,6 @@
     </style>
 </head>
 <body>
-    <!-- 🏷️ 최초 접속 시 닉네임 설정 모달 -->
     <div id="nicknameModal" class="modal">
         <div class="modal-content">
             <h3 style="color:#f1c40f;">✨ 용사 닉네임 설정</h3>
@@ -36,32 +37,38 @@
     </div>
 
     <div class="container">
-        <!-- 🏆 실시간 랭킹판 -->
-        <div class="card" style="border: 2px solid #f1c40f;">
-            <h3 style="margin: 0 0 8px 0; color: #f1c40f;">🏆 실시간 데미지 랭킹</h3>
-            <ol id="rankingList" class="ranking-list"></ol>
-        </div>
-
         <div class="card boss-card">
             <div id="bossIcon" class="boss-icon">⚔️</div>
             <h2 id="bossName">🔄 서버 연결 중...</h2>
             <div class="hp-bar-bg"><div id="bossHpFill" class="hp-bar-fill"></div></div>
             <p id="bossHpText">0 / 0</p>
-            <button class="btn" onclick="attack()">⚔️ 공격하기</button>
+            <div class="btn-group">
+                <button class="btn" onclick="attack()">⚔️ 공격</button>
+                <button class="btn btn-skill" onclick="useSkill()">⚡ 필살기 스킬</button>
+            </div>
         </div>
-        
-        <div class="card">
-            <h3>🎰 무기 상점</h3>
-            <button class="btn btn-gacha" onclick="gacha()">🎲 무기 뽑기 (1,000G)</button>
+
+        <div class="card" style="border: 2px solid #f1c40f;">
+            <h3 style="margin: 0 0 8px 0; color: #f1c40f;">🏆 실시간 랭킹</h3>
+            <ol id="rankingList" class="ranking-list"></ol>
         </div>
 
         <div class="card">
             <h3>🛡️ 내 정보</h3>
             <p>닉네임: <strong id="myName" style="color:#f1c40f;">-</strong> <button style="font-size:10px; padding:2px 6px;" onclick="openNicknameModal()">변경</button></p>
-            <p>❤️ HP: <span id="myHp">100</span>/100 | 💰 골드: <span id="myGold">500</span> G</p>
-            <div>
-                <input type="text" id="couponInput" placeholder="쿠폰 입력" style="width: 60%; margin-bottom: 0;">
-                <button style="padding:8px;" onclick="useCoupon()">사용</button>
+            <p>💰 골드: <span id="myGold">500</span> G | ❤️ HP: <span id="myHp">100</span>/100</p>
+        </div>
+
+        <div class="card">
+            <h3>🎰 무기 뽑기</h3>
+            <button class="btn btn-gacha" onclick="gacha()">🎲 행운의 룰렛 뽑기 (1,000G)</button>
+        </div>
+
+        <div class="card">
+            <h3>🎁 리딤 코드</h3>
+            <div style="display: flex; gap: 5px; justify-content: center;">
+                <input type="text" id="couponInput" placeholder="쿠폰 코드 입력" style="width: 70%; margin-bottom: 0;">
+                <button class="btn" style="width: 25%; padding: 8px; font-size: 14px;" onclick="useCoupon()">등록</button>
             </div>
         </div>
 
@@ -87,16 +94,44 @@
 
         function saveNickname() {
             const name = document.getElementById('nicknameInput').value.trim();
-            if (!name) {
-                alert('닉네임을 입력해주세요!');
-                return;
-            }
+            if (!name) { alert('닉네임을 입력해주세요!'); return; }
             socket.emit('setNickname', name);
             document.getElementById('nicknameModal').style.display = 'none';
         }
 
         function openNicknameModal() {
             document.getElementById('nicknameModal').style.display = 'flex';
+        }
+
+        function attack() { socket.emit('attack'); }
+        function useSkill() { socket.emit('useSkill'); }
+        function gacha() { socket.emit('drawGacha'); }
+        function useCoupon() {
+            const code = document.getElementById('couponInput').value.trim();
+            if (code) socket.emit('useCoupon', code);
+        }
+
+        socket.on('skillResult', (res) => { if (!res.success) alert(res.message); });
+        socket.on('couponResult', (res) => alert(res.message));
+        socket.on('gachaResult', (res) => {
+            if (!res.success) alert(res.message);
+            else alert('🎉 획득: ' + res.weapon.icon + ' [' + res.weapon.rarity + '] ' + res.weapon.name);
+        });
+        socket.on('enhanceResult', (res) => alert(res.message));
+        socket.on('itemObtained', (data) => {
+            if (data.full) {
+                document.getElementById('dropItemText').innerText = '가방 포화로 드랍 실패: ' + data.weapon.name;
+                document.getElementById('fullModal').style.display = 'flex';
+            } else { alert('👑 막타 보상 획득: ' + data.weapon.name); }
+        });
+        
+        function closeModal() { document.getElementById('fullModal').style.display = 'none'; }
+        
+        function showItemMenu(index, item) {
+            const act = prompt('[' + item.name + ' +' + (item.enhance||0) + ']\n1. 장착/해제\n2. 강화 (' + ((item.enhance+1)*500) + 'G)\n3. 판매 (' + item.sellPrice + 'G)');
+            if (act === '1') socket.emit('equipItem', index);
+            if (act === '2') socket.emit('enhanceItem', index);
+            if (act === '3') socket.emit('sellItem', index);
         }
 
         socket.on('updateState', (state) => {
@@ -115,11 +150,10 @@
             document.getElementById('bossHpFill').style.width = Math.max(0, bossHpPct) + '%';
             document.getElementById('bossHpText').innerText = Math.max(0, state.boss.currentHp) + ' / ' + state.boss.maxHp;
             
-            // 🏆 실시간 랭킹판 렌더링
             const rankingList = document.getElementById('rankingList');
             rankingList.innerHTML = '';
             const sortedPlayers = Object.values(state.players).sort((a, b) => (b.totalDamage || 0) - (a.totalDamage || 0));
-            sortedPlayers.slice(0, 5).forEach((p, index) => {
+            sortedPlayers.slice(0, 5).forEach((p) => {
                 const li = document.createElement('li');
                 const isMe = p.id === myId ? ' (나)' : '';
                 li.innerText = `${p.name}${isMe} - ${p.totalDamage || 0} 데미지`;
@@ -131,6 +165,7 @@
                 document.getElementById('myName').innerText = me.name;
                 document.getElementById('myHp').innerText = me.hp;
                 document.getElementById('myGold').innerText = me.gold;
+                
                 const grid = document.getElementById('inventoryGrid');
                 grid.innerHTML = '';
                 for (let i = 0; i < 36; i++) {
@@ -146,34 +181,6 @@
                 }
             }
         });
-
-        function attack() { socket.emit('attack'); }
-        function gacha() { socket.emit('drawGacha'); }
-        function useCoupon() {
-            const code = document.getElementById('couponInput').value.trim();
-            if (code) socket.emit('useCoupon', code);
-        }
-        
-        socket.on('couponResult', (res) => alert(res.message));
-        socket.on('gachaResult', (res) => {
-            if (!res.success) alert(res.message);
-            else alert('🎉 획득: ' + res.weapon.icon + ' [' + res.weapon.rarity + '] ' + res.weapon.name);
-        });
-        socket.on('enhanceResult', (res) => alert(res.message));
-        socket.on('itemObtained', (data) => {
-            if (data.full) {
-                document.getElementById('dropItemText').innerText = '가방 포화로 드랍 실패: ' + data.weapon.name;
-                document.getElementById('fullModal').style.display = 'flex';
-            } else { alert('👑 막타 보상 획득: ' + data.weapon.name); }
-        });
-        
-        function closeModal() { document.getElementById('fullModal').style.display = 'none'; }
-        function showItemMenu(index, item) {
-            const act = prompt('[' + item.name + ' +' + (item.enhance||0) + ']\n1. 장착/해제\n2. 강화 (' + ((item.enhance+1)*500) + 'G)\n3. 판매 (' + item.sellPrice + 'G)');
-            if (act === '1') socket.emit('equipItem', index);
-            if (act === '2') socket.emit('enhanceItem', index);
-            if (act === '3') socket.emit('sellItem', index);
-        }
     </script>
 </body>
 </html>
