@@ -134,9 +134,9 @@
                 overlay.style.top = '10px';
             }, 600);
 
-            // 장착 중인 무기가 있을 때만 게이지 증가 (최대 5)
+            // 장착 중인 무기가 있고 쿨타임 중이 아닐 때만 게이지 증가
             if (myData && myData.equippedIndex !== null && myData.inventory[myData.equippedIndex]) {
-                if (currentSkillGauge < maxSkillGauge) {
+                if ((!myData.skillCoolTime || myData.skillCoolTime <= 0) && currentSkillGauge < maxSkillGauge) {
                     currentSkillGauge++;
                     updateSkillUI();
                 }
@@ -237,7 +237,7 @@
             });
         });
 
-        // 스킬 UI 갱신 함수
+        // 스킬 UI 갱신 함수 (쿨타임 반영)
         function updateSkillUI() {
             if (!myData) return;
             const skillNameText = document.getElementById('skillNameText');
@@ -249,8 +249,18 @@
                 const item = myData.inventory[myData.equippedIndex];
                 const sName = item.skillName || '특수 스킬';
                 skillNameText.innerText = `${sName} (${item.name})`;
+
+                // ✨ 서버에서 받아온 쿨타임이 남아있는 경우
+                if (myData.skillCoolTime && myData.skillCoolTime > 0) {
+                    skillGaugeText.innerText = `쿨타임 중`;
+                    skillGaugeFill.style.width = '0%';
+                    useSkillBtn.innerText = `⏳ 스킬 쿨타임 중... (${myData.skillCoolTime}초 남음)`;
+                    useSkillBtn.className = 'skill-use-btn';
+                    useSkillBtn.disabled = true;
+                    return;
+                }
+
                 skillGaugeText.innerText = `${currentSkillGauge} / ${maxSkillGauge}`;
-                
                 const pct = (currentSkillGauge / maxSkillGauge) * 100;
                 skillGaugeFill.style.width = pct + '%';
 
