@@ -16,38 +16,43 @@ app.get('/admin', (req, res) => {
 });
 
 const BOSS_LIST = [
-    { name: '🐷 꿀신', maxHp: 12000, currentHp: 12000 },
-    { name: '🗿 골리앗', maxHp: 17000, currentHp: 17000 },
-    { name: '🦖 이라소', maxHp: 50000, currentHp: 50000 },
-    { name: '🐉 드래곤', maxHp: 100000, currentHp: 100000 }
+    { name: '🐷 꿀신', maxHp: 1200000, currentHp: 1200000 },
+    { name: '🗿 골리앗', maxHp: 1700000, currentHp: 1700000 },
+    { name: '🦖 이라소', maxHp: 5000000, currentHp: 5000000 },
+    { name: '🐉 드래곤', maxHp: 10000000, currentHp: 10000000 }
 ];
 
+// ✨ 무기 DB (지팡이 회복량 및 등급별 스킬명/효과 포함)
 const WEAPON_DB = {
-    knife_common: { name: '녹슨 도살도', type: 'knife', rarity: 'Common', atk: 15, sellPrice: 50, icon: '🔪' },
-    knife_rare: { name: '혈각의 서사도', type: 'knife', rarity: 'Rare', atk: 45, sellPrice: 250, icon: '🗡️' },
-    knife_epic: { name: '흑염의 사도검', type: 'knife', rarity: 'Epic', atk: 120, sellPrice: 2500, icon: '🗡️🔥' },
-    knife_legendary: { name: '피빛의 소울리퍼', type: 'knife', rarity: 'Legendary', atk: 380, sellPrice: 10000, icon: '⚔️🩸' },
-    knife_mythic: { name: '심연의 핏빛 멸살검', type: 'knife', rarity: 'Mythic', atk: 1500, sellPrice: 100000, icon: '🗡️💀' },
+    // 1. 검
+    knife_common: { name: '녹슨 도살도', type: 'knife', rarity: 'Common', atk: 15, sellPrice: 50, icon: '🔪', skillName: '찌르기' },
+    knife_rare: { name: '혈각의 서사도', type: 'knife', rarity: 'Rare', atk: 45, sellPrice: 250, icon: '🗡️', skillName: '연속 참격' },
+    knife_epic: { name: '흑염의 사도검', type: 'knife', rarity: 'Epic', atk: 120, sellPrice: 2500, icon: '🗡️🔥', skillName: '흑염의 처형검' },
+    knife_legendary: { name: '피빛의 소울리퍼', type: 'knife', rarity: 'Legendary', atk: 380, sellPrice: 10000, icon: '⚔️🩸', skillName: '소울 리퍼의 낫질' },
+    knife_mythic: { name: '심연의 핏빛 멸살검', type: 'knife', rarity: 'Mythic', atk: 1500, sellPrice: 100000, icon: '🗡️💀', skillName: '심연의 핏빛 멸살검' },
 
-    bow_common: { name: '부러진 나무활', type: 'bow', rarity: 'Common', atk: 14, sellPrice: 50, icon: '🏹' },
-    bow_rare: { name: '정밀한 사냥꾼의 활', type: 'bow', rarity: 'Rare', atk: 42, sellPrice: 250, icon: '🏹✨' },
-    bow_epic: { name: '폭풍의 질풍궁', type: 'bow', rarity: 'Epic', atk: 115, sellPrice: 2500, icon: '🏹🌪️' },
-    bow_legendary: { name: '태양의 엘븐 롱보우', type: 'bow', rarity: 'Legendary', atk: 360, sellPrice: 10000, icon: '🏹☀️' },
-    bow_mythic: { name: '천공을 꿰뚫는 스나이퍼', type: 'bow', rarity: 'Mythic', atk: 1450, sellPrice: 100000, icon: '🏹💫' },
+    // 2. 활
+    bow_common: { name: '부러진 나무활', type: 'bow', rarity: 'Common', atk: 14, sellPrice: 50, icon: '🏹', skillName: '조준 발사' },
+    bow_rare: { name: '정밀한 사냥꾼의 활', type: 'bow', rarity: 'Rare', atk: 42, sellPrice: 250, icon: '🏹✨', skillName: '속사' },
+    bow_epic: { name: '폭풍의 질풍궁', type: 'bow', rarity: 'Epic', atk: 115, sellPrice: 2500, icon: '🏹🌪️', skillName: '폭풍의 낙화궁' },
+    bow_legendary: { name: '태양의 엘븐 롱보우', type: 'bow', rarity: 'Legendary', atk: 360, sellPrice: 10000, icon: '🏹☀️', skillName: '태양의 일점사' },
+    bow_mythic: { name: '천공을 꿰뚫는 스나이퍼', type: 'bow', rarity: 'Mythic', atk: 1450, sellPrice: 100000, icon: '🏹💫', skillName: '천공의 스나이퍼' },
 
-    shield_common: { name: '나무 냄비뚜껑', type: 'shield', rarity: 'Common', atk: 8, sellPrice: 50, icon: '🛡️' },
-    shield_rare: { name: '수호자의 가디언 실드', type: 'shield', rarity: 'Rare', atk: 25, sellPrice: 250, icon: '🛡️✨' },
-    shield_epic: { name: '불멸의 가고일 방패', type: 'shield', rarity: 'Epic', atk: 70, sellPrice: 2500, icon: '🛡️🗿' },
-    shield_legendary: { name: '성기사의 천상 실드', type: 'shield', rarity: 'Legendary', atk: 220, sellPrice: 10000, icon: '🛡️👑' },
-    shield_mythic: { name: '신성한 절대자의 결계', type: 'shield', rarity: 'Mythic', atk: 900, sellPrice: 100000, icon: '🛡️❇️' },
+    // 3. 방패
+    shield_common: { name: '나무 냄비뚜껑', type: 'shield', rarity: 'Common', atk: 8, sellPrice: 50, icon: '🛡️', skillName: '가드' },
+    shield_rare: { name: '수호자의 가디언 실드', type: 'shield', rarity: 'Rare', atk: 25, sellPrice: 250, icon: '🛡️✨', skillName: '철벽 방어' },
+    shield_epic: { name: '불멸의 가고일 방패', type: 'shield', rarity: 'Epic', atk: 70, sellPrice: 2500, icon: '🛡️🗿', skillName: '불멸의 가고일 가드' },
+    shield_legendary: { name: '성기사의 천상 실드', type: 'shield', rarity: 'Legendary', atk: 220, sellPrice: 10000, icon: '🛡️👑', skillName: '성기사의 천상 결계' },
+    shield_mythic: { name: '신성한 절대자의 결계', type: 'shield', rarity: 'Mythic', atk: 900, sellPrice: 100000, icon: '🛡️❇️', skillName: '절대자의 무적 방패' },
 
-    staff_common: { name: '빛 바랜 나뭇가지', type: 'staff', rarity: 'Common', atk: 10, sellPrice: 50, icon: '🪄' },
-    staff_rare: { name: '견습 메딕의 지팡이', type: 'staff', rarity: 'Rare', atk: 32, sellPrice: 250, icon: '🪄💖' },
-    staff_epic: { name: '정령의 생명 지팡이', type: 'staff', rarity: 'Epic', atk: 90, sellPrice: 2500, icon: '🪄🌿' },
-    staff_legendary: { name: '대현자의 홀', type: 'staff', rarity: 'Legendary', atk: 280, sellPrice: 10000, icon: '🪄🔮' },
-    staff_mythic: { name: '태초의 세라핌 스태프', type: 'staff', rarity: 'Mythic', atk: 1100, sellPrice: 100000, icon: '🪄✨' },
+    // 4. 지팡이 (회복량 커먼 10, 레어 20, 에픽 30, 레전더리 40, 신화 50)
+    staff_common: { name: '빛 바랜 나뭇가지', type: 'staff', rarity: 'Common', atk: 10, sellPrice: 50, icon: '🪄', heal: 10, skillName: '작은 치유 (+10)' },
+    staff_rare: { name: '견습 메딕의 지팡이', type: 'staff', rarity: 'Rare', atk: 32, sellPrice: 250, icon: '🪄💖', heal: 20, skillName: '정령의 숨결 (+20)' },
+    staff_epic: { name: '정령의 생명 지팡이', type: 'staff', rarity: 'Epic', atk: 90, sellPrice: 2500, icon: '🪄🌿', heal: 30, skillName: '대자연의 생명 부활진 (+30)' },
+    staff_legendary: { name: '대현자의 홀', type: 'staff', rarity: 'Legendary', atk: 280, sellPrice: 10000, icon: '🪄🔮', heal: 40, skillName: '대현자의 마력 폭풍 (+40)' },
+    staff_mythic: { name: '태초의 세라핌 스태프', type: 'staff', rarity: 'Mythic', atk: 1100, sellPrice: 100000, icon: '🪄✨', heal: 50, skillName: '태초의 세라핌 강림 (+50)' },
 
-    hidden_hong: { name: '홍인준의 뱃살 방패', type: 'shield_special', rarity: 'Mythic', atk: 1600, sellPrice: 100000, icon: '🐷🛡️' }
+    hidden_hong: { name: '홍인준의 뱃살 방패', type: 'shield_special', rarity: 'Mythic', atk: 1600, sellPrice: 100000, icon: '🐷🛡️', skillName: '뱃살 철벽' }
 };
 
 const COUPONS = {
@@ -57,7 +62,8 @@ const COUPONS = {
 
 let gameState = {
     boss: { ...BOSS_LIST[0] },
-    players: {}
+    players: {},
+    fieldDrops: [] // 필드에 드랍된 무기 목록
 };
 
 function getRandomWeaponKey() {
@@ -74,12 +80,26 @@ function getRandomWeaponKey() {
     return `${chosenType}_${rarity.toLowerCase()}`;
 }
 
+// ⏰ 10초마다 보스 반격 (사망 시 장착 무기 필드 드랍 발동)
 setInterval(() => {
     let updated = false;
-    Object.values(gameState.players).forEach(p => {
+    Object.entries(gameState.players).forEach(([id, p]) => {
         if (p.hp > 0) {
             p.hp = Math.max(0, p.hp - 5);
             updated = true;
+
+            // 체력이 0이 되어 사망한 경우!
+            if (p.hp === 0 && p.equippedIndex !== null) {
+                const droppedWeapon = p.inventory.splice(p.equippedIndex, 1)[0];
+                p.equippedIndex = null;
+                // 필드에 드랍 추가
+                gameState.fieldDrops.push({
+                    id: Date.now() + Math.random(),
+                    weapon: droppedWeapon,
+                    droppedBy: p.name
+                });
+                io.to(id).emit('notify', `💀 사망하여 장착 중인 [${droppedWeapon.name}]이(가) 필드에 드랍되었습니다!`);
+            }
         }
     });
     if (updated) {
@@ -112,15 +132,22 @@ io.on('connection', (socket) => {
     socket.on('attack', () => {
         const p = gameState.players[socket.id];
         if (!p) return;
-        if (p.hp <= 0) p.hp = p.maxHp;
+        if (p.hp <= 0) p.hp = p.maxHp; // 부활
 
         let eq = p.equippedIndex !== null ? p.inventory[p.equippedIndex] : null;
         let baseAtk = eq ? (eq.atk * (1 + (eq.enhance || 0) * 0.4)) : 10;
         let dmg = Math.round(baseAtk + (p.bonusAtk || 0));
 
+        // 지팡이 계열일 경우 공격 시 체력 회복 효과 적용
+        if (eq && eq.type === 'staff' && eq.heal) {
+            p.hp = Math.min(p.maxHp, p.hp + eq.heal);
+        }
+
         gameState.boss.currentHp -= dmg;
         p.totalDamage = (p.totalDamage || 0) + dmg;
         p.gold += 15;
+
+        let effectData = { type: eq ? eq.type : 'normal', skillName: eq ? eq.skillName : '일반 공격', dmg };
 
         if (gameState.boss.currentHp <= 0) {
             const wKey = getRandomWeaponKey();
@@ -133,7 +160,24 @@ io.on('connection', (socket) => {
             }
             gameState.boss = { ...BOSS_LIST[Math.floor(Math.random() * BOSS_LIST.length)] };
         }
+
+        socket.emit('attackEffect', effectData);
         io.emit('updateState', gameState);
+    });
+
+    // 필드 드랍 아이템 줍기
+    socket.on('pickupDrop', (dropId) => {
+        const p = gameState.players[socket.id];
+        if (!p || p.inventory.length >= 36) {
+            socket.emit('notify', '🎒 인벤토리가 가득 찼습니다!');
+            return;
+        }
+        const idx = gameState.fieldDrops.findIndex(d => d.id === dropId);
+        if (idx !== -1) {
+            const drop = gameState.fieldDrops.splice(idx, 1)[0];
+            p.inventory.push(drop.weapon);
+            io.emit('updateState', gameState);
+        }
     });
 
     socket.on('drawGacha', () => {
@@ -205,7 +249,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 👑 어드민 조작 (킥, 인벤토리 아이템 삭제 기능 포함)
     socket.on('adminAction', (data) => {
         const { action, payload } = data;
         if (action === 'spawnBoss') {
@@ -228,7 +271,6 @@ io.on('connection', (socket) => {
             }
         }
 
-        // 유저 킥 (강퇴)
         if (action === 'kickPlayer') {
             const targetSocket = io.sockets.sockets.get(payload.targetId);
             if (targetSocket) {
@@ -237,7 +279,6 @@ io.on('connection', (socket) => {
             }
         }
 
-        // 어드민이 특정 유저의 인벤토리 아이템 삭제
         if (action === 'adminRemoveItem') {
             const t = gameState.players[payload.targetId];
             if (t && t.inventory[payload.itemIndex] !== undefined) {
