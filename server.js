@@ -83,7 +83,39 @@ function getRandomWeaponKey() {
     return `${selectedType}_${rarity.toLowerCase()}`;
 }
 
-// ⏰ 10초마다 보스가 모든 플레이어 체력을 5씩 깎음 (사망 시 장착 무기 삭제 포함)
+// 🌟 등급별 추가 대미지 배율 함수
+function getRarityMultiplier(rarity) {
+    switch (rarity) {
+        case 'Mythic': return 3.0;     // 신화: 데미지 3배 폭풍 상향
+        case 'Legendary': return 2.0;  // 전설: 데미지 2배
+        case 'Epic': return 1.5;       // 에픽: 데미지 1.5배
+        case 'Rare': return 1.2;       // 레어: 데미지 1.2배
+        default: return 1.0;           // 일반: 기본
+    }
+}
+
+// 📐 실제 데미지 계산 공통 함수
+function calculateDamage(p, isSkill = false) {
+    let eq = p.equippedIndex !== null ? p.inventory[p.equippedIndex] : null;
+    let baseAtk = 10;
+    let rarityMul = 1.0;
+
+    if (eq) {
+        rarityMul = getRarityMultiplier(eq.rarity);
+        // 장비 기본 공격력 + 강화 보정(+40%씩 증가) * 등급 배율
+        baseAtk = (eq.atk * (1 + (eq.enhance || 0) * 0.4)) * rarityMul;
+    }
+
+    if (isSkill) {
+        // 필살기: (장비공격력 * 3) + 보너스 공격력 + 고정 500
+        return Math.round((baseAtk * 3) + (p.bonusAtk || 0) + 500);
+    } else {
+        // 일반 공격: 장비공격력 + 보너스 공격력
+        return Math.round(baseAtk + (p.bonusAtk || 0));
+    }
+}
+
+// ⏰ 10초마다 보스가 모든 플레이어 체력을 5씩 깎음 (사망 시 장착 무기 삭제)
 setInterval(() => {
     let updated = false;
     Object.values(gameState.players).forEach(p => {
@@ -141,9 +173,8 @@ io.on('connection', (socket) => {
     socket.on('attack', () => {
         const p = gameState.players[socket.id];
         if (!p || p.hp <= 0) return;
-        let eq = p.equippedIndex !== null ? p.inventory[p.equippedIndex] : null;
-        let baseAtk = eq ? (eq.atk * (1 + (eq.enhance || 0) * 0.4)) : 10;
-        let dmg = Math.round(baseAtk + (p.bonusAtk || 0));
+
+        let dmg = calculateDamage(p, false);
 
         gameState.boss.currentHp -= dmg;
         p.totalDamage = (p.totalDamage || 0) + dmg;
@@ -174,9 +205,7 @@ io.on('connection', (socket) => {
         }
         p.lastSkillTime = now;
 
-        let eq = p.equippedIndex !== null ? p.inventory[p.equippedIndex] : null;
-        let baseAtk = eq ? (eq.atk * (1 + (eq.enhance || 0) * 0.4)) : 10;
-        let skillDmg = Math.round((baseAtk * 3) + (p.bonusAtk || 0) + 500);
+        let skillDmg = calculateDamage(p, true);
 
         gameState.boss.currentHp -= skillDmg;
         p.totalDamage = (p.totalDamage || 0) + skillDmg;
