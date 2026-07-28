@@ -19,6 +19,7 @@
         .inventory-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; margin-top: 10px; }
         .slot { background: #222530; border: 1px solid #3a3f52; height: 50px; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; cursor: pointer; }
         .slot.equipped { border-color: #f1c40f; background: #3d3512; }
+        .ranking-list { text-align: left; font-size: 13px; max-height: 120px; overflow-y: auto; margin: 0; padding-left: 15px; }
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; }
         .modal-content { background: #222530; padding: 20px; border-radius: 10px; width: 280px; border: 1px solid #555; }
         input { padding: 8px; border-radius: 4px; border: 1px solid #444; background: #111; color: #fff; width: 60%; }
@@ -26,6 +27,12 @@
 </head>
 <body>
     <div class="container">
+        <!-- 🏆 실시간 랭킹 카드 추가 -->
+        <div class="card" style="border: 2px solid #f1c40f;">
+            <h3 style="margin: 0 0 8px 0; color: #f1c40f;">🏆 실시간 데미지 랭킹</h3>
+            <ol id="rankingList" class="ranking-list"></ol>
+        </div>
+
         <div class="card boss-card">
             <div id="bossIcon" class="boss-icon">⚔️</div>
             <h2 id="bossName">🔄 서버 연결 중...</h2>
@@ -66,12 +73,87 @@
         const socket = io({ transports: ['websocket', 'polling'] });
         let myId = null;
 
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let bgmInterval = null;
+
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') { audioCtx.resume(); }
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            const now = audioCtx.currentTime;
+            if (type === 'hit') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(40, now + 0.08);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
+                osc.start(now);
+                osc.stop(now + 0.08);
+            } else if (type === 'gacha') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.exponentialRampToValueAtTime(800, now + 0.2);
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            } else if (type === 'bossDead') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.setValueAtTime(400, now + 0.1);
+                osc.frequency.setValueAtTime(600, now + 0.2);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.35);
+                osc.start(now);
+                osc.stop(now + 0.35);
+            }
+        }
+
+        function startBGM() {
+            if (bgmInterval) return;
+            const notes = [220, 247, 261, 293, 329, 349, 392];
+            let step = 0;
+            bgmInterval = setInterval(() => {
+                if (audioCtx.state === 'suspended') return;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(notes[step % notes.length], audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+                
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+                step++;
+            }, 400);
+        }
+
+        window.addEventListener('click', () => {
+            if (audioCtx.state === 'suspended') { audioCtx.resume(); }
+            startBGM();
+        }, { once: true });
+
         socket.on('connect', () => { myId = socket.id; });
 
+        let prevBossHp = null;
         socket.on('updateState', (state) => {
             if (!state || !state.boss) return;
             
-            // 보스 이름과 이모티콘 분리 (예: "🐷 꿀신" -> 이모티콘 "🐷", 이름 "꿀신")
+            if (prevBossHp !== null && state.boss.currentHp < prevBossHp) {
+                if (state.boss.currentHp <= 0) {
+                    playSound('bossDead');
+                } else {
+                    playSound('hit');
+                }
+            }
+            prevBossHp = state.boss.currentHp;
+
             const bossParts = state.boss.name.split(' ');
             if (bossParts.length >= 2) {
                 document.getElementById('bossIcon').innerText = bossParts[0];
@@ -85,6 +167,17 @@
             document.getElementById('bossHpFill').style.width = Math.max(0, bossHpPct) + '%';
             document.getElementById('bossHpText').innerText = Math.max(0, state.boss.currentHp) + ' / ' + state.boss.maxHp;
             
+            // 🏆 실시간 랭킹판 렌더링
+            const rankingList = document.getElementById('rankingList');
+            rankingList.innerHTML = '';
+            const sortedPlayers = Object.values(state.players).sort((a, b) => (b.totalDamage || 0) - (a.totalDamage || 0));
+            sortedPlayers.slice(0, 5).forEach((p, index) => {
+                const li = document.createElement('li');
+                const isMe = p.id === myId ? ' (나)' : '';
+                li.innerText = `${index + 1위: ${p.name}${isMe} - 누적 데미지: ${p.totalDamage || 0}`;
+                rankingList.appendChild(li);
+            });
+
             const me = state.players[myId];
             if (me) {
                 document.getElementById('myHp').innerText = me.hp;
@@ -106,7 +199,10 @@
         });
 
         function attack() { socket.emit('attack'); }
-        function gacha() { socket.emit('drawGacha'); }
+        function gacha() { 
+            playSound('gacha');
+            socket.emit('drawGacha'); 
+        }
         function useCoupon() {
             const code = document.getElementById('couponInput').value.trim();
             if (code) socket.emit('useCoupon', code);
@@ -134,4 +230,3 @@
     </script>
 </body>
 </html>
-
