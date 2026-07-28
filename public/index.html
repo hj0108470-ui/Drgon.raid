@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>실시간 멀티 방치형 보스 레이드</title>
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <style>
+        body { font-family: sans-serif; background: #0f1016; color: #fff; text-align: center; margin: 0; padding: 10px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        .card { background: #1a1c23; border-radius: 12px; padding: 15px; margin-bottom: 12px; border: 1px solid #2a2e3d; }
+        .boss-card { border: 2px solid #e74c3c; }
+        .hp-bar-bg { background: #333; height: 22px; border-radius: 11px; overflow: hidden; margin: 10px 0; }
+        .hp-bar-fill { background: #e74c3c; height: 100%; width: 100%; transition: width 0.2s; }
+        .btn { background: #e67e22; border: none; padding: 14px; color: #fff; font-size: 16px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; }
+        .btn-gacha { background: #8e44ad; margin-top: 5px; }
+        .inventory-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; margin-top: 10px; }
+        .slot { background: #222530; border: 1px solid #3a3f52; height: 50px; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; cursor: pointer; }
+        .slot.equipped { border-color: #f1c40f; background: #3d3512; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; }
+        .modal-content { background: #222530; padding: 20px; border-radius: 10px; width: 280px; border: 1px solid #555; }
+        input { padding: 8px; border-radius: 4px; border: 1px solid #444; background: #111; color: #fff; width: 60%; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card boss-card">
+            <h2 id="bossName">🔄 서버 연결 중...</h2>
+            <div class="hp-bar-bg"><div id="bossHpFill" class="hp-bar-fill"></div></div>
+            <p id="bossHpText">0 / 0</p>
+            <button class="btn" onclick="attack()">⚔️ 공격하기</button>
+        </div>
+        
+        <div class="card">
+            <h3>🎰 무기 상점</h3>
+            <button class="btn btn-gacha" onclick="gacha()">🎲 무기 뽑기 (1,000G)</button>
+        </div>
+
+        <div class="card">
+            <h3>🛡️ 내 정보</h3>
+            <p>❤️ HP: <span id="myHp">100</span>/100 | 💰 골드: <span id="myGold">500</span> G</p>
+            <div>
+                <input type="text" id="couponInput" placeholder="쿠폰 입력">
+                <button style="padding:8px;" onclick="useCoupon()">사용</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>🎒 무기고 (36칸)</h3>
+            <div class="inventory-grid" id="inventoryGrid"></div>
+        </div>
+    </div>
+
+    <div id="fullModal" class="modal">
+        <div class="modal-content">
+            <h3 style="color:#e74c3c;">⚠️ 인벤토리 가득 참!</h3>
+            <p id="dropItemText"></p>
+            <button class="btn" onclick="closeModal()">확인</button>
+        </div>
+    </div>
+
+    <script>
+        const socket = io({ transports: ['websocket', 'polling'] });
+        let myId = null;
+
+        socket.on('connect', () => { myId = socket.id; });
+
+        socket.on('updateState', (state) => {
+            if (!state || !state.boss) return;
+            document.getElementById('bossName').innerText = state.boss.name;
+            const bossHpPct = (state.boss.currentHp / state.boss.maxHp) * 100;
+            document.getElementById('bossHpFill').style.width = Math.max(0, bossHpPct) + '%';
+            document.getElementById('bossHpText').innerText = Math.max(0, state.boss.currentHp) + ' / ' + state.boss.maxHp;
+            
+            const me = state.players[myId];
+            if (me) {
+                document.getElementById('myHp').innerText = me.hp;
+                document.getElementById('myGold').innerText = me.gold;
+                const grid = document.getElementById('inventoryGrid');
+                grid.innerHTML = '';
+                for (let i = 0; i < 36; i++) {
+                    const slot = document.createElement('div');
+                    slot.className = 'slot';
+                    const item = me.inventory[i];
+                    if (item) {
+                        if (me.equippedIndex === i) slot.classList.add('equipped');
+                        slot.innerHTML = '<div>' + item.icon + '</div><div>+' + (item.enhance||0) + '</div>';
+                        slot.onclick = () => showItemMenu(i, item);
+                    } else { slot.innerText = '빈칸'; }
+                    grid.appendChild(slot);
+                }
+            }
+        });
+
+        function attack() { socket.emit('attack'); }
+        function gacha() { socket.emit('drawGacha'); }
+        function useCoupon() {
+            const code = document.getElementById('couponInput').value.trim();
+            if (code) socket.emit('useCoupon', code);
+        }
+        
+        socket.on('couponResult', (res) => alert(res.message));
+        socket.on('gachaResult', (res) => {
+            if (!res.success) alert(res.message);
+            else alert('🎉 획득: ' + res.weapon.icon + ' [' + res.weapon.rarity + '] ' + res.weapon.name);
+        });
+        socket.on('itemObtained', (data) => {
+            if (data.full) {
+                document.getElementById('dropItemText').innerText = '가방 포화로 드랍 실패: ' + data.weapon.name;
+                document.getElementById('fullModal').style.display = 'flex';
+            } else { alert('👑 막타 보상 획득: ' + data.weapon.name); }
+        });
+        
+        function closeModal() { document.getElementById('fullModal').style.display = 'none'; }
+        function showItemMenu(index, item) {
+            const act = prompt('[' + item.name + ' +' + (item.enhance||0) + ']\n1. 장착/해제\n2. 강화 (' + ((item.enhance+1)*500) + 'G)\n3. 판매 (' + item.sellPrice + 'G)');
+            if (act === '1') socket.emit('equipItem', index);
+            if (act === '2') socket.emit('enhanceItem', index);
+            if (act === '3') socket.emit('sellItem', index);
+        }
+    </script>
+</body>
+</html>
