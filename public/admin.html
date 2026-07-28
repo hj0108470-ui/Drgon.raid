@@ -2,73 +2,167 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>👑 GM 관제 센터</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>방치형 레이드 - 어드민 컨트롤러</title>
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
     <style>
-        body { font-family: sans-serif; background: #0b0c10; color: #66fcf1; padding: 15px; }
-        .btn-gm { background: #45a29e; border: none; color: #fff; padding: 6px 10px; margin: 2px; border-radius: 4px; cursor: pointer; font-size: 11px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; color: #fff; }
-        th, td { border: 1px solid #45a29e; padding: 8px; text-align: center; font-size: 12px; }
+        body { font-family: sans-serif; background: #12141c; color: #fff; margin: 0; padding: 15px; }
+        .container { max-width: 650px; margin: 0 auto; }
+        .card { background: #1a1e29; border: 1px solid #2f354a; border-radius: 10px; padding: 15px; margin-bottom: 15px; }
+        .btn { background: #e74c3c; border: none; padding: 10px 15px; color: #fff; border-radius: 6px; cursor: pointer; font-weight: bold; margin: 4px 2px; }
+        .btn-blue { background: #3498db; }
+        .btn-green { background: #2ecc71; color: #000; }
+        .btn-purple { background: #9b59b6; }
+        select, input { padding: 8px; border-radius: 5px; border: 1px solid #444; background: #111; color: #fff; margin: 5px 0; width: 100%; box-sizing: border-box; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+        th, td { border: 1px solid #333; padding: 8px; text-align: center; }
+        th { background: #222634; }
     </style>
 </head>
 <body>
-    <h2>👑 GM 관제 센터</h2>
-    <div style="background:#1f2833; padding:12px; border-radius:8px;">
-        <p>현재 보스: <strong id="bossStatus">-</strong></p>
-        <button class="btn-gm" onclick="spawnBoss('pig')">🐷 꿀신 소환</button>
-        <button class="btn-gm" onclick="spawnBoss('goliath')">🗿 골리앗 소환</button>
-        <button class="btn-gm" onclick="spawnBoss('iraso')">🦖 이라소 소환</button>
-        <button class="btn-gm" onclick="spawnBoss('dragon')">🐉 드래곤 소환</button>
-        <button class="btn-gm" style="background:#c0392b;" onclick="killBoss()">💥 보스 즉사</button>
+    <div class="container">
+        <h2>👑 서버 어드민 컨트롤러</h2>
+        
+        <!-- 보스 제어 -->
+        <div class="card">
+            <h3>👾 보스 소환 및 제어</h3>
+            <button class="btn" onclick="spawnBoss('pig')">🐷 꿀신 소환</button>
+            <button class="btn" onclick="spawnBoss('goliath')">🗿 골리앗 소환</button>
+            <button class="btn" onclick="spawnBoss('iraso')">🦖 이라소 소환</button>
+            <button class="btn" onclick="spawnBoss('dragon')">🐉 드래곤 소환</button>
+            <button class="btn btn-blue" onclick="killBoss()">⚡ 즉시 처치 (막타 보상)</button>
+        </div>
+
+        <!-- 플레이어 목록 및 제어 -->
+        <div class="card">
+            <h3>🛡️ 접속 중인 용사 관리</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>닉네임</th>
+                        <th>골드 / HP</th>
+                        <th>누적 데미지</th>
+                        <th>개별 치트 제어</th>
+                    </tr>
+                </thead>
+                <tbody id="playerTableBody">
+                    <tr><td colspan="4">접속 중인 용사 검색 중...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 모든 무기 직접 지급 카드 -->
+        <div class="card" style="border: 2px solid #9b59b6;">
+            <h3>🎁 모든 무기 종류 지정 지급</h3>
+            <label>대상 용사 선택:</label>
+            <select id="targetPlayerSelect">
+                <option value="">용사를 선택하세요</option>
+            </select>
+            
+            <label style="margin-top: 10px; display: block;">지급할 무기 선택:</label>
+            <select id="weaponKeySelect">
+                <!-- 단검 계열 -->
+                <optgroup label="🔪 단검 계열 (Knife)">
+                    <option value="knife_common">🔪 녹슨 도살도 (Common)</option>
+                    <option value="knife_rare">🗡️ 혈각의 서사도 (Rare)</option>
+                    <option value="knife_epic">🗡️🔥 흑염의 사도검 (Epic)</option>
+                    <option value="knife_legendary">⚔️🩸 피빛의 소울리퍼 (Legendary)</option>
+                    <option value="knife_mythic">🗡️💀 심연의 핏빛 멸살검 (Mythic)</option>
+                </optgroup>
+                <!-- 방패 계열 -->
+                <optgroup label="🛡️ 방패 계열 (Shield)">
+                    <option value="shield_common">🛡️ 나무 냄비뚜껑 (Common)</option>
+                    <option value="shield_rare">🛡️✨ 수호자의 가디언 실드 (Rare)</option>
+                    <option value="shield_epic">🛡️🗿 불멸의 가고일 방패 (Epic)</option>
+                    <option value="shield_legendary">🛡️👑 성기사의 천상 실드 (Legendary)</option>
+                    <option value="shield_mythic">🛡️❇️ 신성한 절대자의 결계 (Mythic)</option>
+                </optgroup>
+                <!-- 활 계열 -->
+                <optgroup label="🏹 활 계열 (Bow)">
+                    <option value="bow_common">🏹 굽은 나무활 (Common)</option>
+                    <option value="bow_rare">🏹✨ 사냥꾼의 숏보우 (Rare)</option>
+                    <option value="bow_epic">🎯🔥 폭풍의 엘븐 보우 (Epic)</option>
+                    <option value="bow_legendary">🏹⚡ 천둥의 스톰브링어 (Legendary)</option>
+                    <option value="bow_mythic">🏹🌌 태양의 신궁 아폴론 (Mythic)</option>
+                </optgroup>
+                <!-- 지팡이 계열 -->
+                <optgroup label="🌿 지팡이 계열 (Staff)">
+                    <option value="staff_common">🌿 새싹의 허브 지팡이 (Common)</option>
+                    <option value="staff_rare">💧✨ 축복의 성수 지팡이 (Rare)</option>
+                    <option value="staff_epic">🔮🌿 요정의 생명 지팡이 (Epic)</option>
+                    <option value="staff_legendary">🌟💖 세라핌의 치유 지팡이 (Legendary)</option>
+                    <option value="staff_mythic">🌌✨ 세계수의 영원한 생명 (Mythic)</option>
+                </optgroup>
+                <!-- 히든 무기 -->
+                <optgroup label="✨ 히든 아이템">
+                    <option value="hidden_hong">🐷🛡️ 홍인준의 뱃살 방패 (Mythic)</option>
+                </optgroup>
+            </select>
+            
+            <button class="btn btn-purple" style="width: 100%; margin-top: 10px;" onclick="giveSelectedWeapon()">선택한 무기 즉시 지급</button>
+        </div>
     </div>
-    <table>
-        <thead>
-            <tr>
-                <th>닉네임</th>
-                <th>HP</th>
-                <th>골드</th>
-                <th>누적 데미지 (랭킹)</th>
-                <th>인벤</th>
-                <th>GM 치트 / 조작</th>
-            </tr>
-        </thead>
-        <tbody id="playerTable"></tbody>
-    </table>
+
     <script>
         const socket = io({ transports: ['websocket', 'polling'] });
+        let latestPlayers = {};
+
         socket.on('updateState', (state) => {
-            if(!state || !state.boss) return;
-            document.getElementById('bossStatus').innerText = state.boss.name + ' (' + state.boss.currentHp + '/' + state.boss.maxHp + ')';
-            const tbody = document.getElementById('playerTable');
+            if (!state || !state.players) return;
+            latestPlayers = state.players;
+            const tbody = document.getElementById('playerTableBody');
+            const targetSelect = document.getElementById('targetPlayerSelect');
+            
             tbody.innerHTML = '';
-            Object.values(state.players).forEach(p => {
+            targetSelect.innerHTML = '<option value="">용사를 선택하세요</option>';
+            
+            const playersArr = Object.values(state.players);
+            if (playersArr.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4">접속 중인 용사가 없습니다.</td></tr>';
+                return;
+            }
+
+            playersArr.forEach(p => {
+                // 테이블 목록 추가
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td>${p.name}</td>
-                    <td>${p.hp}</td>
-                    <td>${p.gold}G</td>
+                    <td><strong>${p.name}</strong></td>
+                    <td>${p.gold}G / ${p.hp}HP</td>
                     <td>${p.totalDamage || 0}</td>
-                    <td>${p.inventory.length}/36</td>
                     <td>
-                        <button class="btn-gm" onclick="giveGold('${p.id}')">+1만G</button>
-                        <button class="btn-gm" onclick="giveMythic('${p.id}')">신화템</button>
-                        <button class="btn-gm" style="background:#e67e22;" onclick="boostAtk('${p.id}')">공격력+500</button>
-                        <button class="btn-gm" style="background:#8e44ad;" onclick="setRankScore('${p.id}')">랭킹조작</button>
+                        <button class="btn btn-green" style="padding:4px 8px; font-size:11px;" onclick="giveGold('${p.id}')">+1만G</button>
+                        <button class="btn btn-blue" style="padding:4px 8px; font-size:11px;" onclick="boostAtk('${p.id}')">+공격력</button>
                     </td>
                 `;
                 tbody.appendChild(tr);
+
+                // 셀렉트박스 옵션 추가
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.innerText = `${p.name} (${p.id.substring(0, 4)})`;
+                targetSelect.appendChild(opt);
             });
         });
+
         function spawnBoss(type) { socket.emit('adminAction', { action: 'spawnBoss', payload: type }); }
         function killBoss() { socket.emit('adminAction', { action: 'killBoss' }); }
-        function giveGold(id) { socket.emit('adminAction', { action: 'giveGold', payload: { targetId: id, amount: 10000 } }); }
-        function giveMythic(id) { socket.emit('adminAction', { action: 'giveMythic', payload: { targetId: id } }); }
-        function boostAtk(id) { socket.emit('adminAction', { action: 'boostAtk', payload: { targetId: id, amount: 500 } }); }
-        function setRankScore(id) {
-            const score = prompt('조작할 누적 데미지 점수를 입력하세요:', '999999');
-            if (score !== null) {
-                socket.emit('adminAction', { action: 'setRankScore', payload: { targetId: id, score: parseInt(score) || 0 } });
-            }
+        
+        function giveGold(targetId) {
+            socket.emit('adminAction', { action: 'giveGold', payload: { targetId, amount: 10000 } });
+        }
+        
+        function boostAtk(targetId) {
+            socket.emit('adminAction', { action: 'boostAtk', payload: { targetId, amount: 50 } });
+        }
+
+        // 선택한 무기 종류 지급 함수
+        function giveSelectedWeapon() {
+            const targetId = document.getElementById('targetPlayerSelect').value;
+            const weaponKey = document.getElementById('weaponKeySelect').value;
+            if (!targetId) { alert('지급할 용사를 선택해주세요!'); return; }
+            
+            socket.emit('adminAction', { action: 'giveSpecificWeapon', payload: { targetId, weaponKey } });
+            alert('선택한 무기가 지급되었습니다!');
         }
     </script>
 </body>
