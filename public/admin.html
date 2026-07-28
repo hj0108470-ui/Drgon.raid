@@ -24,7 +24,7 @@
     <table>
         <thead>
             <tr>
-                <th>ID</th>
+                <th>닉네임</th>
                 <th>HP</th>
                 <th>골드</th>
                 <th>누적 데미지 (랭킹)</th>
@@ -44,7 +44,7 @@
             Object.values(state.players).forEach(p => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td>${p.id.substring(0, 5)}</td>
+                    <td>${p.name}</td>
                     <td>${p.hp}</td>
                     <td>${p.gold}G</td>
                     <td>${p.totalDamage || 0}</td>
@@ -73,4 +73,3 @@
     </script>
 </body>
 </html>
-
