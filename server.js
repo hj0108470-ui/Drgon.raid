@@ -74,7 +74,6 @@ function getRandomWeaponKey() {
     return `${chosenType}_${rarity.toLowerCase()}`;
 }
 
-// ⏰ 10초마다 보스가 모든 플레이어 체력을 깎음 (사망 시 0 고정)
 setInterval(() => {
     let updated = false;
     Object.values(gameState.players).forEach(p => {
@@ -110,14 +109,10 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 💡 체력이 0일 때 공격하면 부활하도록 수정 (죽으면 안 때려지는 버그 해결)
     socket.on('attack', () => {
         const p = gameState.players[socket.id];
         if (!p) return;
-        
-        if (p.hp <= 0) {
-            p.hp = p.maxHp; // 체력이 0이면 풀피로 부활하며 공격 허용
-        }
+        if (p.hp <= 0) p.hp = p.maxHp;
 
         let eq = p.equippedIndex !== null ? p.inventory[p.equippedIndex] : null;
         let baseAtk = eq ? (eq.atk * (1 + (eq.enhance || 0) * 0.4)) : 10;
@@ -210,7 +205,7 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 👑 어드민 무기 지급 기능 추가
+    // 👑 어드민 조작 (킥, 인벤토리 아이템 삭제 기능 포함)
     socket.on('adminAction', (data) => {
         const { action, payload } = data;
         if (action === 'spawnBoss') {
@@ -223,7 +218,6 @@ io.on('connection', (socket) => {
         if (action === 'boostAtk') { const t = gameState.players[payload.targetId]; if(t) t.bonusAtk = (t.bonusAtk || 0) + payload.amount; }
         if (action === 'setRankScore') { const t = gameState.players[payload.targetId]; if(t) t.totalDamage = payload.score; }
         
-        // 특정 무기 종류 및 등급 지정 지급
         if (action === 'giveSpecificWeapon') {
             const t = gameState.players[payload.targetId];
             if (t && t.inventory.length < 36) {
@@ -231,6 +225,25 @@ io.on('connection', (socket) => {
                 if (WEAPON_DB[key]) {
                     t.inventory.push({ ...WEAPON_DB[key], id: Date.now() + Math.random(), enhance: 0 });
                 }
+            }
+        }
+
+        // 유저 킥 (강퇴)
+        if (action === 'kickPlayer') {
+            const targetSocket = io.sockets.sockets.get(payload.targetId);
+            if (targetSocket) {
+                targetSocket.emit('kicked');
+                targetSocket.disconnect(true);
+            }
+        }
+
+        // 어드민이 특정 유저의 인벤토리 아이템 삭제
+        if (action === 'adminRemoveItem') {
+            const t = gameState.players[payload.targetId];
+            if (t && t.inventory[payload.itemIndex] !== undefined) {
+                t.inventory.splice(payload.itemIndex, 1);
+                if (t.equippedIndex === payload.itemIndex) t.equippedIndex = null;
+                else if (t.equippedIndex > payload.itemIndex) t.equippedIndex--;
             }
         }
 
