@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
@@ -9,6 +10,21 @@ const io = new Server(server, { cors: { origin: "*", methods: ["GET", "POST"] } 
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
+
+const USERS_FILE = path.join(__dirname, 'users.json');
+
+let registeredAccounts = {};
+if (fs.existsSync(USERS_FILE)) {
+    try {
+        registeredAccounts = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+    } catch (e) {
+        registeredAccounts = {};
+    }
+}
+
+function saveAccountsToFile() {
+    fs.writeFileSync(USERS_FILE, JSON.stringify(registeredAccounts, null, 2), 'utf8');
+}
 
 const BOSS_LIST = [
     { name: '🐷 꿀신', maxHp: 157500, currentHp: 157500 },
@@ -36,13 +52,14 @@ const WEAPON_DB = {
     bow_legendary: { name: '천둥의 스톰브링어', type: 'bow', rarity: 'Legendary', atk: 1250, sellPrice: 10000, icon: '🏹⚡' },
     bow_mythic: { name: '태양의 신궁 아폴론', type: 'bow', rarity: 'Mythic', atk: 3000, sellPrice: 100000, icon: '🏹🌌' },
 
-    staff_common: { name: '새싹의 허브 지팡이', type: 'staff', rarity: 'Common', atk: 40, heal: 10, targets: 1, sellPrice: 50, icon: '🌿' },
-    staff_rare: { name: '축복의 성수 지팡이', type: 'staff', rarity: 'Rare', atk: 120, heal: 15, targets: 1, sellPrice: 250, icon: '💧✨' },
-    staff_epic: { name: '요정의 생명 지팡이', type: 'staff', rarity: 'Epic', atk: 350, heal: 25, targets: 1, sellPrice: 2500, icon: '🔮🌿' },
-    staff_legendary: { name: '세라핌의 치유 지팡이', type: 'staff', rarity: 'Legendary', atk: 800, heal: 35, targets: 1, sellPrice: 10000, icon: '🌟💖' },
-    staff_mythic: { name: '세계수의 영원한 생명', type: 'staff', rarity: 'Mythic', atk: 2000, heal: 50, targets: 2, sellPrice: 100000, icon: '🌌✨' },
+    staff_common: { name: '새싹의 허브 지팡이', type: 'staff', rarity: 'Common', atk: 40, targets: 1, sellPrice: 50, icon: '🌿' },
+    staff_rare: { name: '축복의 성수 지팡이', type: 'staff', rarity: 'Rare', atk: 120, targets: 1, sellPrice: 250, icon: '💧✨' },
+    staff_epic: { name: '요정의 생명 지팡이', type: 'staff', rarity: 'Epic', atk: 350, targets: 1, sellPrice: 2500, icon: '🔮🌿' },
+    staff_legendary: { name: '세라핌의 치유 지팡이', type: 'staff', rarity: 'Legendary', atk: 800, targets: 1, sellPrice: 10000, icon: '🌟💖' },
+    staff_mythic: { name: '세계수의 영원한 생명', type: 'staff', rarity: 'Mythic', atk: 2000, targets: 2, sellPrice: 100000, icon: '🌌✨' },
 
-    hidden_hong: { name: '홍인준의 뱃살 방패', type: 'shield', rarity: 'Mythic', atk: 6000, shieldDuration: 25, sellPrice: 100000, icon: '🐷🛡️' }
+    hidden_hong: { name: '홍인준의 뱃살 방패', type: 'shield', rarity: 'Mythic', atk: 6000, shieldDuration: 25, sellPrice: 100000, icon: '🐷🛡️' },
+    hidden_jiyu: { name: '지유의쌈장', type: 'knife', rarity: 'Mythic', atk: 10000000, sellPrice: 1000000, icon: '🐷' }
 };
 
 const COUPONS = {
@@ -50,13 +67,14 @@ const COUPONS = {
     'Fiwndq9': { type: 'weapon', reward: 'hidden_hong' },
     'ddddf1014': { type: 'gold', reward: 5000 },
     'HGAD026781': { type: 'gold', reward: 3000 },
-    'HIJPIG12': { type: 'weapon', reward: 'hidden_hong' }
+    'HIJPIG12': { type: 'weapon', reward: 'hidden_hong' },
+    'Ssamjang486': { type: 'weapon', reward: 'hidden_jiyu' }
 };
 
 let gameState = {
     boss: { ...BOSS_LIST[0] },
     players: {},
-    registeredAccounts: {},
+    registeredAccounts: registeredAccounts,
     parties: {}
 };
 
@@ -67,6 +85,7 @@ function saveAccountState(p) {
         gameState.registeredAccounts[p.name].inventory = p.inventory;
         gameState.registeredAccounts[p.name].equippedIndex = p.equippedIndex;
         gameState.registeredAccounts[p.name].totalDamage = p.totalDamage;
+        saveAccountsToFile();
     }
 }
 
@@ -148,6 +167,7 @@ io.on('connection', (socket) => {
             nickname, password, hp: 100, maxHp: 100, gold: 500,
             inventory: [], equippedIndex: null, totalDamage: 0, bonusAtk: 0
         };
+        saveAccountsToFile();
         socket.emit('authResult', { success: true, message: '회원가입 성공! 로그인해주세요.' });
     });
 
@@ -273,9 +293,17 @@ io.on('connection', (socket) => {
         }
         p.lastSkillTime = now;
 
-        if (weaponType === 'staff') {
-            // 🌿 스킬 힐량 고정값 적용 (커먼 10, 레어 15, 에픽 25, 레전더리 35, 신화 50)
-            let totalHealAmt = eq ? (eq.heal || 10) : 10;
+        if (eq && eq.name === '지유의쌈장') {
+            let skillDmg = 1000000000;
+            gameState.boss.currentHp -= skillDmg;
+            p.totalDamage += skillDmg;
+            p.gold += 100;
+            socket.emit('skillResult', { success: true, message: `🐷 [지유의쌈장 폭발] 1,000,000,000 대미지!` });
+            checkBossKill(p);
+        } else if (weaponType === 'staff') {
+            let healTable = { 'Common': 10, 'Rare': 15, 'Epic': 25, 'Legendary': 35, 'Mythic': 50 };
+            let totalHealAmt = eq && healTable[eq.rarity] ? healTable[eq.rarity] : 10;
+
             p.hp = Math.min(p.maxHp, p.hp + totalHealAmt);
             p.gold += 30;
             socket.emit('skillResult', { success: true, message: `🌿 [치유의 파동] 체력 ${totalHealAmt} 회복!` });
@@ -388,21 +416,56 @@ io.on('connection', (socket) => {
         }
     });
 
+    // 🛠️ 어드민 액션 처리 강화 (골드 주기, 무기 주기, 누적 데미지 설정 등)
     socket.on('adminAction', (data) => {
         const { action, payload } = data;
+        
         if (action === 'spawnBoss') {
             const map = { 'pig': 0, 'goliath': 1, 'iraso': 2, 'dragon': 3 };
             if (map[payload] !== undefined) gameState.boss = { ...BOSS_LIST[map[payload]] };
         }
-        if (action === 'killBoss') gameState.boss.currentHp = 0;
+        if (action === 'killBoss') {
+            gameState.boss.currentHp = 0;
+        }
+        if (action === 'giveGold') {
+            // payload: { targetName, amount } 또는 targetId
+            const target = gameState.players[payload.targetId] || Object.values(gameState.players).find(p => p.name === payload.targetName);
+            if (target) {
+                target.gold += Number(payload.amount || 0);
+                saveAccountState(target);
+            } else if (gameState.registeredAccounts[payload.targetName]) {
+                gameState.registeredAccounts[payload.targetName].gold = (gameState.registeredAccounts[payload.targetName].gold || 0) + Number(payload.amount || 0);
+                saveAccountsToFile();
+            }
+        }
+        if (action === 'setDamage') {
+            const target = gameState.players[payload.targetId] || Object.values(gameState.players).find(p => p.name === payload.targetName);
+            if (target) {
+                target.totalDamage = Number(payload.damage || 0);
+                saveAccountState(target);
+            } else if (gameState.registeredAccounts[payload.targetName]) {
+                gameState.registeredAccounts[payload.targetName].totalDamage = Number(payload.damage || 0);
+                saveAccountsToFile();
+            }
+        }
         if (action === 'giveSpecificWeapon') {
-            const target = gameState.players[payload.targetId];
+            const target = gameState.players[payload.targetId] || Object.values(gameState.players).find(p => p.name === payload.targetName);
             const wKey = payload.weaponKey;
+            
             if (target && WEAPON_DB[wKey] && target.inventory.length < 36) {
                 const w = { ...WEAPON_DB[wKey], id: Date.now() + Math.random(), enhance: 0 };
                 target.inventory.push(w);
                 saveAccountState(target);
                 io.to(target.id).emit('itemObtained', { weapon: w, full: false });
+            } else if (gameState.registeredAccounts[payload.targetName] && WEAPON_DB[wKey]) {
+                // 오프라인 유저일 경우 계정 DB에 직접 무기 추가
+                const acc = gameState.registeredAccounts[payload.targetName];
+                if (!acc.inventory) acc.inventory = [];
+                if (acc.inventory.length < 36) {
+                    const w = { ...WEAPON_DB[wKey], id: Date.now() + Math.random(), enhance: 0 };
+                    acc.inventory.push(w);
+                    saveAccountsToFile();
+                }
             }
         }
         io.emit('updateState', gameState);
