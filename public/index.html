@@ -1,131 +1,128 @@
-
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>👑 실시간 멀티플레이어 보스 레이드</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>👑 모바일 보스 레이드</title>
     <style>
-        body { font-family: 'Malgun Gothic', sans-serif; background: #121212; color: #fff; margin: 0; padding: 20px; }
-        .container { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
-        .card { background: #1e1e1e; border: 1px solid #333; border-radius: 12px; padding: 25px; box-shadow: 0 8px 16px rgba(0,0,0,0.4); }
-        button { background: #ff9800; color: #000; font-weight: bold; cursor: pointer; border: none; padding: 12px 18px; border-radius: 6px; transition: 0.2s; }
-        button:hover { background: #ffa726; transform: translateY(-1px); }
-        input, select { background: #2c2c2c; color: #fff; border: 1px solid #555; padding: 10px; border-radius: 6px; margin: 5px 0; outline: none; }
-        .screen { display: none; }
-        .active-screen { display: block; }
+        * { box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', sans-serif; background: #0f0f0f; color: #fff; margin: 0; padding: 0; display: flex; justify-content: center; }
+        .mobile-container { width: 100%; max-width: 480px; min-height: 100vh; background: #18181b; display: flex; flex-direction: column; padding: 15px; gap: 15px; border-left: 1px solid #27272a; border-right: 1px solid #27272a; }
         
-        .battle-layout { display: flex; gap: 25px; }
-        .battle-panel { flex: 1; background: #252525; padding: 25px; border-radius: 10px; border: 1px solid #3a3a3a; display: flex; flex-direction: column; align-items: center; justify-content: space-between; }
-        .inventory-panel { flex: 1; background: #252525; padding: 25px; border-radius: 10px; border: 1px solid #3a3a3a; }
+        .card { background: #202024; border: 1px solid #2f2f35; border-radius: 12px; padding: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+        button { background: #f59e0b; color: #000; font-weight: bold; cursor: pointer; border: none; padding: 12px; border-radius: 8px; font-size: 14px; transition: 0.1s; }
+        button:active { transform: scale(0.97); }
+        input, select { background: #121214; color: #fff; border: 1px solid #3f3f46; padding: 10px; border-radius: 8px; font-size: 14px; width: 100%; outline: none; }
         
-        .inventory-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-top: 15px; }
-        .slot { background: #1c1c1c; border: 2px solid #333; min-height: 55px; border-radius: 6px; padding: 6px; text-align: center; font-size: 11px; cursor: pointer; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .slot:hover { border-color: #ff9800; }
-        .slot.equipped { border-color: #ffeb3b; background: #2a2a1a; }
+        .screen { display: none; flex-direction: column; gap: 15px; }
+        .active-screen { display: flex; }
+
+        /* 인벤토리 그리드 (4열 x 6행 = 24칸) */
+        .inventory-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+        .slot { background: #121214; border: 2px solid #2f2f35; height: 60px; border-radius: 8px; text-align: center; font-size: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+        .slot.equipped { border-color: #eab308; background: #29251e; }
         
-        progress { appearance: none; width: 100%; height: 28px; border-radius: 14px; overflow: hidden; border: none; }
-        progress::-webkit-progress-bar { background-color: #1a1a1a; border-radius: 14px; }
-        progress::-webkit-progress-value { background: linear-gradient(90deg, #e91e63, #ff5722); border-radius: 14px; }
+        progress { appearance: none; width: 100%; height: 22px; border-radius: 11px; overflow: hidden; border: none; }
+        progress::-webkit-progress-bar { background-color: #121214; }
+        progress::-webkit-progress-value { background: linear-gradient(90deg, #ec4899, #f43f5e); }
     </style>
 </head>
 <body>
 
-<div class="container">
+<div class="mobile-container">
     
-    <!-- 1. 로그인/회원가입 화면 -->
-    <div id="authScreen" class="screen active-screen card" style="max-width: 400px; margin: 80px auto; text-align: center;">
-        <h2>🔐 레이드 로그인</h2>
-        <input type="text" id="username" placeholder="닉네임" style="width: 80%;"><br>
-        <input type="password" id="password" placeholder="비밀번호" style="width: 80%;"><br><br>
-        <div style="display: flex; gap: 10px; justify-content: center;">
-            <button onclick="login()" style="flex: 1; background: #4caf50; color: white;">로그인</button>
-            <button onclick="register()" style="flex: 1; background: #2196f3; color: white;">회원가입</button>
+    <!-- 1. 로그인 / 회원가입 화면 -->
+    <div id="authScreen" class="screen active-screen card" style="margin-top: auto; margin-bottom: auto; text-align: center;">
+        <h2 style="margin-bottom: 5px; color: #f43f5e;">⚔️ 모바일 레이드</h2>
+        <p style="color: #a1a1aa; font-size: 13px; margin-bottom: 20px;">계정으로 로그인하여 모험을 시작하세요</p>
+        <input type="text" id="username" placeholder="닉네임" style="margin-bottom: 10px;"><br>
+        <input type="password" id="password" placeholder="비밀번호" style="margin-bottom: 15px;"><br>
+        <div style="display: flex; gap: 10px;">
+            <button onclick="login()" style="flex: 1; background: #22c55e; color: white;">로그인</button>
+            <button onclick="register()" style="flex: 1; background: #3b82f6; color: white;">회원가입</button>
         </div>
-        <p id="authMsg" style="color: #ff5252; margin-top: 15px;"></p>
+        <p id="authMsg" style="color: #f87171; font-size: 13px; margin-top: 15px;"></p>
     </div>
 
-    <!-- 2. 게임 로비 -->
-    <div id="lobbyScreen" class="screen card">
-        <h1 style="margin-top:0; border-bottom: 2px solid #333; padding-bottom: 10px;">🏰 게임 로비</h1>
-        <div style="display: flex; gap: 25px;">
-            <div style="flex: 1; background: #252525; padding: 25px; border-radius: 8px; border: 1px solid #3a3a3a;">
-                <h3>👤 나의 정보</h3>
-                <p>이름: <b id="lobbyName" style="color:#ff9800;">-</b></p>
-                <p>골드: <b id="lobbyGold" style="color:#4caf50;">0</b> G</p>
-                <p>인벤토리: <b id="lobbyInvenCount">0</b> / 36개</p>
-                <br>
-                <button onclick="goToBattle()" style="background: #e91e63; color: white; width: 100%; padding: 16px; font-size: 17px; border-radius: 8px;">⚔️ 전투 전장으로 입장하기</button>
+    <!-- 2. 게임 로비 (뽑기, 거래소 포함) -->
+    <div id="lobbyScreen" class="screen">
+        <div class="card" style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h3 id="lobbyName" style="margin: 0 0 5px 0; color: #f59e0b;">-</h3>
+                <p style="margin: 0; font-size: 13px; color: #a1a1aa;">보유 골드: <b id="lobbyGold" style="color: #22c55e;">0</b> G</p>
             </div>
+            <button onclick="goToBattle()" style="background: #f43f5e; color: white; padding: 12px 20px; font-size: 15px;">⚔️ 전투 입장</button>
+        </div>
+
+        <!-- 🌟 로비 전용: 무기 가챠 및 상점/거래소 -->
+        <div class="card">
+            <h4 style="margin: 0 0 10px 0; color: #38bdf8;">🎲 무기 뽑기 & 상점 (거래소)</h4>
+            <button onclick="drawGacha()" style="background: #8b5cf6; color: white; width: 100%; margin-bottom: 12px;">무기 뽑기 (1,000 G)</button>
             
-            <div style="flex: 1; background: #252525; padding: 25px; border-radius: 8px; border: 1px solid #3a3a3a;">
-                <h3>🛡️ 길드 시스템</h3>
-                <div id="guildInfoBox">
-                    <p style="color: #aaa;">현재 소속된 길드가 없습니다.</p>
-                    <input type="text" id="newGuildName" placeholder="길드 이름" style="width: calc(100% - 22px);"><br>
-                    <div style="display: flex; align-items: center; gap: 10px; margin: 10px 0;">
-                        <label style="font-size: 13px; color: #ccc;">최대 인원:</label>
-                        <input type="number" id="guildMaxMembers" value="5" min="2" max="20" style="width: 70px;">
-                    </div>
-                    <button onclick="createGuild()" style="background: #2196f3; color: white; width: 100%;">길드 창설</button>
-                </div>
-                <div id="guildListContainer" style="margin-top: 20px; max-height: 150px; overflow-y: auto; padding-right: 5px;"></div>
+            <div style="display: flex; gap: 8px;">
+                <input type="text" id="couponInput" placeholder="쿠폰 번호 입력">
+                <button onclick="useCoupon()" style="background: #06b6d4; color: #000; width: 90px;">사용</button>
             </div>
+        </div>
+
+        <!-- 로비 인벤토리 (판매/장착 가능) -->
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <h4 style="margin: 0;">🎒 인벤토리 (<span id="lobbyInvenCount">0</span>/24)</h4>
+                <span style="font-size: 11px; color: #71717a;">아이템 클릭: 장착 / 하단 판매</span>
+            </div>
+            <div id="lobbyInventoryGrid" class="inventory-grid"></div>
+            <div style="margin-top: 12px; display: flex; gap: 8px;">
+                <select id="sellItemSelect" style="flex: 1;"><option value="">판매할 아이템 선택</option></select>
+                <button onclick="sellSelectedItem()" style="background: #ef4444; color: white; width: 90px;">상점 판매</button>
+            </div>
+        </div>
+
+        <!-- 길드 시스템 -->
+        <div class="card">
+            <h4 style="margin: 0 0 10px 0; color: #fbbf24;">🛡️ 길드 시스템</h4>
+            <div id="guildInfoBox">
+                <p style="color: #a1a1aa; font-size: 13px; margin: 0 0 10px 0;">소속된 길드가 없습니다.</p>
+                <input type="text" id="newGuildName" placeholder="길드 이름" style="margin-bottom: 8px;">
+                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                    <span style="font-size: 13px; color: #a1a1aa; align-self: center;">인원:</span>
+                    <input type="number" id="guildMaxMembers" value="5" min="2" max="20">
+                </div>
+                <button onclick="createGuild()" style="background: #3b82f6; color: white; width: 100%;">길드 창설</button>
+            </div>
+            <div id="guildListContainer" style="margin-top: 12px; max-height: 120px; overflow-y: auto;"></div>
         </div>
     </div>
 
-    <!-- 3. 전투 화면 (로비 복귀 불가) -->
-    <div id="battleScreen" class="screen card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 15px;">
-            <h2 style="margin: 0;">🐉 보스 레이드 전시장</h2>
-            <span style="color: #ff5252; font-weight: bold; font-size: 14px;">⚔️ 전투 지역 (로비 이동 불가)</span>
+    <!-- 3. 전투 화면 (로비 복귀 불가, 뽑기 제외) -->
+    <div id="battleScreen" class="screen">
+        <div class="card" style="display: flex; justify-content: space-between; align-items: center; background: #27272a;">
+            <span style="color: #f87171; font-weight: bold; font-size: 13px;">⚔️ 전투 지역 (도주 불가)</span>
+            <span style="font-size: 13px;"><span id="playerHp" style="color: #22c55e;">100</span> / <span id="playerMaxHp">100</span> HP</span>
         </div>
-        
-        <div class="battle-layout">
-            <div class="battle-panel">
-                <div style="width: 100%; text-align: center;">
-                    <h3 id="bossName" style="font-size: 22px; color: #ffeb3b; margin-bottom: 5px;">보스 이름</h3>
-                    <p style="font-size: 13px; color: #aaa; margin-top: 0;">실시간 레이드 진행 중</p>
-                    
-                    <div style="background: #1a1a1a; padding: 20px; border-radius: 10px; border: 1px solid #333; margin: 15px 0;">
-                        <p style="font-size: 15px; margin: 0 0 10px 0;">체력: <span id="bossHp" style="color: #ff5722; font-weight: bold;">0</span> / <span id="bossMaxHp">0</span></p>
-                        <progress id="bossHpBar" value="0" max="100"></progress>
-                    </div>
-                </div>
 
-                <div style="display: flex; gap: 12px; width: 100%; margin: 15px 0;">
-                    <button onclick="attackBoss()" style="flex: 1; padding: 16px; font-size: 16px; background: #e91e63; color: white; border-radius: 8px;">⚔️ 일반 공격</button>
-                    <button id="skillBtn" onclick="useSkill()" style="flex: 1; padding: 16px; font-size: 16px; background: #9c27b0; color: white; border-radius: 8px;">⚡ 스킬 사용</button>
-                </div>
-
-                <div style="width: 100%; background: #1a1a1a; padding: 12px 20px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333;">
-                    <span style="font-size: 14px; color: #ccc;">내 전투 체력</span>
-                    <span style="font-weight: bold;"><span id="playerHp" style="color: #4caf50;">100</span> / <span id="playerMaxHp">100</span></span>
-                </div>
-            </div>
-
-            <div class="inventory-panel">
-                <h3 style="margin-top: 0;">🎒 인벤토리 (<span id="invenCountText">0</span> / 36)</h3>
-                <div id="inventoryGrid" class="inventory-grid"></div>
-                <div style="margin-top: 20px; display: flex; gap: 10px;">
-                    <button onclick="drawGacha()" style="flex: 1; background: #ff5722; color: white; padding: 12px;">🎲 무기 가챠 (1,000 G)</button>
-                    <input type="text" id="couponInput" placeholder="쿠폰 입력" style="flex: 1;">
-                    <button onclick="useCoupon()" style="background: #00bcd4; color: #000; padding: 12px;">사용</button>
-                </div>
+        <div class="card" style="text-align: center;">
+            <h3 id="bossName" style="color: #fde047; margin: 0 0 5px 0;">보스</h3>
+            <p style="font-size: 13px; color: #a1a1aa; margin: 0 0 12px 0;">체력: <span id="bossHp" style="color: #f43f5e; font-weight: bold;">0</span> / <span id="bossMaxHp">0</span></p>
+            <progress id="bossHpBar" value="0" max="100" style="margin-bottom: 15px;"></progress>
+            
+            <div style="display: flex; gap: 10px;">
+                <button onclick="attackBoss()" style="flex: 1; background: #f43f5e; color: white; padding: 16px;">⚔️ 일반 공격</button>
+                <button id="skillBtn" onclick="useSkill()" style="flex: 1; background: #a855f7; color: white; padding: 16px;">⚡ 스킬 사용</button>
             </div>
         </div>
 
-        <!-- 랭킹 영역 -->
-        <div class="card" style="margin-top: 25px; background: #191919; border: 1px solid #333;">
-            <h3 style="margin-top: 0; color: #ffeb3b;">🏆 실시간 통합 랭킹보드</h3>
-            <div style="display: flex; gap: 25px;">
-                <div style="flex: 1; background: #222; padding: 15px; border-radius: 8px;">
-                    <h4 style="margin-top: 0; color: #ff9800;">👤 플레이어 데미지 순위</h4>
-                    <ul id="playerRankList" style="padding-left: 20px; margin-bottom: 0; font-size: 14px; line-height: 1.6;"></ul>
+        <!-- 랭킹보드 -->
+        <div class="card">
+            <h4 style="margin: 0 0 10px 0; color: #fde047;">🏆 실시간 랭킹</h4>
+            <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
+                <div style="background: #121214; padding: 10px; border-radius: 6px;">
+                    <b style="color: #f59e0b;">👤 개인 딜량 순위</b>
+                    <ul id="playerRankList" style="padding-left: 15px; margin: 5px 0 0 0; line-height: 1.5;"></ul>
                 </div>
-                <div style="flex: 1; background: #222; padding: 15px; border-radius: 8px;">
-                    <h4 style="margin-top: 0; color: #2196f3;">🏰 길드 통합 순위</h4>
-                    <ul id="guildRankList" style="padding-left: 20px; margin-bottom: 0; font-size: 14px; line-height: 1.6;"></ul>
+                <div style="background: #121214; padding: 10px; border-radius: 6px;">
+                    <b style="color: #3b82f6;">🏰 길드 순위</b>
+                    <ul id="guildRankList" style="padding-left: 15px; margin: 5px 0 0 0; line-height: 1.5;"></ul>
                 </div>
             </div>
         </div>
@@ -139,15 +136,11 @@
     let myData = null;
 
     function register() {
-        const nickname = document.getElementById('username').value;
-        const password = document.getElementById('password').value;
-        socket.emit('register', { nickname, password });
+        socket.emit('register', { nickname: document.getElementById('username').value, password: document.getElementById('password').value });
     }
 
     function login() {
-        const nickname = document.getElementById('username').value;
-        const password = document.getElementById('password').value;
-        socket.emit('login', { nickname, password });
+        socket.emit('login', { nickname: document.getElementById('username').value, password: document.getElementById('password').value });
     }
 
     socket.on('authResult', (res) => { document.getElementById('authMsg').innerText = res.message; });
@@ -167,47 +160,42 @@
     function attackBoss() { socket.emit('attack'); }
     function useSkill() { socket.emit('useSkill'); }
     function drawGacha() { socket.emit('drawGacha'); }
+    function useCoupon() { socket.emit('useCoupon', document.getElementById('couponInput').value); }
     
-    function useCoupon() {
-        const code = document.getElementById('couponInput').value;
-        socket.emit('useCoupon', code);
-    }
-
     function createGuild() {
-        const name = document.getElementById('newGuildName').value;
-        const maxMembers = document.getElementById('guildMaxMembers').value;
-        socket.emit('createGuild', { guildName: name, maxMembers });
+        socket.emit('createGuild', { guildName: document.getElementById('newGuildName').value, maxMembers: document.getElementById('guildMaxMembers').value });
     }
 
-    socket.on('guildResult', (res) => {
-        alert(res.message);
-        socket.emit('getGuildList');
-    });
+    function sellSelectedItem() {
+        const idx = document.getElementById('sellItemSelect').value;
+        if (idx !== "") socket.emit('sellItem', parseInt(idx));
+    }
+
+    socket.on('actionResult', (res) => { alert(res.message); });
+    socket.on('guildResult', (res) => { alert(res.message); socket.emit('getGuildList'); });
+    socket.on('skillResult', (res) => { alert(res.message); });
 
     socket.on('guildListResult', (guilds) => {
         const container = document.getElementById('guildListContainer');
-        container.innerHTML = '<h4 style="margin:0 0 10px 0;">🗺️ 가입 가능한 길드 목록</h4>';
+        container.innerHTML = '<p style="font-size:12px; color:#a1a1aa; margin:0 0 5px 0;">가입 가능한 길드 목록</p>';
         if (guilds.length === 0) {
-            container.innerHTML += '<p style="color:#888; font-size:13px;">생성된 길드가 없습니다.</p>';
+            container.innerHTML += '<p style="font-size:12px; color:#71717a;">생성된 길드가 없습니다.</p>';
             return;
         }
         guilds.forEach(g => {
-            container.innerHTML += `<div style="display:flex; justify-content:space-between; align-items:center; background:#1c1c1c; padding:8px 12px; border-radius:6px; margin-bottom:8px;">
-                <span style="font-size:13px;"><b>${g.name}</b> (${g.currentCount}/${g.maxMembers})</span>
-                <button onclick="socket.emit('joinGuild', '${g.id}')" style="padding:6px 12px; font-size:12px; background:#4caf50; color:white;">가입</button>
+            container.innerHTML += `<div style="display:flex; justify-content:space-between; align-items:center; background:#121214; padding:6px 10px; border-radius:6px; margin-bottom:5px;">
+                <span style="font-size:12px;"><b>${g.name}</b> (${g.currentCount}/${g.maxMembers})</span>
+                <button onclick="socket.emit('joinGuild', '${g.id}')" style="padding:4px 8px; font-size:11px; background:#22c55e; color:white;">가입</button>
             </div>`;
         });
     });
-
-    socket.on('skillResult', (res) => { alert(res.message); });
-    socket.on('couponResult', (res) => { alert(res.message); });
 
     socket.on('updateState', (state) => {
         if (!myData) return;
         const updatedMe = state.players[socket.id];
         if (updatedMe) myData = updatedMe;
 
-        // 보스 정보 갱신
+        // 보스 정보
         document.getElementById('bossName').innerText = state.boss.name;
         document.getElementById('bossHp').innerText = state.boss.currentHp.toLocaleString();
         document.getElementById('bossMaxHp').innerText = state.boss.maxHp.toLocaleString();
@@ -217,77 +205,73 @@
         document.getElementById('playerHp').innerText = myData.hp;
         document.getElementById('playerMaxHp').innerText = myData.maxHp;
 
-        // 로비 정보 갱신
+        // 로비 정보
         document.getElementById('lobbyName').innerText = myData.name;
         document.getElementById('lobbyGold').innerText = myData.gold.toLocaleString();
         document.getElementById('lobbyInvenCount').innerText = myData.inventory.length;
-        document.getElementById('invenCountText').innerText = myData.inventory.length;
 
-        // 길드 UI 상태 갱신
-        const guildBox = document.getElementById('guildInfoBox');
-        if (myData.guildId && state.guilds[myData.guildId]) {
-            const myGuild = state.guilds[myData.guildId];
-            guildBox.innerHTML = `
-                <p style="color: #4caf50; font-weight: bold;">🏰 소속 길드: ${myGuild.name}</p>
-                <p style="font-size: 13px; color: #ccc;">길드원 수: ${myGuild.members.length} / ${myGuild.maxMembers}명</p>
-                <button onclick="socket.emit('leaveGuild')" style="background: #e53935; color: white; width: 100%; margin-top: 10px;">길드 탈퇴하기</button>
-            `;
-        } else {
-            guildBox.innerHTML = `
-                <p style="color: #aaa;">현재 소속된 길드가 없습니다.</p>
-                <input type="text" id="newGuildName" placeholder="길드 이름" style="width: calc(100% - 22px);"><br>
-                <div style="display: flex; align-items: center; gap: 10px; margin: 10px 0;">
-                    <label style="font-size: 13px; color: #ccc;">최대 인원:</label>
-                    <input type="number" id="guildMaxMembers" value="5" min="2" max="20" style="width: 70px;">
-                </div>
-                <button onclick="createGuild()" style="background: #2196f3; color: white; width: 100%;">길드 창설</button>
-            `;
-        }
-
-        // 인벤토리 렌더링
-        const grid = document.getElementById('inventoryGrid');
+        // 인벤토리 & 상점 셀렉트 렌더링
+        const grid = document.getElementById('lobbyInventoryGrid');
+        const selectBox = document.getElementById('sellItemSelect');
         grid.innerHTML = '';
-        for (let i = 0; i < 36; i++) {
+        selectBox.innerHTML = '<option value="">판매할 아이템 선택</option>';
+
+        for (let i = 0; i < 24; i++) {
             const slot = document.createElement('div');
             slot.className = 'slot';
             if (i < myData.inventory.length) {
                 const item = myData.inventory[i];
                 if (i === myData.equippedIndex) slot.classList.add('equipped');
-                slot.innerHTML = `<div style="font-size:18px;">${item.icon || '⚔️'}</div><div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:100%;">${item.name}</div>`;
+                slot.innerHTML = `<span style="font-size:16px;">${item.icon || '⚔️'}</span><span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%;">${item.name}</span>`;
                 slot.onclick = () => socket.emit('equipItem', i);
+                
+                selectBox.innerHTML += `<option value="${i}">[${item.rarity || 'Common'}] ${item.name} (${(item.sellPrice || 50).toLocaleString()}G)</option>`;
             }
             grid.appendChild(slot);
         }
 
-        // 실시간 랭킹보드 렌더링
+        // 길드 UI 상태
+        const guildBox = document.getElementById('guildInfoBox');
+        if (myData.guildId && state.guilds[myData.guildId]) {
+            const myGuild = state.guilds[myData.guildId];
+            guildBox.innerHTML = `
+                <p style="color: #22c55e; font-size: 13px; font-weight: bold; margin: 0 0 5px 0;">🏰 소속 길드: ${myGuild.name}</p>
+                <p style="font-size: 12px; color: #a1a1aa; margin: 0 0 10px 0;">멤버: ${myGuild.members.length} / ${myGuild.maxMembers}</p>
+                <button onclick="socket.emit('leaveGuild')" style="background: #ef4444; color: white; width: 100%;">길드 탈퇴 (길드장 탈퇴시 폭파)</button>
+            `;
+        } else {
+            guildBox.innerHTML = `
+                <p style="color: #a1a1aa; font-size: 13px; margin: 0 0 10px 0;">소속된 길드가 없습니다.</p>
+                <input type="text" id="newGuildName" placeholder="길드 이름" style="margin-bottom: 8px;">
+                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                    <span style="font-size: 13px; color: #a1a1aa; align-self: center;">인원:</span>
+                    <input type="number" id="guildMaxMembers" value="5" min="2" max="20">
+                </div>
+                <button onclick="createGuild()" style="background: #3b82f6; color: white; width: 100%;">길드 창설</button>
+            `;
+        }
+
+        // 랭킹 보드
         if (state.rankings) {
             const playerRankList = document.getElementById('playerRankList');
             playerRankList.innerHTML = '';
-            (state.rankings.players || []).slice(0, 5).forEach(r => {
-                playerRankList.innerHTML += `<li><b>${r.rank}위</b> ${r.name} - 딜량: ${r.totalDamage.toLocaleString()}</li>`;
+            (state.rankings.players || []).slice(0, 3).forEach(r => {
+                playerRankList.innerHTML += `<li><b>${r.rank}위</b> ${r.name} (${r.totalDamage.toLocaleString()})</li>`;
             });
 
             const guildRankList = document.getElementById('guildRankList');
             guildRankList.innerHTML = '';
             if (!state.rankings.guilds || state.rankings.guilds.length === 0) {
-                guildRankList.innerHTML = '<li style="list-style:none; color:#888;">등록된 길드가 없습니다.</li>';
+                guildRankList.innerHTML = '<li style="list-style:none; color:#71717a;">등록된 길드 없음</li>';
             } else {
-                state.rankings.guilds.slice(0, 5).forEach(g => {
-                    guildRankList.innerHTML += `<li><b>${g.rank}위</b> ${g.name} - 누적딜: ${g.totalDamage.toLocaleString()}</li>`;
+                state.rankings.guilds.slice(0, 3).forEach(g => {
+                    guildRankList.innerHTML += `<li><b>${g.rank}위</b> ${g.name} (${g.totalDamage.toLocaleString()})</li>`;
                 });
             }
         }
-
-        // 스킬 버튼 텍스트 변경
-        const eq = myData.equippedIndex !== null ? myData.inventory[myData.equippedIndex] : null;
-        const skillBtn = document.getElementById('skillBtn');
-        if (!eq) skillBtn.innerText = '⚡ 일반 스킬';
-        else if (eq.type === 'staff') skillBtn.innerText = '🌿 길드 힐 파동';
-        else if (eq.type === 'buff') skillBtn.innerText = '🥁 길드 버프';
-        else if (eq.type === 'shield') skillBtn.innerText = '🛡️ 절대 방벽';
-        else skillBtn.innerText = '⚔️ 강타 스킬';
     });
 </script>
 
 </body>
 </html>
+
