@@ -10,19 +10,13 @@ const io = new Server(server, { cors: { origin: "*", methods: ["GET", "POST"] } 
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 
-// -------------------------------------------------------------
-// 1. 보스 목록 (체력 10.5배 상향 유지)
-// -------------------------------------------------------------
 const BOSS_LIST = [
-    { name: '🐷 꿀신', maxHp: 157500, currentHp: 157500 },     // 15,000 * 10.5
-    { name: '🗿 골리앗', maxHp: 367500, currentHp: 367500 },   // 35,000 * 10.5
-    { name: '🦖 이라소', maxHp: 840000, currentHp: 840000 },   // 80,000 * 10.5
-    { name: '🐉 드래곤', maxHp: 2100000, currentHp: 2100000 }  // 200,000 * 10.5
+    { name: '🐷 꿀신', maxHp: 157500, currentHp: 157500 },
+    { name: '🗿 골리앗', maxHp: 367500, currentHp: 367500 },
+    { name: '🦖 이라소', maxHp: 840000, currentHp: 840000 },
+    { name: '🐉 드래곤', maxHp: 2100000, currentHp: 2100000 }
 ];
 
-// -------------------------------------------------------------
-// 2. 무기 및 아이템 DB (방패 무적 스킬 지속 시간 포함)
-// -------------------------------------------------------------
 const WEAPON_DB = {
     knife_common: { name: '녹슨 도살도', type: 'knife', rarity: 'Common', atk: 10, sellPrice: 50, icon: '🔪' },
     knife_rare: { name: '혈각의 서사도', type: 'knife', rarity: 'Rare', atk: 25, sellPrice: 250, icon: '🗡️' },
@@ -62,13 +56,10 @@ const COUPONS = {
 let gameState = {
     boss: { ...BOSS_LIST[0] },
     players: {},
-    registeredAccounts: {}, // 계정 데이터 저장 DB (서버 메모리 상에 보존)
+    registeredAccounts: {},
     parties: {}
 };
 
-// -------------------------------------------------------------
-// 3. 계정 데이터베이스 실시간 동기화 헬퍼 함수
-// -------------------------------------------------------------
 function saveAccountState(p) {
     if (p && gameState.registeredAccounts[p.name]) {
         gameState.registeredAccounts[p.name].gold = p.gold;
@@ -79,20 +70,17 @@ function saveAccountState(p) {
     }
 }
 
-// -------------------------------------------------------------
-// 4. 뽑기 및 전투 연산 함수들
-// -------------------------------------------------------------
 function getRandomWeaponKey() {
     const types = ['knife', 'shield', 'bow', 'staff'];
     const selectedType = types[Math.floor(Math.random() * types.length)];
     const rand = Math.random() * 100;
     
     let rarity = 'Common';
-    if (rand < 1.5) rarity = 'Mythic';                 // 1.5%
-    else if (rand < 1.5 + 5.5) rarity = 'Legendary';     // 5.5%
-    else if (rand < 1.5 + 5.5 + 13.0) rarity = 'Epic';   // 13.0%
-    else if (rand < 1.5 + 5.5 + 13.0 + 30.0) rarity = 'Rare'; // 30.0%
-    else rarity = 'Common';                            // 50.0%
+    if (rand < 1.5) rarity = 'Mythic';
+    else if (rand < 1.5 + 5.5) rarity = 'Legendary';
+    else if (rand < 1.5 + 5.5 + 13.0) rarity = 'Epic';
+    else if (rand < 1.5 + 5.5 + 13.0 + 30.0) rarity = 'Rare';
+    else rarity = 'Common';
 
     return `${selectedType}_${rarity.toLowerCase()}`;
 }
@@ -118,7 +106,6 @@ function calculateDamage(p) {
     return Math.round(baseAtk + (p.bonusAtk || 0));
 }
 
-// 사망 및 즉시 부활 루프 (무기 파괴 패널티 및 데이터 동기화 유지)
 setInterval(() => {
     let updated = false;
     let now = Date.now();
@@ -138,7 +125,7 @@ setInterval(() => {
                     p.inventory.splice(p.equippedIndex, 1);
                     p.equippedIndex = null;
                 }
-                p.hp = p.maxHp; // 즉시 부활
+                p.hp = p.maxHp;
                 updated = true;
             }
             saveAccountState(p);
@@ -148,7 +135,6 @@ setInterval(() => {
 }, 10000);
 
 io.on('connection', (socket) => {
-    // 회원가입
     socket.on('register', ({ nickname, password }) => {
         if (!nickname || !password) {
             socket.emit('authResult', { success: false, message: '닉네임과 비밀번호를 입력해주세요.' });
@@ -165,7 +151,6 @@ io.on('connection', (socket) => {
         socket.emit('authResult', { success: true, message: '회원가입 성공! 로그인해주세요.' });
     });
 
-    // 로그인 (계정 데이터 안전하게 불러오기)
     socket.on('login', ({ nickname, password }) => {
         const account = gameState.registeredAccounts[nickname];
         if (!account || account.password !== password) {
@@ -178,8 +163,8 @@ io.on('connection', (socket) => {
             name: account.nickname,
             hp: account.hp !== undefined ? account.hp : 100,
             maxHp: account.maxHp !== undefined ? account.maxHp : 100,
-            gold: account.gold !== undefined ? account.gold : 500, // 저장된 골드 불러오기
-            inventory: account.inventory ? [...account.inventory] : [], // 저장된 인벤토리 불러오기
+            gold: account.gold !== undefined ? account.gold : 500,
+            inventory: account.inventory ? [...account.inventory] : [],
             equippedIndex: account.equippedIndex !== undefined ? account.equippedIndex : null,
             totalDamage: account.totalDamage || 0,
             bonusAtk: account.bonusAtk || 0,
@@ -193,7 +178,7 @@ io.on('connection', (socket) => {
         io.emit('updateState', gameState);
     });
 
-    // 다중 선택 일괄 판매 (골드 증가 후 registeredAccounts에 즉시 저장)
+    // 💰 다중 선택 판매 핸들러 (내림차순 정렬로 인덱스 밀림 방지)
     socket.on('sellItems', (indices) => {
         const p = gameState.players[socket.id];
         if (!p || !Array.isArray(indices) || indices.length === 0) return;
@@ -216,13 +201,37 @@ io.on('connection', (socket) => {
         });
 
         p.gold += totalEarnedGold;
-        saveAccountState(p); // 💰 변경된 골드 및 인벤토리 계정에 즉시 저장
+        saveAccountState(p);
 
         socket.emit('sellResult', { success: true, message: `💰 총 ${totalEarnedGold.toLocaleString()} 골드 획득!` });
         io.emit('updateState', gameState);
     });
 
-    // 무기 뽑기 (골드 차감 및 계정 저장)
+    // 🗑️ 다중 선택 삭제 핸들러
+    socket.on('deleteItems', (indices) => {
+        const p = gameState.players[socket.id];
+        if (!p || !Array.isArray(indices) || indices.length === 0) return;
+
+        const uniqueIndices = [...new Set(indices)].sort((a, b) => b - a);
+
+        uniqueIndices.forEach(idx => {
+            if (idx >= 0 && idx < p.inventory.length) {
+                p.inventory.splice(idx, 1);
+
+                if (p.equippedIndex === idx) {
+                    p.equippedIndex = null;
+                } else if (p.equippedIndex !== null && p.equippedIndex > idx) {
+                    p.equippedIndex--;
+                }
+            }
+        });
+
+        saveAccountState(p);
+
+        socket.emit('deleteResult', { success: true, message: `🗑️ 선택한 무기들이 삭제되었습니다.` });
+        io.emit('updateState', gameState);
+    });
+
     socket.on('drawGacha', () => {
         const p = gameState.players[socket.id];
         if (!p || p.gold < 1000 || p.inventory.length >= 36) return;
@@ -230,13 +239,12 @@ io.on('connection', (socket) => {
         const wKey = getRandomWeaponKey();
         const w = { ...WEAPON_DB[wKey], id: Date.now() + Math.random(), enhance: 0 };
         p.inventory.push(w);
-        saveAccountState(p); // 💰 골드 차감 및 인벤토리 추가 계정에 즉시 저장
+        saveAccountState(p);
 
         socket.emit('gachaResult', { success: true, weapon: w });
         io.emit('updateState', gameState);
     });
 
-    // 일반 공격 (골드 획득 및 계정 저장)
     socket.on('attack', () => {
         const p = gameState.players[socket.id];
         if (!p || p.hp <= 0) return;
@@ -244,13 +252,12 @@ io.on('connection', (socket) => {
         gameState.boss.currentHp -= dmg;
         p.totalDamage = (p.totalDamage || 0) + dmg;
         p.gold += 15;
-        saveAccountState(p); // 💰 골드 적립 계정에 즉시 저장
+        saveAccountState(p);
 
         checkBossKill(p);
         io.emit('updateState', gameState);
     });
 
-    // 스킬 사용 (지팡이 힐, 방패 무적 지속 시간 및 골드 저장)
     socket.on('useSkill', () => {
         const p = gameState.players[socket.id];
         if (!p || p.hp <= 0) return;
@@ -288,7 +295,7 @@ io.on('connection', (socket) => {
             socket.emit('skillResult', { success: true, message: `⚔️ 스킬 적중! ${skillDmg} 대미지!` });
             checkBossKill(p);
         }
-        saveAccountState(p); // 💰 골드 및 상태 계정에 즉시 저장
+        saveAccountState(p);
         io.emit('updateState', gameState);
     });
 
@@ -307,7 +314,6 @@ io.on('connection', (socket) => {
         }
     }
 
-    // 파티 및 쿠폰 시스템
     socket.on('createParty', (partyName) => {
         const p = gameState.players[socket.id];
         if (!p || p.partyId) return;
@@ -354,7 +360,7 @@ io.on('connection', (socket) => {
             p.inventory.push(w);
             socket.emit('couponResult', { success: true, message: `🎉 [${w.name}] 획득!` });
         }
-        saveAccountState(p); // 💰 쿠폰 보상 즉시 계정 저장
+        saveAccountState(p);
         io.emit('updateState', gameState);
     });
 
@@ -375,14 +381,15 @@ io.on('connection', (socket) => {
             if (p.gold >= cost) {
                 p.gold -= cost;
                 item.enhance = (item.enhance || 0) + 1;
-                saveAccountState(p); // 💰 강화 골드 차감 및 레벨 저장
+                saveAccountState(p);
                 socket.emit('enhanceResult', { success: true, message: '✨ 강화 성공!' });
                 io.emit('updateState', gameState);
+            } else {
+                socket.emit('enhanceResult', { success: false, message: '❌ 골드가 부족합니다!' });
             }
         }
     });
 
-    // 어드민 액션
     socket.on('adminAction', (data) => {
         const { action, payload } = data;
         if (action === 'spawnBoss') {
