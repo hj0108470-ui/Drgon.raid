@@ -6,7 +6,6 @@
     <title>실시간 멀티 방치형 보스 레이드</title>
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
     <style>
-        /* 🏰 던전 배경 화면 고정 */
         body { 
             font-family: sans-serif; 
             margin: 0; 
@@ -17,7 +16,6 @@
             color: #fff;
             position: relative;
         }
-        
         body::before {
             content: "";
             position: fixed;
@@ -73,7 +71,7 @@
         .btn-skill { background: #8e44ad; }
         .btn-gacha { background: #f1c40f; color: #000; }
         .btn-party { background: #2980b9; font-size: 13px; padding: 6px 12px; width: auto; }
-        .btn-sell { background: #e74c3c; margin-top: 8px; font-size: 14px; padding: 10px; }
+        .btn-action { background: #27ae60; margin-top: 8px; font-size: 14px; padding: 10px; }
 
         .inventory-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; margin-top: 10px; }
         .slot { background: #15171e; border: 1px solid #2f354a; height: 50px; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; cursor: pointer; position: relative; }
@@ -87,10 +85,12 @@
         input { padding: 8px; border-radius: 4px; border: 1px solid #444; background: #111; color: #fff; width: 85%; margin-bottom: 10px; }
         
         .party-item-row { background: #2a2e3d; padding: 10px; border-radius: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .popup-btn { background: #34495e; color: white; border: none; padding: 10px; margin: 4px 0; width: 100%; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .popup-btn:hover { background: #2c3e50; }
     </style>
 </head>
 <body>
-    <!-- 🔐 로그인 및 회원가입 모달 (최초 진입점) -->
+    <!-- 🔐 로그인 및 회원가입 모달 -->
     <div id="authModal" class="modal" style="display: flex;">
         <div class="modal-content">
             <h3 style="color:#f1c40f; margin-top:0;">🔐 계정 로그인 / 회원가입</h3>
@@ -104,7 +104,7 @@
         </div>
     </div>
 
-    <!-- 파티 목록 참여 모달 -->
+    <!-- 파티 참여 모달 -->
     <div id="partyListModal" class="modal">
         <div class="modal-content" style="width: 330px;">
             <h3 style="color:#3498db; margin-top:0;">🛡️ 파티 참여하기</h3>
@@ -114,36 +114,40 @@
         </div>
     </div>
 
+    <!-- 🎒 아이템 상호작용 팝업 모달 (단건/다중선택 분기) -->
+    <div id="itemActionModal" class="modal">
+        <div class="modal-content">
+            <h3 id="popupTitle" style="color:#f1c40f; margin-top:0;">아이템 관리</h3>
+            <div id="popupContentArea"></div>
+            <button class="popup-btn" style="background:#7f8c8d; margin-top: 10px;" onclick="closeItemModal()">닫기</button>
+        </div>
+    </div>
+
     <div class="container">
-        <!-- 1. 보스 이모티콘 그림 (중앙 상단) -->
+        <!-- 보스 카드 -->
         <div class="card boss-card" id="bossCardArea">
             <div id="bossIcon" class="boss-icon">⚔️</div>
             <h2 id="bossName" style="margin: 5px 0;">🔄 서버 연결 중...</h2>
-            
-            <!-- 2. 보스 HP 바 -->
             <div class="hp-bar-bg"><div id="bossHpFill" class="hp-bar-fill"></div></div>
             <p id="bossHpText" style="margin: 0; font-weight: bold; font-size: 14px;">0 / 0</p>
-            
-            <!-- 3. 공격 / 스킬 버튼 -->
             <div class="action-grid">
                 <button class="btn" onclick="attack()">⚔️ 일반 공격</button>
                 <button class="btn btn-skill" onclick="useSkill()">⚡ 스킬</button>
             </div>
         </div>
 
-        <!-- 4. 내 정보 (골드, 닉네임, HP, 파티 내용) -->
+        <!-- 내 정보 -->
         <div class="card">
             <h3 style="margin-top:0; color:#3498db;">🛡️ 내 정보 & 파티</h3>
             <p style="margin: 6px 0;">닉네임: <strong id="myName" style="color:#f1c40f;">-</strong></p>
             <p style="margin: 6px 0;">💰 골드: <span id="myGold">500</span> G | ❤️ HP: <span id="myHp">100</span>/100</p>
-            
             <div id="partyBox" style="margin-top: 8px; font-size: 13px; border-top: 1px dashed #444; padding-top: 8px; display: flex; justify-content: space-between; align-items: center;">
                 <div>파티: <span id="partyStatus" style="color:#e74c3c;">미소속</span></div>
                 <div id="partyButtonsArea"></div>
             </div>
         </div>
 
-        <!-- 5. 실시간 랭킹, 무기 뽑기, 리딤 코드 -->
+        <!-- 랭킹 & 뽑기 & 쿠폰 -->
         <div class="card" style="border: 2px solid #f1c40f;">
             <h3 style="margin: 0 0 8px 0; color: #f1c40f;">🏆 실시간 랭킹</h3>
             <ol id="rankingList" class="ranking-list"></ol>
@@ -162,14 +166,14 @@
             </div>
         </div>
 
-        <!-- 6. 무기고 및 다중 선택 판매 기능 추가 -->
+        <!-- 무기고 -->
         <div class="card">
             <h3 style="margin-top:0; display:flex; justify-content:space-between; align-items:center;">
                 <span>🎒 무기고 (36칸)</span>
-                <span style="font-size:11px; color:#aaa;">슬롯 클릭: 다중선택/해제</span>
+                <span style="font-size:11px; color:#aaa;">슬롯 클릭: 다중선택</span>
             </h3>
             <div class="inventory-grid" id="inventoryGrid"></div>
-            <button class="btn btn-sell" onclick="sellSelectedItems()">💰 선택한 무기 일괄 판매</button>
+            <button class="btn btn-action" onclick="openActionModal()">⚙️ 선택한 무기 관리 / 일괄 처리</button>
         </div>
     </div>
 
@@ -186,11 +190,12 @@
         const socket = io({ transports: ['websocket', 'polling'] });
         let myId = null;
         let currentPartyId = null;
-        let selectedIndices = []; // 다중 선택된 인벤토리 인덱스 관리 배열
+        let selectedIndices = []; 
+        let latestInventory = [];
+        let equippedIndex = null;
 
         socket.on('connect', () => { myId = socket.id; });
 
-        // 계정 회원가입 및 로그인 요청 함수들
         function requestRegister() {
             const nickname = document.getElementById('authNickInput').value.trim();
             const password = document.getElementById('authPwInput').value.trim();
@@ -206,7 +211,6 @@
         }
 
         socket.on('authResult', (res) => { alert(res.message); });
-
         socket.on('loginSuccess', (res) => {
             if (res.success) {
                 document.getElementById('authModal').style.display = 'none';
@@ -224,7 +228,6 @@
         function attack() { triggerHitEffect(); socket.emit('attack'); }
         function useSkill() { socket.emit('useSkill'); }
         function gacha() { socket.emit('drawGacha'); }
-        
         function useCoupon() {
             const code = document.getElementById('couponInput').value.trim();
             if (code) socket.emit('useCoupon', code);
@@ -239,18 +242,9 @@
             socket.emit('getPartyList');
             document.getElementById('partyListModal').style.display = 'flex';
         }
-
-        function closePartyModal() {
-            document.getElementById('partyListModal').style.display = 'none';
-        }
-
-        function joinSelectedParty(partyId) {
-            socket.emit('joinParty', partyId);
-            closePartyModal();
-        }
-
+        function closePartyModal() { document.getElementById('partyListModal').style.display = 'none'; }
+        function joinSelectedParty(partyId) { socket.emit('joinParty', partyId); closePartyModal(); }
         function leaveParty() { socket.emit('leaveParty'); }
-
         socket.on('partyResult', (res) => { alert(res.message); });
 
         socket.on('partyListResult', (list) => {
@@ -278,20 +272,70 @@
             else { triggerHitEffect(); alert(res.message); }
         });
 
-        // 💰 선택한 여러 아이템 판매 요청 함수
-        function sellSelectedItems() {
+        // ⚙️ 선택 개수에 따른 동적 팝업 제어
+        function openActionModal() {
             if (selectedIndices.length === 0) {
-                alert("판매할 무기를 슬롯에서 선택(클릭)해주세요!");
+                alert("관리할 무기를 슬롯에서 선택해주세요!");
                 return;
             }
-            socket.emit('sellItems', selectedIndices);
-            selectedIndices = []; // 전송 후 선택 초기화
+
+            const modal = document.getElementById('itemActionModal');
+            const title = document.getElementById('popupTitle');
+            const contentArea = document.getElementById('popupContentArea');
+            contentArea.innerHTML = '';
+
+            if (selectedIndices.length === 1) {
+                // 단건 클릭: 강화, 판매, 삭제, 장착/해제 메뉴 제공
+                const idx = selectedIndices[0];
+                const item = latestInventory[idx];
+                if (!item) { alert("비어있는 슬롯입니다."); selectedIndices = []; return; }
+
+                title.innerText = `🔍 단건 무기 관리: ${item.name} (+${item.enhance || 0})`;
+                const isEquipped = (equippedIndex === idx);
+                const equipText = isEquipped ? '장착 해제' : '무기 장착';
+                const enhanceCost = ((item.enhance || 0) + 1) * 400;
+
+                contentArea.innerHTML = `
+                    <button class="popup-btn" style="background:#2980b9;" onclick="doSingleAction('equip', ${idx})">${equipText}</button>
+                    <button class="popup-btn" style="background:#f39c12;" onclick="doSingleAction('enhance', ${idx})">✨ 강화 (${enhanceCost}G)</button>
+                    <button class="popup-btn" style="background:#e67e22;" onclick="doSingleAction('sell', ${idx})">💰 단건 판매 (${item.sellPrice}G)</button>
+                    <button class="popup-btn" style="background:#c0392b;" onclick="doSingleAction('delete', ${idx})">🗑️ 단건 삭제</button>
+                `;
+            } else {
+                // 다중 클릭: 판매, 삭제 메뉴 제공
+                title.innerText = `📦 다중 선택 무기 관리 (${selectedIndices.length개})`;
+                contentArea.innerHTML = `
+                    <button class="popup-btn" style="background:#e67e22;" onclick="doBatchAction('sell')">💰 선택 무기 일괄 판매</button>
+                    <button class="popup-btn" style="background:#c0392b;" onclick="doBatchAction('delete')">🗑️ 선택 무기 일괄 삭제</button>
+                `;
+            }
+
+            modal.style.display = 'flex';
         }
 
-        socket.on('sellResult', (res) => {
-            alert(res.message);
+        function closeItemModal() {
+            document.getElementById('itemActionModal').style.display = 'none';
+        }
+
+        function doSingleAction(actionType, idx) {
+            closeItemModal();
+            if (actionType === 'equip') socket.emit('equipItem', idx);
+            if (actionType === 'enhance') socket.emit('enhanceItem', idx);
+            if (actionType === 'sell') socket.emit('sellItems', [idx]);
+            if (actionType === 'delete') socket.emit('deleteItems', [idx]);
             selectedIndices = [];
-        });
+        }
+
+        function doBatchAction(actionType) {
+            closeItemModal();
+            if (actionType === 'sell') socket.emit('sellItems', selectedIndices);
+            if (actionType === 'delete') socket.emit('deleteItems', selectedIndices);
+            selectedIndices = [];
+        }
+
+        socket.on('sellResult', (res) => { alert(res.message); selectedIndices = []; });
+        socket.on('deleteResult', (res) => { alert(res.message); selectedIndices = []; });
+        socket.on('enhanceResult', (res) => { alert(res.message); });
 
         socket.on('updateState', (state) => {
             if (!state || !state.boss) return;
@@ -325,6 +369,9 @@
                 document.getElementById('myHp').innerText = me.hp;
                 document.getElementById('myGold').innerText = me.gold;
                 
+                latestInventory = me.inventory || [];
+                equippedIndex = me.equippedIndex;
+
                 currentPartyId = me.partyId;
                 const partyStatus = document.getElementById('partyStatus');
                 const partyButtonsArea = document.getElementById('partyButtonsArea');
@@ -356,9 +403,8 @@
 
                         slot.innerHTML = '<div>' + item.icon + '</div><div>+' + (item.enhance||0) + '</div>';
                         
-                        // 슬롯 클릭 시 다중선택 토글 + 개별 장착/강화 메뉴 동시 처리
-                        slot.onclick = (e) => {
-                            // Ctrl키나 모바일 편의를 위해 다중 선택 토글 기능 부여
+                        // 슬롯 클릭: 다중 선택 토글
+                        slot.onclick = () => {
                             const idxPos = selectedIndices.indexOf(i);
                             if (idxPos > -1) {
                                 selectedIndices.splice(idxPos, 1);
@@ -367,11 +413,6 @@
                                 selectedIndices.push(i);
                                 slot.classList.add('selected');
                             }
-                        };
-
-                        // 더블클릭이나 길게 누를 때 기존 장착/강화 메뉴 팝업 연동
-                        slot.ondblclick = () => {
-                            showItemMenu(i, item);
                         };
                     } else { 
                         slot.innerText = '빈칸'; 
@@ -386,22 +427,14 @@
             if (!res.success) alert(res.message);
             else alert('🎉 획득: ' + res.weapon.icon + ' [' + res.weapon.rarity + '] ' + res.weapon.name);
         });
-        socket.on('enhanceResult', (res) => alert(res.message));
         socket.on('itemObtained', (data) => {
             if (data.full) {
                 document.getElementById('dropItemText').innerText = '가방 포화로 드랍 실패: ' + data.weapon.name;
                 document.getElementById('fullModal').style.display = 'flex';
-            } else { alert('👑 막타 보상 획득: ' + data.weapon.name); }
+            } else { alert('👑 보상 획득: ' + data.weapon.name); }
         });
         
         function closeModal() { document.getElementById('fullModal').style.display = 'none'; }
-        
-        function showItemMenu(index, item) {
-            const act = prompt('[' + item.name + ' +' + (item.enhance||0) + ']\n1. 장착/해제\n2. 강화 (' + ((item.enhance+1)*400) + 'G)\n3. 단건 판매 (' + item.sellPrice + 'G)');
-            if (act === '1') socket.emit('equipItem', index);
-            if (act === '2') socket.emit('enhanceItem', index);
-            if (act === '3') socket.emit('sellItems', [index]); // 단건도 다중선택 판매 API 활용
-        }
     </script>
 </body>
 </html>
