@@ -2,7 +2,6 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
-const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
@@ -10,36 +9,6 @@ const io = new Server(server, { cors: { origin: "*", methods: ["GET", "POST"] } 
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
-
-const USERS_FILE = path.join(__dirname, 'users.json');
-const MARKET_FILE = path.join(__dirname, 'market.json');
-
-let registeredAccounts = {};
-if (fs.existsSync(USERS_FILE)) {
-    try {
-        registeredAccounts = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
-    } catch (e) {
-        registeredAccounts = {};
-    }
-}
-
-// 🛒 거래소 등록 아이템 관리
-let marketList = [];
-if (fs.existsSync(MARKET_FILE)) {
-    try {
-        marketList = JSON.parse(fs.readFileSync(MARKET_FILE, 'utf8'));
-    } catch (e) {
-        marketList = [];
-    }
-}
-
-function saveAccountsToFile() {
-    fs.writeFileSync(USERS_FILE, JSON.stringify(registeredAccounts, null, 2), 'utf8');
-}
-
-function saveMarketToFile() {
-    fs.writeFileSync(MARKET_FILE, JSON.stringify(marketList, null, 2), 'utf8');
-}
 
 const BOSS_LIST = [
     { name: '🐷 꿀신', maxHp: 157500, currentHp: 157500 },
@@ -67,21 +36,17 @@ const WEAPON_DB = {
     bow_legendary: { name: '천둥의 스톰브링어', type: 'bow', rarity: 'Legendary', atk: 1250, sellPrice: 10000, icon: '🏹⚡' },
     bow_mythic: { name: '태양의 신궁 아폴론', type: 'bow', rarity: 'Mythic', atk: 3000, sellPrice: 100000, icon: '🏹🌌' },
 
-    staff_common: { name: '새싹의 허브 지팡이', type: 'staff', rarity: 'Common', atk: 40, sellPrice: 50, icon: '🌿' },
-    staff_rare: { name: '축복의 성수 지팡이', type: 'staff', rarity: 'Rare', atk: 120, sellPrice: 250, icon: '💧✨' },
-    staff_epic: { name: '요정의 생명 지팡이', type: 'staff', rarity: 'Epic', atk: 350, sellPrice: 2500, icon: '🔮🌿' },
-    staff_legendary: { name: '세라핌의 치유 지팡이', type: 'staff', rarity: 'Legendary', atk: 800, sellPrice: 10000, icon: '🌟💖' },
-    staff_mythic: { name: '세계수의 영원한 생명', type: 'staff', rarity: 'Mythic', atk: 2000, sellPrice: 100000, icon: '🌌✨' },
-
-    buff_common: { name: '작은 사기의 북', type: 'buff', rarity: 'Common', atk: 20, buffValue: 10, defValue: 0, sellPrice: 50, icon: '🥁' },
-    buff_uncommon: { name: '군악대의 나팔', type: 'buff', rarity: 'Uncommon', atk: 40, buffValue: 30, defValue: 0, sellPrice: 150, icon: '🎺' },
-    buff_rare: { name: '수호자의 깃발', type: 'buff', rarity: 'Rare', atk: 80, buffValue: 50, defValue: 20, sellPrice: 250, icon: '🚩' },
-    buff_epic: { name: '용맹의 북', type: 'buff', rarity: 'Epic', atk: 150, buffValue: 100, defValue: 0, sellPrice: 1200, icon: '🪘' },
-    buff_legendary: { name: '기사단의 대형 군단기', type: 'buff', rarity: 'Legendary', atk: 300, buffValue: 150, defValue: 50, sellPrice: 10000, icon: '✨🚩' },
-    buff_mythic: { name: '태초의 군신 오라', type: 'buff', rarity: 'Mythic', atk: 600, buffValue: 250, defValue: 0, sellPrice: 100000, icon: '👑🔥' },
+    staff_common: { name: '새싹의 허브 지팡이', type: 'staff', rarity: 'Common', atk: 40, heal: 100, targets: 1, sellPrice: 50, icon: '🌿' },
+    staff_rare: { name: '축복의 성수 지팡이', type: 'staff', rarity: 'Rare', atk: 120, heal: 150, targets: 1, sellPrice: 250, icon: '💧✨' },
+    staff_epic: { name: '요정의 생명 지팡이', type: 'staff', rarity: 'Epic', atk: 350, heal: 200, targets: 1, sellPrice: 2500, icon: '🔮🌿' },
+    staff_legendary: { name: '세라핌의 치유 지팡이', type: 'staff', rarity: 'Legendary', atk: 800, heal: 250, targets: 1, sellPrice: 10000, icon: '🌟💖' },
+    staff_mythic: { name: '세계수의 영원한 생명', type: 'staff', rarity: 'Mythic', atk: 2000, heal: 300, targets: 2, sellPrice: 100000, icon: '🌌✨' },
 
     hidden_hong: { name: '홍인준의 뱃살 방패', type: 'shield', rarity: 'Mythic', atk: 6000, shieldDuration: 25, sellPrice: 100000, icon: '🐷🛡️' },
-    hidden_jiyu: { name: '지유의쌈장', type: 'knife', rarity: 'Mythic', atk: 10000000, sellPrice: 1000000, icon: '🐷' }
+
+    // 유물(Artifacts) 데이터 추가
+    artifact_sun: { name: '태양의 성배', type: 'artifact', rarity: 'Mythic', atk: 1500, sellPrice: 50000, icon: '🏆🔥' },
+    artifact_moon: { name: '달빛의 눈물', type: 'artifact', rarity: 'Mythic', atk: 1500, sellPrice: 50000, icon: '💎🌙' }
 };
 
 const COUPONS = {
@@ -89,17 +54,18 @@ const COUPONS = {
     'Fiwndq9': { type: 'weapon', reward: 'hidden_hong' },
     'ddddf1014': { type: 'gold', reward: 5000 },
     'HGAD026781': { type: 'gold', reward: 3000 },
-    'HIJPIG12': { type: 'weapon', reward: 'hidden_hong' },
-    'Ssamjang486': { type: 'weapon', reward: 'hidden_jiyu' }
+    'HIJPIG12': { type: 'weapon', reward: 'hidden_hong' }
 };
 
 let gameState = {
     boss: { ...BOSS_LIST[0] },
     players: {},
-    registeredAccounts: registeredAccounts,
+    registeredAccounts: {},
     guilds: {},
-    market: marketList
+    rankings: { players: [], guilds: [] }
 };
+
+let activeTrades = {};
 
 function saveAccountState(p) {
     if (p && gameState.registeredAccounts[p.name]) {
@@ -108,32 +74,37 @@ function saveAccountState(p) {
         gameState.registeredAccounts[p.name].inventory = p.inventory;
         gameState.registeredAccounts[p.name].equippedIndex = p.equippedIndex;
         gameState.registeredAccounts[p.name].totalDamage = p.totalDamage;
-        saveAccountsToFile();
     }
 }
 
-function getRandomWeaponKey() {
-    const types = ['knife', 'shield', 'bow', 'staff', 'buff'];
-    const selectedType = types[Math.floor(Math.random() * types.length)];
-    
-    if (selectedType === 'buff') {
-        const rand = Math.random() * 100;
-        if (rand < 1.5) return 'buff_mythic';
-        if (rand < 7.0) return 'buff_legendary';
-        if (rand < 20.0) return 'buff_epic';
-        if (rand < 50.0) return 'buff_rare';
-        if (rand < 80.0) return 'buff_uncommon';
-        return 'buff_common';
-    }
+function updateRankings() {
+    const pList = Object.values(gameState.players).map(p => ({
+        name: p.name,
+        totalDamage: p.totalDamage || 0
+    })).sort((a, b) => b.totalDamage - a.totalDamage);
+    gameState.rankings.players = pList;
 
-    const rand = Math.random() * 100;
-    let rarity = 'Common';
-    if (rand < 1.5) rarity = 'Mythic';
-    else if (rand < 7.0) rarity = 'Legendary';
-    else if (rand < 20.0) rarity = 'Epic';
-    else if (rand < 50.0) rarity = 'Rare';
-    
-    return `${selectedType}_${rarity.toLowerCase()}`;
+    const gList = Object.values(gameState.guilds).map(g => {
+        let gDmg = 0;
+        g.members.forEach(mId => {
+            if (gameState.players[mId]) gDmg += (gameState.players[mId].totalDamage || 0);
+        });
+        g.totalDamage = gDmg;
+        return {
+            id: g.id,
+            name: g.name,
+            maxMembers: g.maxMembers,
+            memberCount: g.members.length,
+            totalDamage: gDmg
+        };
+    }).sort((a, b) => b.totalDamage - a.totalDamage);
+    gameState.rankings.guilds = gList;
+}
+
+function getRandomWeaponKey() {
+    // 유물 포함 드랍 확률 테이블 조정 또는 무작위 선택
+    const keys = Object.keys(WEAPON_DB);
+    return keys[Math.floor(Math.random() * keys.length)];
 }
 
 function getRarityMultiplier(rarity) {
@@ -148,43 +119,13 @@ function getRarityMultiplier(rarity) {
 
 function calculateDamage(p) {
     let eq = p.equippedIndex !== null ? p.inventory[p.equippedIndex] : null;
-    let baseAtk = 80; 
+    let baseAtk = 80;
     let rarityMul = 1.0;
     if (eq) {
         rarityMul = getRarityMultiplier(eq.rarity);
         baseAtk = (eq.atk * (1 + (eq.enhance || 0) * 0.15)) * rarityMul;
     }
-    return Math.round(baseAtk + (p.bonusAtk || 0) + (p.buffAtk || 0));
-}
-
-function getRankings() {
-    const allAccs = Object.values(registeredAccounts);
-    allAccs.sort((a, b) => (b.totalDamage || 0) - (a.totalDamage || 0));
-    const playerRankings = allAccs.map((acc, index) => ({
-        rank: index + 1,
-        name: acc.nickname,
-        totalDamage: acc.totalDamage || 0,
-        gold: acc.gold || 0
-    }));
-
-    const guildRankings = Object.keys(gameState.guilds).map(guildId => {
-        const guild = gameState.guilds[guildId];
-        let totalGuildDamage = 0;
-        guild.members.forEach(memberId => {
-            let mem = gameState.players[memberId];
-            if (mem) totalGuildDamage += (mem.totalDamage || 0);
-        });
-        return {
-            id: guildId,
-            name: guild.name,
-            totalDamage: totalGuildDamage,
-            memberCount: guild.members.length,
-            maxMembers: guild.maxMembers
-        };
-    });
-
-    guildRankings.sort((a, b) => b.totalDamage - a.totalDamage);
-    return { players: playerRankings, guilds: guildRankings.map((g, idx) => ({ rank: idx + 1, ...g })) };
+    return Math.round(baseAtk + (p.bonusAtk || 0));
 }
 
 setInterval(() => {
@@ -195,6 +136,7 @@ setInterval(() => {
             p.isInvincible = false;
             updated = true;
         }
+
         if (p.hp > 0) {
             if (!p.isInvincible) {
                 p.hp = Math.max(0, p.hp - 5);
@@ -228,7 +170,6 @@ io.on('connection', (socket) => {
             nickname, password, hp: 100, maxHp: 100, gold: 500,
             inventory: [], equippedIndex: null, totalDamage: 0, bonusAtk: 0
         };
-        saveAccountsToFile();
         socket.emit('authResult', { success: true, message: '회원가입 성공! 로그인해주세요.' });
     });
 
@@ -249,85 +190,142 @@ io.on('connection', (socket) => {
             equippedIndex: account.equippedIndex !== undefined ? account.equippedIndex : null,
             totalDamage: account.totalDamage || 0,
             bonusAtk: account.bonusAtk || 0,
-            buffAtk: 0,
-            buffDef: 0,
-            lastSkillTime: 0,
-            isInvincible: false,
-            invincibleUntil: 0,
+            lastSkillTime: 0, 
+            isInvincible: false, 
+            invincibleUntil: 0, 
             guildId: null
         };
 
-        socket.emit('loginSuccess', { success: true, player: gameState.players[socket.id], rankings: getRankings() });
+        socket.emit('loginSuccess', { success: true, player: gameState.players[socket.id] });
+        updateRankings();
         io.emit('updateState', gameState);
     });
 
-    // 🛒 거래소 아이템 등록
-    socket.on('registerMarketItem', ({ index, price }) => {
-        const p = gameState.players[socket.id];
-        const sellPrice = parseInt(price);
-        if (!p || index < 0 || index >= p.inventory.length || isNaN(sellPrice) || sellPrice <= 0) return;
+    socket.on('getOnlineUsers', () => {
+        const users = Object.values(gameState.players)
+            .filter(p => p.id !== socket.id)
+            .map(p => ({ id: p.id, name: p.name }));
+        socket.emit('onlineUsersResult', users);
+    });
 
-        if (p.equippedIndex === index) {
-            socket.emit('marketResult', { success: false, message: '❌ 장착 중인 아이템은 등록할 수 없습니다.' });
+    socket.on('requestTrade', (targetId) => {
+        const sender = gameState.players[socket.id];
+        const target = gameState.players[targetId];
+        if (!sender || !target) return;
+        io.to(targetId).emit('tradeRequested', { fromId: socket.id, fromName: sender.name });
+    });
+
+    socket.on('acceptTrade', (fromId) => {
+        const p1 = gameState.players[fromId];
+        const p2 = gameState.players[socket.id];
+        if (!p1 || !p2) {
+            socket.emit('tradeMsg', { success: false, message: '상대방이 접속 중이 아닙니다.' });
             return;
         }
 
-        const item = p.inventory.splice(index, 1)[0];
-        if (p.equippedIndex !== null && p.equippedIndex > index) p.equippedIndex--;
-
-        const marketItem = {
-            id: 'm_' + Date.now() + Math.random(),
-            seller: p.name,
-            item: item,
-            price: sellPrice
+        const tradeId = 'trade_' + Date.now();
+        activeTrades[tradeId] = {
+            p1Id: p1.id,
+            p2Id: p2.id,
+            items1: [],
+            items2: [],
+            indices1: [],
+            indices2: [],
+            ready1: false,
+            ready2: false
         };
 
-        gameState.market.push(marketItem);
-        saveMarketToFile();
-        saveAccountState(p);
-
-        socket.emit('marketResult', { success: true, message: '🛒 거래소에 아이템이 등록되었습니다.' });
-        io.emit('updateState', gameState);
+        io.to(p1.id).emit('tradeStart', { tradeId, partnerName: p2.name });
+        io.to(p2.id).emit('tradeStart', { tradeId, partnerName: p1.name });
     });
 
-    // 🛒 거래소 아이템 구매
-    socket.on('buyMarketItem', (marketId) => {
+    socket.on('updateTradeOffer', ({ tradeId, offeredIndices }) => {
+        const trade = activeTrades[tradeId];
+        if (!trade) return;
         const p = gameState.players[socket.id];
-        const mIdx = gameState.market.findIndex(m => m.id === marketId);
-        if (!p || mIdx === -1) return;
+        if (!p) return;
 
-        const targetMarket = gameState.market[mIdx];
-        if (targetMarket.seller === p.name) {
-            socket.emit('marketResult', { success: false, message: '❌ 자신이 올린 아이템은 구매할 수 없습니다.' });
-            return;
+        const isP1 = (socket.id === trade.p1Id);
+        const indices = [...new Set(offeredIndices)].sort((a, b) => b - a);
+        const items = indices.map(idx => p.inventory[idx]).filter(item => item !== undefined);
+
+        if (isP1) {
+            trade.indices1 = indices;
+            trade.items1 = items;
+            trade.ready1 = false;
+        } else {
+            trade.indices2 = indices;
+            trade.items2 = items;
+            trade.ready2 = false;
         }
-        if (p.gold < targetMarket.price) {
-            socket.emit('marketResult', { success: false, message: '❌ 골드가 부족합니다!' });
-            return;
+
+        io.to(trade.p1Id).emit('tradeStateUpdate', trade);
+        io.to(trade.p2Id).emit('tradeStateUpdate', trade);
+    });
+
+    socket.on('setTradeReady', ({ tradeId, ready }) => {
+        const trade = activeTrades[tradeId];
+        if (!trade) return;
+        const isP1 = (socket.id === trade.p1Id);
+
+        if (isP1) trade.ready1 = ready;
+        else trade.ready2 = ready;
+
+        io.to(trade.p1Id).emit('tradeStateUpdate', trade);
+        io.to(trade.p2Id).emit('tradeStateUpdate', trade);
+
+        if (trade.ready1 && trade.ready2) {
+            const p1 = gameState.players[trade.p1Id];
+            const p2 = gameState.players[trade.p2Id];
+
+            if (!p1 || !p2) return;
+
+            const p1RemainingSlots = 36 - (p1.inventory.length - trade.indices1.length);
+            const p2RemainingSlots = 36 - (p2.inventory.length - trade.indices2.length);
+
+            if (p1RemainingSlots < trade.items2.length || p2RemainingSlots < trade.items1.length) {
+                io.to(trade.p1Id).emit('tradeMsg', { success: false, message: '인벤토리 공간이 부족하여 거래가 취소되었습니다.' });
+                io.to(trade.p2Id).emit('tradeMsg', { success: false, message: '인벤토리 공간이 부족하여 거래가 취소되었습니다.' });
+                delete activeTrades[tradeId];
+                return;
+            }
+
+            let p1ItemsToRemove = trade.indices1.map(idx => ({ idx, item: p1.inventory[idx] }));
+            p1ItemsToRemove.sort((a, b) => b.idx - a.idx);
+            p1ItemsToRemove.forEach(({ idx }) => {
+                if (p1.equippedIndex === idx) p1.equippedIndex = null;
+                else if (p1.equippedIndex !== null && p1.equippedIndex > idx) p1.equippedIndex--;
+                p1.inventory.splice(idx, 1);
+            });
+
+            let p2ItemsToRemove = trade.indices2.map(idx => ({ idx, item: p2.inventory[idx] }));
+            p2ItemsToRemove.sort((a, b) => b.idx - a.idx);
+            p2ItemsToRemove.forEach(({ idx }) => {
+                if (p2.equippedIndex === idx) p2.equippedIndex = null;
+                else if (p2.equippedIndex !== null && p2.equippedIndex > idx) p2.equippedIndex--;
+                p2.inventory.splice(idx, 1);
+            });
+
+            trade.items2.forEach(item => p1.inventory.push(item));
+            trade.items1.forEach(item => p2.inventory.push(item));
+
+            saveAccountState(p1);
+            saveAccountState(p2);
+
+            io.to(trade.p1Id).emit('tradeComplete', { success: true, message: '🤝 거래가 성공적으로 완료되었습니다!' });
+            io.to(trade.p2Id).emit('tradeComplete', { success: true, message: '🤝 거래가 성공적으로 완료되었습니다!' });
+
+            delete activeTrades[tradeId];
+            io.emit('updateState', gameState);
         }
-        if (p.inventory.length >= 36) {
-            socket.emit('marketResult', { success: false, message: '❌ 인벤토리가 가득 찼습니다!' });
-            return;
-        }
+    });
 
-        p.gold -= targetMarket.price;
-        p.inventory.push(targetMarket.item);
-
-        // 판매자에게 골드 지급 (온/오프라인 대응)
-        const sellerAcc = gameState.registeredAccounts[targetMarket.seller];
-        if (sellerAcc) {
-            sellerAcc.gold = (sellerAcc.gold || 0) + targetMarket.price;
-            saveAccountsToFile();
-        }
-        const onlineSellerSocket = Object.values(gameState.players.find(pl => pl.name === targetMarket.seller));
-        // 간단한 소켓 전송은 online status 확인 후 처리 가능
-
-        gameState.market.splice(mIdx, 1);
-        saveMarketToFile();
-        saveAccountState(p);
-
-        socket.emit('marketResult', { success: true, message: `🎉 [${targetMarket.item.name}] 구매 완료!` });
-        io.emit('updateState', gameState);
+    socket.on('cancelTrade', (tradeId) => {
+        const trade = activeTrades[tradeId];
+        if (!trade) return;
+        io.to(trade.p1Id).emit('tradeCancelled', { success: false, message: '거래가 취소되었습니다.' });
+        io.to(trade.p2Id).emit('tradeCancelled', { success: false, message: '거래가 취소되었습니다.' });
+        delete activeTrades[tradeId];
     });
 
     socket.on('sellItems', (indices) => {
@@ -343,8 +341,11 @@ io.on('connection', (socket) => {
                 totalEarnedGold += (soldItem.sellPrice || 0);
                 p.inventory.splice(idx, 1);
 
-                if (p.equippedIndex === idx) p.equippedIndex = null;
-                else if (p.equippedIndex !== null && p.equippedIndex > idx) p.equippedIndex--;
+                if (p.equippedIndex === idx) {
+                    p.equippedIndex = null;
+                } else if (p.equippedIndex !== null && p.equippedIndex > idx) {
+                    p.equippedIndex--;
+                }
             }
         });
 
@@ -352,6 +353,30 @@ io.on('connection', (socket) => {
         saveAccountState(p);
 
         socket.emit('sellResult', { success: true, message: `💰 총 ${totalEarnedGold.toLocaleString()} 골드 획득!` });
+        io.emit('updateState', gameState);
+    });
+
+    socket.on('deleteItems', (indices) => {
+        const p = gameState.players[socket.id];
+        if (!p || !Array.isArray(indices) || indices.length === 0) return;
+
+        const uniqueIndices = [...new Set(indices)].sort((a, b) => b - a);
+
+        uniqueIndices.forEach(idx => {
+            if (idx >= 0 && idx < p.inventory.length) {
+                p.inventory.splice(idx, 1);
+
+                if (p.equippedIndex === idx) {
+                    p.equippedIndex = null;
+                } else if (p.equippedIndex !== null && p.equippedIndex > idx) {
+                    p.equippedIndex--;
+                }
+            }
+        });
+
+        saveAccountState(p);
+
+        socket.emit('deleteResult', { success: true, message: `🗑️ 선택한 아이템들이 삭제되었습니다.` });
         io.emit('updateState', gameState);
     });
 
@@ -377,6 +402,7 @@ io.on('connection', (socket) => {
         p.gold += 15;
         saveAccountState(p);
 
+        updateRankings();
         checkBossKill(p);
         io.emit('updateState', gameState);
     });
@@ -398,19 +424,12 @@ io.on('connection', (socket) => {
         }
         p.lastSkillTime = now;
 
-        if (eq && eq.name === '지유의쌈장') {
-            let skillDmg = 1000000000;
-            gameState.boss.currentHp -= skillDmg;
-            p.totalDamage += skillDmg;
-            p.gold += 100;
-            socket.emit('skillResult', { success: true, message: `🐷 [지유의쌈장 폭발] 1,000,000,000 대미지!` });
-            checkBossKill(p);
-        } else if (weaponType === 'staff') {
-            let healTable = { 'Common': 10, 'Rare': 15, 'Epic': 25, 'Legendary': 35, 'Mythic': 50 };
-            let healAmt = eq && healTable[eq.rarity] ? healTable[eq.rarity] : 10;
-            p.hp = Math.min(p.maxHp, p.hp + healAmt);
-            socket.emit('skillResult', { success: true, message: `🌿 [치유의 파동] 체력 ${healAmt} 회복!` });
+        if (weaponType === 'staff') {
+            let healBase = eq.heal || 100;
+            let totalHealAmt = Math.round((healBase * rarityMul) + 200);
+            p.hp = Math.min(p.maxHp, p.hp + totalHealAmt);
             p.gold += 30;
+            socket.emit('skillResult', { success: true, message: `🌿 [치유의 파동] 체력 ${totalHealAmt} 회복!` });
         } else if (weaponType === 'shield') {
             let durationSec = eq.shieldDuration || 10;
             p.isInvincible = true;
@@ -423,6 +442,7 @@ io.on('connection', (socket) => {
             p.totalDamage += skillDmg;
             p.gold += 50;
             socket.emit('skillResult', { success: true, message: `⚔️ 스킬 적중! ${skillDmg} 대미지!` });
+            updateRankings();
             checkBossKill(p);
         }
         saveAccountState(p);
@@ -447,18 +467,26 @@ io.on('connection', (socket) => {
     socket.on('createGuild', ({ guildName, maxMembers }) => {
         const p = gameState.players[socket.id];
         if (!p || p.guildId) return;
-        const limit = parseInt(maxMembers) || 5;
-        const guildId = 'guild_' + Date.now();
-        
-        gameState.guilds[guildId] = { name: guildName.trim(), master: socket.id, maxMembers: limit, members: [socket.id] };
+        const guildId = 'g_' + Math.random().toString(36).substring(2, 9);
+        gameState.guilds[guildId] = {
+            id: guildId,
+            name: guildName.trim(),
+            maxMembers: Math.max(2, Math.min(20, maxMembers || 5)),
+            leaderId: socket.id,
+            members: [socket.id]
+        };
         p.guildId = guildId;
-        socket.emit('guildResult', { success: true, message: `🏰 [${guildName}] 길드가 창설되었습니다!` });
+        updateRankings();
+        socket.emit('guildResult', { success: true, message: `🏰 '${guildName}' 길드가 생성되었습니다!` });
         io.emit('updateState', gameState);
     });
 
     socket.on('getGuildList', () => {
-        const list = Object.keys(gameState.guilds).map(id => ({
-            id, name: gameState.guilds[id].name, currentCount: gameState.guilds[id].members.length, maxMembers: gameState.guilds[id].maxMembers
+        const list = Object.values(gameState.guilds).map(g => ({
+            id: g.id,
+            name: g.name,
+            maxMembers: g.maxMembers,
+            currentCount: g.members.length
         }));
         socket.emit('guildListResult', list);
     });
@@ -466,11 +494,33 @@ io.on('connection', (socket) => {
     socket.on('joinGuild', (guildId) => {
         const p = gameState.players[socket.id];
         const guild = gameState.guilds[guildId];
-        if (!p || p.guildId || !guild || guild.members.length >= guild.maxMembers) return;
-        
+        if (!p || !guild || p.guildId) return;
+        if (guild.members.length >= guild.maxMembers) {
+            socket.emit('guildResult', { success: false, message: '길드 정원이 가득 찼습니다.' });
+            return;
+        }
         guild.members.push(socket.id);
         p.guildId = guildId;
-        socket.emit('guildResult', { success: true, message: `✨ [${guild.name}] 길드에 가입되었습니다!` });
+        updateRankings();
+        socket.emit('guildResult', { success: true, message: `🏰 '${guild.name}' 길드에 가입되었습니다!` });
+        io.emit('updateState', gameState);
+    });
+
+    socket.on('leaveGuild', () => {
+        const p = gameState.players[socket.id];
+        if (!p || !p.guildId) return;
+        const guild = gameState.guilds[p.guildId];
+        if (guild) {
+            guild.members = guild.members.filter(id => id !== socket.id);
+            if (guild.members.length === 0) {
+                delete gameState.guilds[p.guildId];
+            } else if (guild.leaderId === socket.id) {
+                guild.leaderId = guild.members[0];
+            }
+        }
+        p.guildId = null;
+        updateRankings();
+        socket.emit('guildResult', { success: true, message: '길드를 탈퇴했습니다.' });
         io.emit('updateState', gameState);
     });
 
@@ -516,10 +566,51 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('adminAction', (data) => {
+        const { action, payload } = data;
+        if (action === 'spawnBoss') {
+            const map = { 'pig': 0, 'goliath': 1, 'iraso': 2, 'dragon': 3 };
+            if (map[payload] !== undefined) gameState.boss = { ...BOSS_LIST[map[payload]] };
+        }
+        if (action === 'killBoss') gameState.boss.currentHp = 0;
+        if (action === 'giveSpecificWeapon') {
+            const target = gameState.players[payload.targetId];
+            const wKey = payload.weaponKey;
+            if (target && WEAPON_DB[wKey] && target.inventory.length < 36) {
+                const w = { ...WEAPON_DB[wKey], id: Date.now() + Math.random(), enhance: 0 };
+                target.inventory.push(w);
+                saveAccountState(target);
+                io.to(target.id).emit('itemObtained', { weapon: w, full: false });
+            }
+        }
+        io.emit('updateState', gameState);
+    });
+
     socket.on('disconnect', () => {
         const p = gameState.players[socket.id];
-        if (p) saveAccountState(p);
+        if (p) {
+            saveAccountState(p);
+            if (p.guildId && gameState.guilds[p.guildId]) {
+                const guild = gameState.guilds[p.guildId];
+                guild.members = guild.members.filter(id => id !== socket.id);
+                if (guild.members.length === 0) {
+                    delete gameState.guilds[p.guildId];
+                } else if (guild.leaderId === socket.id) {
+                    guild.leaderId = guild.members[0];
+                }
+            }
+        }
+        Object.keys(activeTrades).forEach(tradeId => {
+            const trade = activeTrades[tradeId];
+            if (trade.p1Id === socket.id || trade.p2Id === socket.id) {
+                const partnerId = (trade.p1Id === socket.id) ? trade.p2Id : trade.p1Id;
+                io.to(partnerId).emit('tradeCancelled', { success: false, message: '상대방이 연결을 끊어 거래가 취소되었습니다.' });
+                delete activeTrades[tradeId];
+            }
+        });
+
         delete gameState.players[socket.id];
+        updateRankings();
         io.emit('updateState', gameState);
     });
 });
