@@ -62,12 +62,13 @@ const WEAPON_DB = {
     staff_legendary: { name: '세라핌의 치유 지팡이', type: 'staff', rarity: 'Legendary', atk: 800, sellPrice: 10000, icon: '🌟💖' },
     staff_mythic: { name: '세계수의 영원한 생명', type: 'staff', rarity: 'Mythic', atk: 2000, sellPrice: 100000, icon: '🌌✨' },
 
-    // 🌟 신규 추가: 버프템 (Buff) 계열
-    buff_common: { name: '작은 사기의 북', type: 'buff', rarity: 'Common', atk: 30, buffStat: 'atk', buffValue: 50, sellPrice: 50, icon: '🥁' },
-    buff_rare: { name: '용기의 나팔', type: 'buff', rarity: 'Rare', atk: 90, buffStat: 'atk', buffValue: 150, sellPrice: 250, icon: '🎺' },
-    buff_epic: { name: '함성의 깃발', type: 'buff', rarity: 'Epic', atk: 250, buffStat: 'atk', buffValue: 400, sellPrice: 2500, icon: '🚩' },
-    buff_legendary: { name: '군신의 오라', type: 'buff', rarity: 'Legendary', atk: 600, buffStat: 'atk', buffValue: 1000, sellPrice: 10000, icon: '✨🔥' },
-    buff_mythic: { name: '태초의 군단기', type: 'buff', rarity: 'Mythic', atk: 1500, buffStat: 'atk', buffValue: 2500, sellPrice: 100000, icon: '👑⚡' },
+    // 🌟 버프템 계열 (공격력 10, 30, 50, 100, 150, 250 순서 + 방어력 복합)
+    buff_common: { name: '작은 사기의 북', type: 'buff', rarity: 'Common', atk: 20, buffValue: 10, defValue: 0, sellPrice: 50, icon: '🥁' },
+    buff_uncommon: { name: '군악대의 나팔', type: 'buff', rarity: 'Uncommon', atk: 40, buffValue: 30, defValue: 0, sellPrice: 150, icon: '🎺' },
+    buff_rare: { name: '수호자의 깃발', type: 'buff', rarity: 'Rare', atk: 80, buffValue: 50, defValue: 20, sellPrice: 250, icon: '🚩' },
+    buff_epic: { name: '용맹의 북', type: 'buff', rarity: 'Epic', atk: 150, buffValue: 100, defValue: 0, sellPrice: 1200, icon: '🪘' },
+    buff_legendary: { name: '기사단의 대형 군단기', type: 'buff', rarity: 'Legendary', atk: 300, buffValue: 150, defValue: 50, sellPrice: 10000, icon: '✨🚩' },
+    buff_mythic: { name: '태초의 군신 오라', type: 'buff', rarity: 'Mythic', atk: 600, buffValue: 250, defValue: 0, sellPrice: 100000, icon: '👑🔥' },
 
     hidden_hong: { name: '홍인준의 뱃살 방패', type: 'shield', rarity: 'Mythic', atk: 6000, shieldDuration: 25, sellPrice: 100000, icon: '🐷🛡️' },
     hidden_jiyu: { name: '지유의쌈장', type: 'knife', rarity: 'Mythic', atk: 10000000, sellPrice: 1000000, icon: '🐷' }
@@ -86,7 +87,7 @@ let gameState = {
     boss: { ...BOSS_LIST[0] },
     players: {},
     registeredAccounts: registeredAccounts,
-    parties: {}
+    guilds: {}
 };
 
 function saveAccountState(p) {
@@ -101,17 +102,26 @@ function saveAccountState(p) {
 }
 
 function getRandomWeaponKey() {
-    const types = ['knife', 'shield', 'bow', 'staff', 'buff']; // 버프템 가챠 풀 추가
+    const types = ['knife', 'shield', 'bow', 'staff', 'buff'];
     const selectedType = types[Math.floor(Math.random() * types.length)];
-    const rand = Math.random() * 100;
     
+    if (selectedType === 'buff') {
+        const rand = Math.random() * 100;
+        if (rand < 1.5) return 'buff_mythic';
+        if (rand < 7.0) return 'buff_legendary';
+        if (rand < 20.0) return 'buff_epic';
+        if (rand < 50.0) return 'buff_rare';
+        if (rand < 80.0) return 'buff_uncommon';
+        return 'buff_common';
+    }
+
+    const rand = Math.random() * 100;
     let rarity = 'Common';
     if (rand < 1.5) rarity = 'Mythic';
-    else if (rand < 1.5 + 5.5) rarity = 'Legendary';
-    else if (rand < 1.5 + 5.5 + 13.0) rarity = 'Epic';
-    else if (rand < 1.5 + 5.5 + 13.0 + 30.0) rarity = 'Rare';
-    else rarity = 'Common';
-
+    else if (rand < 7.0) rarity = 'Legendary';
+    else if (rand < 20.0) rarity = 'Epic';
+    else if (rand < 50.0) rarity = 'Rare';
+    
     return `${selectedType}_${rarity.toLowerCase()}`;
 }
 
@@ -136,16 +146,45 @@ function calculateDamage(p) {
     return Math.round(baseAtk + (p.bonusAtk || 0) + (p.buffAtk || 0));
 }
 
-// 랭킹 계산 헬퍼 함수
+// 랭킹 계산 함수 (개인 + 길드)
 function getRankings() {
     const allAccs = Object.values(registeredAccounts);
     allAccs.sort((a, b) => (b.totalDamage || 0) - (a.totalDamage || 0));
-    return allAccs.map((acc, index) => ({
+    const playerRankings = allAccs.map((acc, index) => ({
         rank: index + 1,
         name: acc.nickname,
         totalDamage: acc.totalDamage || 0,
         gold: acc.gold || 0
     }));
+
+    const guildRankings = Object.keys(gameState.guilds).map(guildId => {
+        const guild = gameState.guilds[guildId];
+        let totalGuildDamage = 0;
+        guild.members.forEach(memberId => {
+            let mem = gameState.players[memberId];
+            if (mem) {
+                totalGuildDamage += (mem.totalDamage || 0);
+            } else {
+                // 오프라인 상태 계정 데미지 반영 탐색
+                const memberAccount = Object.values(gameState.registeredAccounts).find(acc => {
+                    // memberId가 닉네임인 경우 등 대응을 위한 예시 처리
+                    return false; 
+                });
+            }
+        });
+        return {
+            id: guildId,
+            name: guild.name,
+            totalDamage: totalGuildDamage,
+            memberCount: guild.members.length,
+            maxMembers: guild.maxMembers
+        };
+    });
+
+    guildRankings.sort((a, b) => b.totalDamage - a.totalDamage);
+    const indexedGuildRankings = guildRankings.map((g, idx) => ({ rank: idx + 1, ...g }));
+
+    return { players: playerRankings, guilds: indexedGuildRankings };
 }
 
 setInterval(() => {
@@ -212,10 +251,11 @@ io.on('connection', (socket) => {
             totalDamage: account.totalDamage || 0,
             bonusAtk: account.bonusAtk || 0,
             buffAtk: 0,
+            buffDef: 0,
             lastSkillTime: 0, 
             isInvincible: false, 
             invincibleUntil: 0, 
-            partyId: null
+            guildId: null
         };
 
         socket.emit('loginSuccess', { success: true, player: gameState.players[socket.id], rankings: getRankings() });
@@ -269,7 +309,6 @@ io.on('connection', (socket) => {
         });
 
         saveAccountState(p);
-
         socket.emit('deleteResult', { success: true, message: `🗑️ 선택한 무기들이 삭제되었습니다.` });
         io.emit('updateState', gameState);
     });
@@ -300,7 +339,7 @@ io.on('connection', (socket) => {
         io.emit('updateState', gameState);
     });
 
-    // 🌟 스킬 사용 (파티 힐 공유 및 파티 버프 기능 포함)
+    // 🌟 스킬 사용 (길드원 힐 및 버프 효과 공유)
     socket.on('useSkill', () => {
         const p = gameState.players[socket.id];
         if (!p || p.hp <= 0) return;
@@ -326,16 +365,15 @@ io.on('connection', (socket) => {
             socket.emit('skillResult', { success: true, message: `🐷 [지유의쌈장 폭발] 1,000,000,000 대미지!` });
             checkBossKill(p);
         } else if (weaponType === 'staff') {
-            // 🌿 [힐러] 파티원 전원 회복 적용
             let healTable = { 'Common': 10, 'Rare': 15, 'Epic': 25, 'Legendary': 35, 'Mythic': 50 };
             let healAmt = eq && healTable[eq.rarity] ? healTable[eq.rarity] : 10;
 
-            if (p.partyId && gameState.parties[p.partyId]) {
-                gameState.parties[p.partyId].members.forEach(memberId => {
+            if (p.guildId && gameState.guilds[p.guildId]) {
+                gameState.guilds[p.guildId].members.forEach(memberId => {
                     let member = gameState.players[memberId];
                     if (member && member.hp > 0) {
                         member.hp = Math.min(member.maxHp, member.hp + healAmt);
-                        io.to(memberId).emit('skillResult', { success: true, message: `🌿 [파티 치유의 파동] 힐러 ${p.name}의 능력으로 체력 ${healAmt} 회복!` });
+                        io.to(memberId).emit('skillResult', { success: true, message: `🌿 [길드 치유의 파동] 힐러 ${p.name}의 능력으로 체력 ${healAmt} 회복!` });
                         saveAccountState(member);
                     }
                 });
@@ -345,29 +383,43 @@ io.on('connection', (socket) => {
             }
             p.gold += 30;
         } else if (weaponType === 'buff') {
-            // 🥁 [버프템] 파티원 전원에게 공격력 버프 부여
-            let buffVal = eq && eq.buffValue ? eq.buffValue : 50;
-            let buffDuration = 15; // 15초간 버프
+            let buffAtkVal = eq.buffValue || 10;
+            let buffDefVal = eq.defValue || 0;
+            let buffDuration = 15;
 
-            if (p.partyId && gameState.parties[p.partyId]) {
-                gameState.parties[p.partyId].members.forEach(memberId => {
+            if (p.guildId && gameState.guilds[p.guildId]) {
+                gameState.guilds[p.guildId].members.forEach(memberId => {
                     let member = gameState.players[memberId];
                     if (member) {
-                        member.buffAtk = (member.buffAtk || 0) + buffVal;
-                        io.to(memberId).emit('skillResult', { success: true, message: `🥁 [파티 버프 활성화] ${p.name}의 버프로 공격력 +${buffVal} 증가!` });
+                        member.buffAtk = (member.buffAtk || 0) + buffAtkVal;
+                        member.buffDef = (member.buffDef || 0) + buffDefVal;
+                        
+                        let msg = `🥁 [길드 버프] 공격력 +${buffAtkVal}`;
+                        if (buffDefVal > 0) msg += `, 방어력 +${buffDefVal}`;
+                        
+                        io.to(memberId).emit('skillResult', { success: true, message: `${msg} 증가!` });
+                        
                         setTimeout(() => {
                             if (gameState.players[memberId]) {
-                                gameState.players[memberId].buffAtk = Math.max(0, (gameState.players[memberId].buffAtk || 0) - buffVal);
+                                gameState.players[memberId].buffAtk = Math.max(0, (gameState.players[memberId].buffAtk || 0) - buffAtkVal);
+                                gameState.players[memberId].buffDef = Math.max(0, (gameState.players[memberId].buffDef || 0) - buffDefVal);
                             }
                         }, buffDuration * 1000);
                     }
                 });
             } else {
-                p.buffAtk = (p.buffAtk || 0) + buffVal;
-                socket.emit('skillResult', { success: true, message: `🥁 [버프 활성화] 공격력 +${buffVal} 증가!` });
+                p.buffAtk = (p.buffAtk || 0) + buffAtkVal;
+                p.buffDef = (p.buffDef || 0) + buffDefVal;
+                
+                let msg = `🥁 [버프 활성화] 공격력 +${buffAtkVal}`;
+                if (buffDefVal > 0) msg += `, 방어력 +${buffDefVal}`;
+                
+                socket.emit('skillResult', { success: true, message: `${msg} 증가!` });
+                
                 setTimeout(() => {
                     if (gameState.players[socket.id]) {
-                        gameState.players[socket.id].buffAtk = Math.max(0, (gameState.players[socket.id].buffAtk || 0) - buffVal);
+                        gameState.players[socket.id].buffAtk = Math.max(0, (gameState.players[socket.id].buffAtk || 0) - buffAtkVal);
+                        gameState.players[socket.id].buffDef = Math.max(0, (gameState.players[socket.id].buffDef || 0) - buffDefVal);
                     }
                 }, buffDuration * 1000);
             }
@@ -405,37 +457,69 @@ io.on('connection', (socket) => {
         }
     }
 
-    socket.on('createParty', (partyName) => {
+    // 길드 시스템 소켓
+    socket.on('createGuild', ({ guildName, maxMembers }) => {
         const p = gameState.players[socket.id];
-        if (!p || p.partyId) return;
-        const partyId = 'party_' + Date.now();
-        gameState.parties[partyId] = { name: partyName.trim(), leader: socket.id, members: [socket.id] };
-        p.partyId = partyId;
-        socket.emit('partyResult', { success: true, message: '🎉 파티 생성 완료!' });
+        if (!p || p.guildId) return;
+        
+        const limit = parseInt(maxMembers) || 5;
+        const guildId = 'guild_' + Date.now();
+        
+        gameState.guilds[guildId] = {
+            name: guildName.trim(),
+            master: socket.id,
+            maxMembers: limit,
+            members: [socket.id]
+        };
+        
+        p.guildId = guildId;
+        socket.emit('guildResult', { success: true, message: `🏰 [${guildName}] 길드가 창설되었습니다! (최대 인원: ${limit}명)` });
         io.emit('updateState', gameState);
     });
 
-    socket.on('getPartyList', () => {
-        const list = Object.keys(gameState.parties).map(id => ({
-            id, name: gameState.parties[id].name, count: gameState.parties[id].members.length
+    socket.on('getGuildList', () => {
+        const list = Object.keys(gameState.guilds).map(id => ({
+            id,
+            name: gameState.guilds[id].name,
+            currentCount: gameState.guilds[id].members.length,
+            maxMembers: gameState.guilds[id].maxMembers
         }));
-        socket.emit('partyListResult', list);
+        socket.emit('guildListResult', list);
     });
 
-    socket.on('joinParty', (partyId) => {
+    socket.on('joinGuild', (guildId) => {
         const p = gameState.players[socket.id];
-        if (!p || p.partyId || !gameState.parties[partyId]) return;
-        gameState.parties[partyId].members.push(socket.id);
-        p.partyId = partyId;
-        socket.emit('partyResult', { success: true, message: '✨ 파티 참여 완료!' });
+        const guild = gameState.guilds[guildId];
+        
+        if (!p || p.guildId || !guild) return;
+        
+        if (guild.members.length >= guild.maxMembers) {
+            socket.emit('guildResult', { success: false, message: '❌ 길드 정원이 가득 찼습니다!' });
+            return;
+        }
+        
+        guild.members.push(socket.id);
+        p.guildId = guildId;
+        socket.emit('guildResult', { success: true, message: `✨ [${guild.name}] 길드에 가입되었습니다!` });
         io.emit('updateState', gameState);
     });
 
-    socket.on('leaveParty', () => {
+    socket.on('leaveGuild', () => {
         const p = gameState.players[socket.id];
-        if (!p || !p.partyId) return;
-        delete p.partyId;
-        socket.emit('partyResult', { success: true, message: '👋 파티 탈퇴 완료.' });
+        if (!p || !p.guildId) return;
+        
+        const guild = gameState.guilds[p.guildId];
+        if (guild) {
+            guild.members = guild.members.filter(id => id !== socket.id);
+            if (guild.members.length === 0) {
+                delete gameState.guilds[p.guildId];
+            } else if (guild.master === socket.id) {
+                guild.master = guild.members[0];
+            }
+        }
+        
+        delete p.guildId;
+        socket.emit('guildResult', { success: true, message: '👋 길드를 탈퇴했습니다.' });
         io.emit('updateState', gameState);
     });
 
