@@ -114,7 +114,7 @@
         </div>
     </div>
 
-    <!-- 🎒 아이템 상호작용 팝업 모달 (단건/다중선택 분기) -->
+    <!-- 🎒 아이템 상호작용 팝업 모달 -->
     <div id="itemActionModal" class="modal">
         <div class="modal-content">
             <h3 id="popupTitle" style="color:#f1c40f; margin-top:0;">아이템 관리</h3>
@@ -272,7 +272,7 @@
             else { triggerHitEffect(); alert(res.message); }
         });
 
-        // ⚙️ 선택 개수에 따른 동적 팝업 제어
+        // ⚙️ 동적 팝업 제어 (단건 선택 시: 강화, 판매, 삭제, 장착/해제 / 다중 선택 시: 판매, 삭제)
         function openActionModal() {
             if (selectedIndices.length === 0) {
                 alert("관리할 무기를 슬롯에서 선택해주세요!");
@@ -284,11 +284,17 @@
             const contentArea = document.getElementById('popupContentArea');
             contentArea.innerHTML = '';
 
+            selectedIndices = [...new Set(selectedIndices)];
+
             if (selectedIndices.length === 1) {
-                // 단건 클릭: 강화, 판매, 삭제, 장착/해제 메뉴 제공
                 const idx = selectedIndices[0];
                 const item = latestInventory[idx];
-                if (!item) { alert("비어있는 슬롯입니다."); selectedIndices = []; return; }
+                if (!item) { 
+                    alert("비어있는 슬롯입니다."); 
+                    selectedIndices = []; 
+                    modal.style.display = 'none';
+                    return; 
+                }
 
                 title.innerText = `🔍 단건 무기 관리: ${item.name} (+${item.enhance || 0})`;
                 const isEquipped = (equippedIndex === idx);
@@ -302,8 +308,7 @@
                     <button class="popup-btn" style="background:#c0392b;" onclick="doSingleAction('delete', ${idx})">🗑️ 단건 삭제</button>
                 `;
             } else {
-                // 다중 클릭: 판매, 삭제 메뉴 제공
-                title.innerText = `📦 다중 선택 무기 관리 (${selectedIndices.length개})`;
+                title.innerText = `📦 다중 선택 무기 관리 (${selectedIndices.length}개)`;
                 contentArea.innerHTML = `
                     <button class="popup-btn" style="background:#e67e22;" onclick="doBatchAction('sell')">💰 선택 무기 일괄 판매</button>
                     <button class="popup-btn" style="background:#c0392b;" onclick="doBatchAction('delete')">🗑️ 선택 무기 일괄 삭제</button>
@@ -403,7 +408,6 @@
 
                         slot.innerHTML = '<div>' + item.icon + '</div><div>+' + (item.enhance||0) + '</div>';
                         
-                        // 슬롯 클릭: 다중 선택 토글
                         slot.onclick = () => {
                             const idxPos = selectedIndices.indexOf(i);
                             if (idxPos > -1) {
