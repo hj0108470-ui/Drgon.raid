@@ -36,16 +36,14 @@ const WEAPON_DB = {
     bow_legendary: { name: '천둥의 스톰브링어', type: 'bow', rarity: 'Legendary', atk: 1250, sellPrice: 10000, icon: '🏹⚡' },
     bow_mythic: { name: '태양의 신궁 아폴론', type: 'bow', rarity: 'Mythic', atk: 3000, sellPrice: 100000, icon: '🏹🌌' },
 
-    // 지팡이 등급별 고정 회복 및 대상자 설정 (targets: 2인 이상이면 광역)
-    staff_common: { name: '새싹의 허브 지팡이', type: 'staff', rarity: 'Common', atk: 40, heal: 150, targets: 1, sellPrice: 50, icon: '🌿' },
-    staff_rare: { name: '축복의 성수 지팡이', type: 'staff', rarity: 'Rare', atk: 120, heal: 300, targets: 1, sellPrice: 250, icon: '💧✨' },
-    staff_epic: { name: '요정의 생명 지팡이', type: 'staff', rarity: 'Epic', atk: 350, heal: 600, targets: 1, sellPrice: 2500, icon: '🔮🌿' },
-    staff_legendary: { name: '세라핌의 치유 지팡이', type: 'staff', rarity: 'Legendary', atk: 800, heal: 1200, targets: 1, sellPrice: 10000, icon: '🌟💖' },
-    staff_mythic: { name: '세계수의 영원한 생명', type: 'staff', rarity: 'Mythic', atk: 2000, heal: 2500, targets: 2, sellPrice: 100000, icon: '🌌✨' },
+    staff_common: { name: '새싹의 허브 지팡이', type: 'staff', rarity: 'Common', atk: 40, heal: 100, targets: 1, sellPrice: 50, icon: '🌿' },
+    staff_rare: { name: '축복의 성수 지팡이', type: 'staff', rarity: 'Rare', atk: 120, heal: 150, targets: 1, sellPrice: 250, icon: '💧✨' },
+    staff_epic: { name: '요정의 생명 지팡이', type: 'staff', rarity: 'Epic', atk: 350, heal: 200, targets: 1, sellPrice: 2500, icon: '🔮🌿' },
+    staff_legendary: { name: '세라핌의 치유 지팡이', type: 'staff', rarity: 'Legendary', atk: 800, heal: 250, targets: 1, sellPrice: 10000, icon: '🌟💖' },
+    staff_mythic: { name: '세계수의 영원한 생명', type: 'staff', rarity: 'Mythic', atk: 2000, heal: 300, targets: 2, sellPrice: 100000, icon: '🌌✨' },
 
     hidden_hong: { name: '홍인준의 뱃살 방패', type: 'shield', rarity: 'Mythic', atk: 6000, shieldDuration: 25, sellPrice: 100000, icon: '🐷🛡️' },
 
-    // 보스 처치 시 획득하는 거래 및 수집 전용 유물 시스템
     artifact_honey_fork: { name: '부러진 꿀신 갈퀴', type: 'artifact', rarity: 'Common', atk: 0, sellPrice: 1000, icon: '🪵' },
     artifact_goliath_stone: { name: '골리앗의 돌멩이 조각', type: 'artifact', rarity: 'Common', atk: 0, sellPrice: 1000, icon: '🪨' },
     artifact_iraso_scale: { name: '이라소의 비늘 파편', type: 'artifact', rarity: 'Common', atk: 0, sellPrice: 1000, icon: '🐟' },
@@ -87,12 +85,27 @@ function saveAccountState(p) {
         gameState.registeredAccounts[p.name].gold = p.gold;
         gameState.registeredAccounts[p.name].hp = p.hp;
         gameState.registeredAccounts[p.name].maxHp = p.maxHp;
-        gameState.registeredAccounts[p.name].level = p.level;
-        gameState.registeredAccounts[p.name].exp = p.exp;
         gameState.registeredAccounts[p.name].inventory = p.inventory;
         gameState.registeredAccounts[p.name].equippedIndex = p.equippedIndex;
         gameState.registeredAccounts[p.name].totalDamage = p.totalDamage;
+        gameState.registeredAccounts[p.name].level = p.level;
+        gameState.registeredAccounts[p.name].exp = p.exp;
+        gameState.registeredAccounts[p.name].maxExp = p.maxExp;
     }
+}
+
+function checkLevelUp(p) {
+    let leveledUp = false;
+    while (p.exp >= p.maxExp) {
+        p.exp -= p.maxExp;
+        p.level = (p.level || 1) + 1;
+        p.maxExp = Math.round(p.maxExp * 1.3);
+        p.maxHp += 10; // 레벨업 시 최대 체력 10 증가
+        p.hp = p.maxHp; 
+        p.bonusAtk = (p.bonusAtk || 0) + 10;
+        leveledUp = true;
+    }
+    return leveledUp;
 }
 
 function updateRankings() {
@@ -117,18 +130,6 @@ function updateRankings() {
         };
     }).sort((a, b) => b.totalDamage - a.totalDamage);
     gameState.rankings.guilds = gList;
-}
-
-// 레벨업 경험치 계산 함수 (레벨 * 1000)
-function checkLevelUp(p) {
-    let neededExp = p.level * 1000;
-    while (p.exp >= neededExp) {
-        p.exp -= neededExp;
-        p.level++;
-        p.maxHp += 50;
-        p.hp = p.maxHp; // 레벨업 시 체력 완전 회복
-        neededExp = p.level * 1000;
-    }
 }
 
 function getRandomArtifactKey() {
@@ -167,7 +168,7 @@ function calculateDamage(p) {
         rarityMul = getRarityMultiplier(eq.rarity);
         baseAtk = (eq.atk * (1 + (eq.enhance || 0) * 0.15)) * rarityMul;
     }
-    return Math.round(baseAtk + (p.bonusAtk || 0) + (p.level * 5));
+    return Math.round(baseAtk + (p.bonusAtk || 0));
 }
 
 setInterval(() => {
@@ -183,7 +184,6 @@ setInterval(() => {
                 p.hp = Math.max(0, p.hp - 5);
                 updated = true;
             }
-            // 사망 시 즉시 부활 및 장착 중인 무기 파괴 패널티 로직
             if (p.hp === 0) {
                 if (p.equippedIndex !== null && p.inventory[p.equippedIndex]) {
                     p.inventory.splice(p.equippedIndex, 1);
@@ -209,8 +209,9 @@ io.on('connection', (socket) => {
             return;
         }
         gameState.registeredAccounts[nickname] = {
-            nickname, password, hp: 100, maxHp: 100, gold: 500, level: 1, exp: 0,
-            inventory: [], equippedIndex: null, totalDamage: 0, bonusAtk: 0
+            nickname, password, hp: 100, maxHp: 100, gold: 500,
+            inventory: [], equippedIndex: null, totalDamage: 0, bonusAtk: 0,
+            level: 1, exp: 0, maxExp: 100
         };
         socket.emit('authResult', { success: true, message: '회원가입 성공! 로그인해주세요.' });
     });
@@ -228,12 +229,13 @@ io.on('connection', (socket) => {
             hp: account.hp !== undefined ? account.hp : 100,
             maxHp: account.maxHp !== undefined ? account.maxHp : 100,
             gold: account.gold !== undefined ? account.gold : 500,
-            level: account.level !== undefined ? account.level : 1,
-            exp: account.exp !== undefined ? account.exp : 0,
             inventory: account.inventory ? [...account.inventory] : [],
             equippedIndex: account.equippedIndex !== undefined ? account.equippedIndex : null,
             totalDamage: account.totalDamage || 0,
             bonusAtk: account.bonusAtk || 0,
+            level: account.level || 1,
+            exp: account.exp || 0,
+            maxExp: account.maxExp || 100,
             lastSkillTime: 0, 
             isInvincible: false, 
             invincibleUntil: 0, 
@@ -245,9 +247,6 @@ io.on('connection', (socket) => {
         io.emit('updateState', gameState);
     });
 
-    // ──────────────────────────────────────────────
-    // 실시간 거래소 (Market) 이벤트
-    // ──────────────────────────────────────────────
     socket.on('getMarketList', () => {
         socket.emit('marketListResult', gameState.marketListings);
     });
@@ -337,7 +336,8 @@ io.on('connection', (socket) => {
             socket.emit('marketResult', { success: true, message: '🎉 거래가 성공적으로 완료되었습니다!' });
             io.emit('updateState', gameState);
             io.emit('marketListResult', gameState.marketListings);
-        } else if (payWithInventoryIndex !== undefined) {
+        } 
+        else if (payWithInventoryIndex !== undefined) {
             if (payWithInventoryIndex < 0 || payWithInventoryIndex >= buyer.inventory.length) return;
             if (buyer.equippedIndex === payWithInventoryIndex) {
                 socket.emit('marketResult', { success: false, message: '장착 중인 아이템은 지불할 수 없습니다.' });
@@ -367,9 +367,14 @@ io.on('connection', (socket) => {
             buyer.inventory.push(listing.item);
 
             if (seller) {
-                seller.inventory.push(offeredItem);
-                saveAccountState(seller);
-                io.to(seller.id).emit('marketResult', { success: true, message: `🤝 물물교환이 성사되어 [${offeredItem.name}]을(를) 획득했습니다!` });
+                if (seller.inventory.length < 36) {
+                    seller.inventory.push(offeredItem);
+                    saveAccountState(seller);
+                    io.to(seller.id).emit('marketResult', { success: true, message: `🤝 물물교환이 성사되어 [${offeredItem.name}]을(를) 획득했습니다!` });
+                } else {
+                    seller.inventory.push(offeredItem);
+                    saveAccountState(seller);
+                }
             } else if (gameState.registeredAccounts[listing.sellerName]) {
                 gameState.registeredAccounts[listing.sellerName].inventory.push(offeredItem);
             }
@@ -556,7 +561,7 @@ io.on('connection', (socket) => {
         gameState.boss.currentHp -= dmg;
         p.totalDamage = (p.totalDamage || 0) + dmg;
         p.gold += 15;
-        p.exp += 50; // 공격 시 경험치 획득
+        p.exp += 30; // 공격 시 경험치 획득
         checkLevelUp(p);
         saveAccountState(p);
 
@@ -565,7 +570,6 @@ io.on('connection', (socket) => {
         io.emit('updateState', gameState);
     });
 
-    // 지팡이 등급별 고정 회복 및 광역 회복(파티원 대상) 로직 반영
     socket.on('useSkill', () => {
         const p = gameState.players[socket.id];
         if (!p || p.hp <= 0) return;
@@ -584,37 +588,22 @@ io.on('connection', (socket) => {
         p.lastSkillTime = now;
 
         if (weaponType === 'staff') {
-            let healAmount = (eq.heal || 150);
-            let targetsCount = eq.targets || 1;
-
-            if (p.guildId && gameState.guilds[p.guildId] && targetsCount > 1) {
-                // 길드원 대상 광역 회복
-                let guildMembers = gameState.guilds[p.guildId].members;
-                guildMembers.forEach(mId => {
-                    let member = gameState.players[mId];
-                    if (member && member.hp > 0) {
-                        member.hp = Math.min(member.maxHp, member.hp + healAmount);
-                        saveAccountState(member);
-                    }
-                });
-                socket.emit('skillResult', { success: true, message: `🌿 [광역 치유의 파동] 길드원 전원 체력 ${healAmount} 회복!` });
-            } else {
-                p.hp = Math.min(p.maxHp, p.hp + healAmount);
-                socket.emit('skillResult', { success: true, message: `🌿 [치유의 파동] 체력 ${healAmount} 회복!` });
-            }
+            let totalHealAmt = Math.round(((eq.heal || 100) * rarityMul) + 200);
+            p.hp = Math.min(p.maxHp, p.hp + totalHealAmt);
             p.gold += 30;
-            p.exp += 40;
+            p.exp += 50;
             checkLevelUp(p);
+            socket.emit('skillResult', { success: true, message: `🌿 [치유의 파동] 체력 ${totalHealAmt} 회복!` });
         } else if (weaponType === 'shield') {
             let durationSec = eq.shieldDuration || 10;
             p.isInvincible = true;
             p.invincibleUntil = now + (durationSec * 1000);
             p.gold += 25;
-            p.exp += 30;
+            p.exp += 40;
             checkLevelUp(p);
             socket.emit('skillResult', { success: true, message: `🛡️ [절대 방벽] ${durationSec}초 무적!` });
         } else {
-            let skillDmg = Math.round((baseAtk * rarityMul * 2.5) + (p.bonusAtk || 0) + (p.level * 5));
+            let skillDmg = Math.round((baseAtk * rarityMul * 2.5) + (p.bonusAtk || 0));
             gameState.boss.currentHp -= skillDmg;
             p.totalDamage += skillDmg;
             p.gold += 50;
@@ -644,7 +633,6 @@ io.on('connection', (socket) => {
         }
     }
 
-    // 길드 마스터 및 부마스터 임명 UI 관련 로직 연동
     socket.on('createGuild', ({ guildName, maxMembers }) => {
         const p = gameState.players[socket.id];
         if (!p || p.guildId) return;
@@ -661,12 +649,11 @@ io.on('connection', (socket) => {
 
     socket.on('getGuildList', () => {
         const list = Object.values(gameState.guilds).map(g => {
-            const leaderName = Object.values(gameState.players).find(pl => pl.id === g.leaderId)?.name || gameState.registeredAccounts[Object.keys(gameState.registeredAccounts).find(k => gameState.registeredAccounts[k].socketId === g.leaderId)]?.nickname || '길드마스터';
             const subName = g.subLeaderId ? (Object.values(gameState.players).find(pl => pl.id === g.subLeaderId)?.name || '부마스터') : '없음';
             let membersInfoText = g.members.map(mId => gameState.players[mId]?.name).filter(Boolean).join(', ');
             return {
                 id: g.id, name: g.name, maxMembers: g.maxMembers, currentCount: g.members.length,
-                infoText: `[길드마스터👑] : ${leaderName}\n[부마스터] : ${subName}\n일반원 : ${membersInfoText}`
+                infoText: `[길드마스터👑] : ${Object.values(gameState.players).find(pl => pl.id === g.leaderId)?.name || '미정'}\n[부마스터] : ${subName}\n일반원 : ${membersInfoText}`
             };
         });
         socket.emit('guildListResult', list);
@@ -739,7 +726,7 @@ io.on('connection', (socket) => {
         if (p && p.inventory[idx]) {
             const item = p.inventory[idx];
             if (item.type === 'artifact') {
-                socket.emit('enhanceResult', { success: false, message: '❌ 유물은 강화할 수 없습니다!' });
+                socket.emit('enhanceResult', { success: false, message: '❌ 유물은 유물 강화소를 이용해주세요!' });
                 return;
             }
             const cost = ((item.enhance || 0) + 1) * 400;
@@ -753,6 +740,108 @@ io.on('connection', (socket) => {
                 socket.emit('enhanceResult', { success: false, message: '❌ 골드가 부족합니다!' });
             }
         }
+    });
+
+    // 유물 강화 시스템 (등급별 5개 소모, 강 단위 표시)
+    socket.on('enhanceArtifact', ({ targetIndex, materialIndices }) => {
+        const p = gameState.players[socket.id];
+        if (!p) return;
+
+        if (targetIndex === undefined || targetIndex < 0 || targetIndex >= p.inventory.length) {
+            socket.emit('enhanceResult', { success: false, message: '❌ 강화할 대상 유물을 선택해주세요.' });
+            return;
+        }
+
+        const targetItem = p.inventory[targetIndex];
+        if (!targetItem || targetItem.type !== 'artifact') {
+            socket.emit('enhanceResult', { success: false, message: '❌ 선택한 대상은 유물이 아닙니다.' });
+            return;
+        }
+
+        if (!Array.isArray(materialIndices) || materialIndices.length !== 5) {
+            socket.emit('enhanceResult', { success: false, message: '❌ 강화 재료는 정확히 5개가 필요합니다.' });
+            return;
+        }
+
+        const uniqueMaterials = [...new Set(materialIndices)].sort((a, b) => b - a);
+        if (uniqueMaterials.length !== 5) {
+            socket.emit('enhanceResult', { success: false, message: '❌ 중복되지 않은 5개의 재료 유물을 선택해주세요.' });
+            return;
+        }
+
+        if (uniqueMaterials.includes(targetIndex)) {
+            socket.emit('enhanceResult', { success: false, message: '❌ 강화 대상 유물을 재료로 사용할 수 없습니다.' });
+            return;
+        }
+
+        for (let mIdx of uniqueMaterials) {
+            if (mIdx < 0 || mIdx >= p.inventory.length) {
+                socket.emit('enhanceResult', { success: false, message: '❌ 올바르지 않은 재료 인덱스입니다.' });
+                return;
+            }
+            const matItem = p.inventory[mIdx];
+            if (!matItem || matItem.type !== 'artifact' || matItem.rarity !== targetItem.rarity) {
+                socket.emit('enhanceResult', { success: false, message: '❌ 재료는 모두 같은 등급의 유물이어야 합니다.' });
+                return;
+            }
+        }
+
+        const currentEnhance = targetItem.enhance || 0;
+        const rarity = targetItem.rarity;
+
+        let maxAllowed = 0;
+        let minAllowed = 0;
+        if (rarity === 'Common') { minAllowed = 0; maxAllowed = 5; }
+        else if (rarity === 'Rare') { minAllowed = 5; maxAllowed = 10; }
+        else if (rarity === 'Epic') { minAllowed = 10; maxAllowed = 15; }
+        else if (rarity === 'Legendary') { minAllowed = 15; maxAllowed = 20; }
+        else {
+            socket.emit('enhanceResult', { success: false, message: '❌ 해당 유물은 강화할 수 없는 등급입니다.' });
+            return;
+        }
+
+        if (currentEnhance < minAllowed || currentEnhance >= maxAllowed) {
+            socket.emit('enhanceResult', { success: false, message: `❌ 이 유물은 현재 단계(${currentEnhance}강)에서 더 이상 강화할 수 없습니다. (구간: ${minAllowed}~${maxAllowed}강)` });
+            return;
+        }
+
+        let adjustedTargetIndex = targetIndex;
+        uniqueMaterials.forEach(mIdx => {
+            p.inventory.splice(mIdx, 1);
+            if (p.equippedIndex === mIdx) p.equippedIndex = null;
+            else if (p.equippedIndex !== null && p.equippedIndex > mIdx) p.equippedIndex--;
+            
+            if (mIdx < adjustedTargetIndex) {
+                adjustedTargetIndex--;
+            }
+        });
+
+        const freshTargetItem = p.inventory[adjustedTargetIndex];
+        freshTargetItem.enhance = (freshTargetItem.enhance || 0) + 1;
+
+        saveAccountState(p);
+        socket.emit('enhanceResult', { success: true, message: `🎉 유물 강화 성공! (${freshTargetItem.enhance}강 달성)` });
+        io.emit('updateState', gameState);
+    });
+
+    socket.on('adminAction', (data) => {
+        const { action, payload } = data;
+        if (action === 'spawnBoss') {
+            const map = { 'pig': 0, 'goliath': 1, 'iraso': 2, 'dragon': 3 };
+            if (map[payload] !== undefined) gameState.boss = { ...BOSS_LIST[map[payload]] };
+        }
+        if (action === 'killBoss') gameState.boss.currentHp = 0;
+        if (action === 'giveSpecificWeapon') {
+            const target = gameState.players[payload.targetId];
+            const wKey = payload.weaponKey;
+            if (target && WEAPON_DB[wKey] && target.inventory.length < 36) {
+                const w = { ...WEAPON_DB[wKey], id: Date.now() + Math.random(), enhance: 0 };
+                target.inventory.push(w);
+                saveAccountState(target);
+                io.to(target.id).emit('itemObtained', { weapon: w, full: false });
+            }
+        }
+        io.emit('updateState', gameState);
     });
 
     socket.on('disconnect', () => {
