@@ -131,13 +131,30 @@
         </div>
     </div>
 
+    <!-- 유물 강화 모달 -->
+    <div id="artifactEnhanceModal" class="modal">
+        <div class="modal-content" style="width: 360px;">
+            <h3 style="color:#9b59b6; margin-top:0;">🏺 유물 강화소</h3>
+            <p id="artifactEnhanceInfo" style="font-size: 11px; color: #aaa; text-align:left; margin-bottom: 8px;"></p>
+            <div style="font-size: 12px; color: #f1c40f; text-align: left; margin-bottom: 5px;">선택한 재료 유물 (5개 필요):</div>
+            <div id="selectedMaterialsGrid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-bottom: 10px; min-height: 45px; background: #111; padding: 5px; border-radius: 6px;"></div>
+            <p style="font-size: 11px; color: #3498db; text-align: left; margin: 4px 0;">🎒 아래 인벤토리에서 동일 등급의 재료 유물 5개를 선택하세요:</p>
+            <div class="inventory-grid" id="artifactMaterialGrid" style="max-height: 180px; overflow-y: auto;"></div>
+            <div style="display:flex; gap:5px; margin-top: 10px;">
+                <button class="btn" style="background:#9b59b6; padding: 10px; font-size: 13px;" onclick="confirmArtifactEnhance()">✨ 강화 실행</button>
+                <button class="btn" style="background:#555; padding: 10px; font-size: 13px;" onclick="closeArtifactEnhanceModal()">닫기</button>
+            </div>
+        </div>
+    </div>
+
     <div class="container">
         <!-- 로비 화면 -->
-        <div id="lobbyScreen" class="screen active">
+        <div id="lobbyScreen" class="screen">
             <div class="card" style="text-align: center;">
                 <h1 style="color:#f1c40f; margin: 5px 0;">🌟 LOBBY</h1>
                 <div style="background: #15171e; padding: 12px; border-radius: 8px; margin: 15px 0; text-align: left;">
-                    <p style="margin: 5px 0;">👤 닉네임: <strong id="lobbyName" style="color:#f1c40f;">-</strong></p>
+                    <p style="margin: 5px 0;">👤 닉네임: <strong id="lobbyName" style="color:#f1c40f;">-</strong> (Lv.<span id="lobbyLevel" style="color:#2ecc71;">1</span>)</p>
+                    <p style="margin: 5px 0;">📊 경험치: <span id="lobbyExp">0</span> / <span id="lobbyMaxExp">100</span></p>
                     <p style="margin: 5px 0;">💰 보유 골드: <span id="lobbyGold" style="color:#f1c40f;">0</span> G</p>
                     <p style="margin: 5px 0;">🎒 인벤토리: <span id="lobbyInvenCount">0</span> / 36 칸</p>
                     <p style="margin: 5px 0;">🏰 소속 길드: <span id="lobbyGuildStatus" style="color:#e74c3c;">미소속</span></p>
@@ -199,7 +216,8 @@
 
             <div class="card">
                 <h3 style="margin-top:0; color:#3498db;">🛡️ 전투 상태</h3>
-                <p style="margin: 6px 0;">❤️ 체력: <span id="myHp">100</span>/100 | 💰 골드: <span id="myGold">500</span> G</p>
+                <p style="margin: 6px 0;">⭐ 레벨: Lv.<span id="myLevel">1</span> (EXP: <span id="myExp">0</span>/<span id="myMaxExp">100</span>)</p>
+                <p style="margin: 6px 0;">❤️ 체력: <span id="myHp">100</span>/<span id="myMaxHp">100</span> | 💰 골드: <span id="myGold">500</span> G</p>
             </div>
 
             <div class="card" style="border: 2px solid #f1c40f;">
@@ -494,27 +512,36 @@
                 const item = latestInventory[idx];
                 if (!item) { alert("비어있는 슬롯입니다."); selectedIndices = []; modal.style.display = 'none'; return; }
 
-                title.innerText = `🔍 무기 관리: ${item.name} (+${item.enhance || 0})`;
+                title.innerText = `🔍 아이템 관리: ${item.name} (+${item.enhance || 0})`;
                 const isEquipped = (equippedIndex === idx);
                 const enhanceCost = ((item.enhance || 0) + 1) * 400;
 
-                contentArea.innerHTML = `
-                    <button class="popup-btn" style="background:#2980b9;" onclick="doSingleAction('equip', ${idx})">${isEquipped ? '장착 해제' : '무기 장착'}</button>
-                    <button class="popup-btn" style="background:#f39c12;" onclick="doSingleAction('enhance', ${idx})">✨ 강화 (${enhanceCost}G)</button>
-                    <button class="popup-btn" style="background:#e67e22;" onclick="doSingleAction('sell', ${idx})">💰 단건 판매 (${item.sellPrice}G)</button>
-                    <button class="popup-btn" style="background:#c0392b;" onclick="doSingleAction('delete', ${idx})">🗑️ 단건 삭제</button>
-                `;
+                if (item.type === 'artifact') {
+                    contentArea.innerHTML = `
+                        <button class="popup-btn" style="background:#9b59b6;" onclick="openArtifactEnhance(${idx})">🏺 유물 강화하기</button>
+                        <button class="popup-btn" style="background:#e67e22;" onclick="doSingleAction('sell', ${idx})">💰 단건 판매 (${item.sellPrice}G)</button>
+                        <button class="popup-btn" style="background:#c0392b;" onclick="doSingleAction('delete', ${idx})">🗑️ 단건 삭제</button>
+                    `;
+                } else {
+                    contentArea.innerHTML = `
+                        <button class="popup-btn" style="background:#2980b9;" onclick="doSingleAction('equip', ${idx})">${isEquipped ? '장착 해제' : '무기 장착'}</button>
+                        <button class="popup-btn" style="background:#f39c12;" onclick="doSingleAction('enhance', ${idx})">✨ 일반 강화 (${enhanceCost}G)</button>
+                        <button class="popup-btn" style="background:#e67e22;" onclick="doSingleAction('sell', ${idx})">💰 단건 판매 (${item.sellPrice}G)</button>
+                        <button class="popup-btn" style="background:#c0392b;" onclick="doSingleAction('delete', ${idx})">🗑️ 단건 삭제</button>
+                    `;
+                }
             } else {
                 title.innerText = `📦 다중 선택 관리 (${selectedIndices.length}개)`;
                 contentArea.innerHTML = `
-                    <button class="popup-btn" style="background:#e67e22;" onclick="doBatchAction('sell')">💰 선택 무기 일괄 판매</button>
-                    <button class="popup-btn" style="background:#c0392b;" onclick="doBatchAction('delete')">🗑️ 선택 무기 일괄 삭제</button>
+                    <button class="popup-btn" style="background:#e67e22;" onclick="doBatchAction('sell')">💰 선택 아이템 일괄 판매</button>
+                    <button class="popup-btn" style="background:#c0392b;" onclick="doBatchAction('delete')">🗑️ 선택 아이템 일괄 삭제</button>
                 `;
             }
             modal.style.display = 'flex';
         }
 
         function closeItemModal() { document.getElementById('itemActionModal').style.display = 'none'; }
+        
         function doSingleAction(actionType, idx) {
             closeItemModal();
             if (actionType === 'equip') socket.emit('equipItem', idx);
@@ -527,6 +554,115 @@
             closeItemModal();
             if (actionType === 'sell') socket.emit('sellItems', selectedIndices);
             if (actionType === 'delete') socket.emit('deleteItems', selectedIndices);
+            selectedIndices = [];
+        }
+
+        // 유물 강화 모달 로직
+        let currentArtifactIndex = null;
+        let artifactMaterialIndices = [];
+
+        function openArtifactEnhance(idx) {
+            closeItemModal();
+            currentArtifactIndex = idx;
+            artifactMaterialIndices = [];
+            const targetItem = latestInventory[idx];
+
+            let maxAllowed = 0;
+            let minAllowed = 0;
+            if (targetItem.rarity === 'Common') { minAllowed = 0; maxAllowed = 5; }
+            else if (targetItem.rarity === 'Rare') { minAllowed = 5; maxAllowed = 10; }
+            else if (targetItem.rarity === 'Epic') { minAllowed = 10; maxAllowed = 15; }
+            else if (targetItem.rarity === 'Legendary') { minAllowed = 15; maxAllowed = 20; }
+            else {
+                alert('해당 유물은 강화할 수 없는 등급입니다.');
+                return;
+            }
+
+            const currentEnhance = targetItem.enhance || 0;
+            if (currentEnhance < minAllowed || currentEnhance >= maxAllowed) {
+                alert(`이 유물은 현재 ${currentEnhance}강이며, 해당 등급의 강화 구간(${minAllowed}~${maxAllowed}강)을 벗어났습니다.`);
+                return;
+            }
+
+            document.getElementById('artifactEnhanceInfo').innerHTML = `대상: <strong>${targetItem.name}</strong> [현재: <strong>${currentEnhance}강</strong>] <br>※ 동일 등급(${targetItem.rarity}) 유물 재료 5개를 선택하세요.`;
+            renderArtifactEnhanceModal();
+            document.getElementById('artifactEnhanceModal').style.display = 'flex';
+        }
+
+        function closeArtifactEnhanceModal() {
+            document.getElementById('artifactEnhanceModal').style.display = 'none';
+            currentArtifactIndex = null;
+            artifactMaterialIndices = [];
+        }
+
+        function renderArtifactEnhanceModal() {
+            const targetItem = latestInventory[currentArtifactIndex];
+            
+            const selectedGrid = document.getElementById('selectedMaterialsGrid');
+            selectedGrid.innerHTML = '';
+            for (let i = 0; i < 5; i++) {
+                const slot = document.createElement('div');
+                slot.className = 'slot';
+                slot.style.height = '42px';
+                if (i < artifactMaterialIndices.length) {
+                    const matItem = latestInventory[artifactMaterialIndices[i]];
+                    if (matItem) {
+                        slot.innerHTML = `<div>${matItem.icon}</div><div style="font-size:9px;">+${matItem.enhance||0}</div>`;
+                        slot.onclick = () => {
+                            artifactMaterialIndices.splice(i, 1);
+                            renderArtifactEnhanceModal();
+                        };
+                    }
+                } else {
+                    slot.innerText = '재료' + (i + 1);
+                    slot.style.color = '#555';
+                }
+                selectedGrid.appendChild(slot);
+            }
+
+            const materialGrid = document.getElementById('artifactMaterialGrid');
+            materialGrid.innerHTML = '';
+            for (let i = 0; i < 36; i++) {
+                const slot = document.createElement('div');
+                slot.className = 'slot';
+                const item = latestInventory[i];
+                if (item) {
+                    if (i === currentArtifactIndex) {
+                        slot.style.opacity = '0.2';
+                        slot.innerText = '대상';
+                    } else if (artifactMaterialIndices.includes(i)) {
+                        slot.style.opacity = '0.3';
+                        slot.innerText = '선택됨';
+                    } else {
+                        slot.innerHTML = `<div>${item.icon}</div><div style="font-size:9px;">+${item.enhance||0}</div>`;
+                        if (item.type === 'artifact' && item.rarity === targetItem.rarity) {
+                            slot.onclick = () => {
+                                if (artifactMaterialIndices.length < 5) {
+                                    artifactMaterialIndices.push(i);
+                                    renderArtifactEnhanceModal();
+                                }
+                            };
+                        } else {
+                            slot.style.opacity = '0.2';
+                        }
+                    }
+                } else {
+                    slot.innerText = '빈칸';
+                }
+                materialGrid.appendChild(slot);
+            }
+        }
+
+        function confirmArtifactEnhance() {
+            if (artifactMaterialIndices.length !== 5) {
+                alert('재료 유물 5개를 모두 선택해주세요!');
+                return;
+            }
+            socket.emit('enhanceArtifact', {
+                targetIndex: currentArtifactIndex,
+                materialIndices: artifactMaterialIndices
+            });
+            closeArtifactEnhanceModal();
             selectedIndices = [];
         }
 
@@ -574,10 +710,17 @@
             const me = state.players[myId];
             if (me) {
                 document.getElementById('lobbyName').innerText = me.name;
+                document.getElementById('lobbyLevel').innerText = me.level || 1;
+                document.getElementById('lobbyExp').innerText = (me.exp || 0).toLocaleString();
+                document.getElementById('lobbyMaxExp').innerText = (me.maxExp || 100).toLocaleString();
                 document.getElementById('lobbyGold').innerText = me.gold.toLocaleString();
                 document.getElementById('lobbyInvenCount').innerText = me.inventory.length;
                 
+                document.getElementById('myLevel').innerText = me.level || 1;
+                document.getElementById('myExp').innerText = (me.exp || 0).toLocaleString();
+                document.getElementById('myMaxExp').innerText = (me.maxExp || 100).toLocaleString();
                 document.getElementById('myHp').innerText = me.hp;
+                document.getElementById('myMaxHp').innerText = me.maxHp;
                 document.getElementById('myGold').innerText = me.gold.toLocaleString();
                 
                 latestInventory = me.inventory || [];
