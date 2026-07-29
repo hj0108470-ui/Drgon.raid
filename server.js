@@ -10,7 +10,6 @@ const io = new Server(server, { cors: { origin: "*", methods: ["GET", "POST"] } 
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 
-// 👾 보스 체력은 기존 원래 수치 유지
 const BOSS_LIST = [
     { name: '🐷 꿀신', maxHp: 157500, currentHp: 157500 },
     { name: '🗿 골리앗', maxHp: 367500, currentHp: 367500 },
@@ -18,7 +17,6 @@ const BOSS_LIST = [
     { name: '🐉 드래곤', maxHp: 2100000, currentHp: 2100000 }
 ];
 
-// ⚔️ 모든 무기 기본 공격력(atk) 10배 상향 완료
 const WEAPON_DB = {
     knife_common: { name: '녹슨 도살도', type: 'knife', rarity: 'Common', atk: 100, sellPrice: 50, icon: '🔪' },
     knife_rare: { name: '혈각의 서사도', type: 'knife', rarity: 'Rare', atk: 250, sellPrice: 250, icon: '🗡️' },
@@ -38,11 +36,11 @@ const WEAPON_DB = {
     bow_legendary: { name: '천둥의 스톰브링어', type: 'bow', rarity: 'Legendary', atk: 1250, sellPrice: 10000, icon: '🏹⚡' },
     bow_mythic: { name: '태양의 신궁 아폴론', type: 'bow', rarity: 'Mythic', atk: 3000, sellPrice: 100000, icon: '🏹🌌' },
 
-    staff_common: { name: '새싹의 허브 지팡이', type: 'staff', rarity: 'Common', atk: 40, heal: 100, targets: 1, sellPrice: 50, icon: '🌿' },
-    staff_rare: { name: '축복의 성수 지팡이', type: 'staff', rarity: 'Rare', atk: 120, heal: 150, targets: 1, sellPrice: 250, icon: '💧✨' },
-    staff_epic: { name: '요정의 생명 지팡이', type: 'staff', rarity: 'Epic', atk: 350, heal: 200, targets: 1, sellPrice: 2500, icon: '🔮🌿' },
-    staff_legendary: { name: '세라핌의 치유 지팡이', type: 'staff', rarity: 'Legendary', atk: 800, heal: 250, targets: 1, sellPrice: 10000, icon: '🌟💖' },
-    staff_mythic: { name: '세계수의 영원한 생명', type: 'staff', rarity: 'Mythic', atk: 2000, heal: 300, targets: 2, sellPrice: 100000, icon: '🌌✨' },
+    staff_common: { name: '새싹의 허브 지팡이', type: 'staff', rarity: 'Common', atk: 40, heal: 10, targets: 1, sellPrice: 50, icon: '🌿' },
+    staff_rare: { name: '축복의 성수 지팡이', type: 'staff', rarity: 'Rare', atk: 120, heal: 15, targets: 1, sellPrice: 250, icon: '💧✨' },
+    staff_epic: { name: '요정의 생명 지팡이', type: 'staff', rarity: 'Epic', atk: 350, heal: 25, targets: 1, sellPrice: 2500, icon: '🔮🌿' },
+    staff_legendary: { name: '세라핌의 치유 지팡이', type: 'staff', rarity: 'Legendary', atk: 800, heal: 35, targets: 1, sellPrice: 10000, icon: '🌟💖' },
+    staff_mythic: { name: '세계수의 영원한 생명', type: 'staff', rarity: 'Mythic', atk: 2000, heal: 50, targets: 2, sellPrice: 100000, icon: '🌌✨' },
 
     hidden_hong: { name: '홍인준의 뱃살 방패', type: 'shield', rarity: 'Mythic', atk: 6000, shieldDuration: 25, sellPrice: 100000, icon: '🐷🛡️' }
 };
@@ -99,7 +97,7 @@ function getRarityMultiplier(rarity) {
 
 function calculateDamage(p) {
     let eq = p.equippedIndex !== null ? p.inventory[p.equippedIndex] : null;
-    let baseAtk = 80; // 기본 맨손 공격력도 10배 (8 -> 80)
+    let baseAtk = 80; 
     let rarityMul = 1.0;
     if (eq) {
         rarityMul = getRarityMultiplier(eq.rarity);
@@ -266,7 +264,7 @@ io.on('connection', (socket) => {
         let eq = p.equippedIndex !== null ? p.inventory[p.equippedIndex] : null;
         let weaponType = eq ? eq.type : 'none';
         let rarityMul = eq ? getRarityMultiplier(eq.rarity) : 1.0;
-        let baseAtk = eq ? eq.atk : 100; // 기본 스킬 기준 공격력 10배 적용 (10 -> 100)
+        let baseAtk = eq ? eq.atk : 100;
 
         let currentCooldown = (weaponType === 'shield') ? ((eq.shieldDuration || 10) + 5) * 1000 : 5000;
         if (now - (p.lastSkillTime || 0) < currentCooldown) {
@@ -276,8 +274,8 @@ io.on('connection', (socket) => {
         p.lastSkillTime = now;
 
         if (weaponType === 'staff') {
-            let healBase = eq.heal || 100; // 지팡이 힐량 10배 적용 (10 -> 100)
-            let totalHealAmt = Math.round((healBase * rarityMul) + 200); // 힐 추가 수치도 10배 (20 -> 200)
+            // 🌿 스킬 힐량 고정값 적용 (커먼 10, 레어 15, 에픽 25, 레전더리 35, 신화 50)
+            let totalHealAmt = eq ? (eq.heal || 10) : 10;
             p.hp = Math.min(p.maxHp, p.hp + totalHealAmt);
             p.gold += 30;
             socket.emit('skillResult', { success: true, message: `🌿 [치유의 파동] 체력 ${totalHealAmt} 회복!` });
