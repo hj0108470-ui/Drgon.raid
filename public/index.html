@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>모바일 보스 레이드 RPG & 거래소</title>
+    <title>모바일 보스 레이드 RPG & 거래소 & 길드</title>
     <style>
         body { background: #0f111a; color: #fff; font-family: sans-serif; margin: 0; padding: 10px; display: flex; flex-direction: column; align-items: center; }
         .container { width: 100%; max-width: 400px; background: #15171e; border-radius: 12px; padding: 15px; box-sizing: border-box; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
@@ -13,7 +13,7 @@
         .btn:hover { opacity: 0.9; }
         input, select { width: 100%; padding: 8px; margin: 5px 0 10px 0; box-sizing: border-box; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; }
         .nav-bar { display: flex; justify-content: space-around; background: #1e222f; padding: 8px; border-radius: 8px; margin-top: 15px; }
-        .nav-btn { background: none; border: none; color: #aaa; cursor: pointer; font-size: 12px; font-weight: bold; }
+        .nav-btn { background: none; border: none; color: #aaa; cursor: pointer; font-size: 11px; font-weight: bold; }
         .nav-btn.active { color: #f1c40f; }
         .inventory-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; margin-top: 10px; }
         .slot { background: #111; border: 1px solid #444; border-radius: 4px; height: 45px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; font-size: 10px; position: relative; }
@@ -64,7 +64,19 @@
                 <button class="btn" style="background:#9b59b6;" onclick="openOnlineUserList()">👥 1:1 실시간 거래</button>
             </div>
 
-            <!-- [탭 3] 랭킹 화면 -->
+            <!-- [탭 3] 길드 화면 (길드 정보 및 길드장 관리) -->
+            <div id="tabGuild" class="tab-content" style="display:none;">
+                <h4 style="margin:0 0 5px 0; color:#f1c40f;">🏰 길드 시스템</h4>
+                <div id="guildInfoArea" style="background:#1e222f; padding:10px; border-radius:6px; font-size:12px; margin-bottom:10px;">
+                    <p style="margin:0; color:#aaa;">소속된 길드가 없습니다.</p>
+                </div>
+                <div id="guildActionArea">
+                    <input type="text" id="guildNameInput" placeholder="생성할 길드 이름">
+                    <button class="btn" style="background:#27ae60;" onclick="createGuild()">길드 창설</button>
+                </div>
+            </div>
+
+            <!-- [탭 4] 랭킹 화면 -->
             <div id="tabRanking" class="tab-content" style="display:none;">
                 <h4 style="margin:0 0 5px 0; color:#f1c40f;">🏆 데미지 랭킹</h4>
                 <div id="rankingContainer" style="max-height: 200px; overflow-y:auto; font-size:11px; background:#111; padding:5px; border-radius:4px;"></div>
@@ -73,7 +85,8 @@
             <!-- 하단 네비게이션 탭 -->
             <div class="nav-bar">
                 <button class="nav-btn active" onclick="switchTab('Fight')">⚔️ 전투</button>
-                <button class="nav-btn" onclick="switchTab('Lobby')">🏰 로비/인벤</button>
+                <button class="nav-btn" onclick="switchTab('Lobby')">🏰 로비</button>
+                <button class="nav-btn" onclick="switchTab('Guild')">🛡️ 길드</button>
                 <button class="nav-btn" onclick="switchTab('Ranking')">🏆 랭킹</button>
             </div>
         </div>
@@ -83,10 +96,23 @@
     <div id="marketModal" class="modal">
         <div class="modal-content">
             <h3 style="color:#f1c40f; margin-top:0;">🏪 통합 플레이어 거래소</h3>
-            <div id="marketListContainer" style="margin-bottom: 15px; max-height: 200px; overflow-y: auto; border: 1px solid #444; padding: 5px; font-size:12px;">
+            <div style="margin-bottom:10px;">
+                <button class="btn" style="background:#3498db; padding:6px; font-size:11px;" onclick="openMarketRegisterModal()">📦 내 아이템 등록하기</button>
+            </div>
+            <div id="marketListContainer" style="margin-bottom: 15px; max-height: 180px; overflow-y: auto; border: 1px solid #444; padding: 5px; font-size:12px;">
                 <p style="text-align:center; color:#888;">등록된 매물이 없습니다.</p>
             </div>
             <button class="btn" style="background:#c0392b; width:100%; padding:8px;" onclick="closeMarketModal()">닫기 ❌</button>
+        </div>
+    </div>
+
+    <div id="marketRegisterModal" class="modal" style="z-index: 1100;">
+        <div class="modal-content" style="width: 300px;">
+            <h4 style="color:#3498db; margin-top:0;">📦 거래소 등록 아이템 선택</h4>
+            <div class="inventory-grid" id="marketRegisterInventoryGrid" style="display:grid; grid-template-columns: repeat(4, 1fr); gap:5px; max-height: 150px; overflow-y: auto; margin-bottom:10px;"></div>
+            <input type="number" id="marketPriceInput" placeholder="판매 가격 (골드)" style="font-size:11px;">
+            <button class="btn" style="background:#27ae60;" onclick="confirmMarketRegister()">등록 완료</button>
+            <button class="btn" style="background:#555; padding:6px;" onclick="closeMarketRegisterModal()">취소</button>
         </div>
     </div>
 
@@ -150,6 +176,7 @@
         let myData = null;
         let currentTradeId = null;
         let selectedTradeItemIndex = null;
+        let selectedMarketItemIdx = null;
         let isP1 = false;
         let pendingRequesterId = null;
 
@@ -186,6 +213,10 @@
             } else if (tabName === 'Lobby') {
                 document.getElementById('tabLobby').style.display = 'block';
                 socket.emit('setScreen', 'lobby');
+            } else if (tabName === 'Guild') {
+                document.getElementById('tabGuild').style.display = 'block';
+                socket.emit('setScreen', 'guild');
+                socket.emit('getGuildInfo');
             } else if (tabName === 'Ranking') {
                 document.getElementById('tabRanking').style.display = 'block';
                 socket.emit('setScreen', 'ranking');
@@ -201,7 +232,6 @@
 
         socket.on('updateState', (state) => {
             if (!myData) return;
-            // 내 정보 갱신
             for (let sId in state.players) {
                 if (state.players[sId].name === myData.name) {
                     myData = state.players[sId];
@@ -210,16 +240,14 @@
             }
             updateUI();
 
-            // 보스 정보 갱신
             document.getElementById('bossName').innerText = state.boss.name;
             let hpPer = Math.max(0, (state.boss.currentHp / state.boss.maxHp) * 100);
             document.getElementById('bossHpBar').style.width = hpPer + '%';
             document.getElementById('bossHpText').innerText = `${state.boss.currentHp.toLocaleString()} / ${state.boss.maxHp.toLocaleString()} (${hpPer.toFixed(1)}%)`;
 
-            // 랭킹 갱신
             let rankHtml = '';
             state.rankings.players.forEach((p, idx) => {
-                rankHtml += `<div>${idx + 1위} ${p.name} (Lv.${p.level}) - ${p.totalDamage.toLocaleString()} DMG</div>`;
+                rankHtml += `<div>${idx + 1}위 ${p.name} (Lv.${p.level}) - ${p.totalDamage.toLocaleString()} DMG</div>`;
             });
             document.getElementById('rankingContainer').innerHTML = rankHtml || '랭킹 데이터가 없습니다.';
         });
@@ -234,7 +262,6 @@
             document.getElementById('pMaxHp').innerText = myData.maxHp;
             document.getElementById('pGold').innerText = myData.gold.toLocaleString();
 
-            // 인벤토리 렌더링
             const grid = document.getElementById('inventoryGrid');
             grid.innerHTML = '';
             for (let i = 0; i < 36; i++) {
@@ -250,9 +277,89 @@
             }
         }
 
-        // 거래소 및 실시간 1:1 거래 핸들러
-        function openMarketModal() { document.getElementById('marketModal').style.display = 'flex'; }
+        // --- 길드 관련 함수들 ---
+        function createGuild() {
+            const name = document.getElementById('guildNameInput').value;
+            if (!name) { alert('길드 이름을 입력해주세요.'); return; }
+            socket.emit('createGuild', name);
+        }
+
+        socket.on('guildInfoResult', (guild) => {
+            const infoArea = document.getElementById('guildInfoArea');
+            const actionArea = document.getElementById('guildActionArea');
+            if (!guild) {
+                infoArea.innerHTML = '<p style="margin:0; color:#aaa;">소속된 길드가 없습니다.</p>';
+                actionArea.style.display = 'block';
+                return;
+            }
+            actionArea.style.display = 'none';
+            let html = `<h4 style="margin:0 0 5px 0; color:#f1c40f;">🏰 길드명: ${guild.name}</h4>`;
+            html += `<p style="margin:2px 0;">길드장: ${guild.masterName}</p>`;
+            html += `<p style="margin:2px 0;">멤버 (${guild.members.length}명): ${guild.memberNames.join(', ')}</p>`;
+            if (guild.masterId === socket.id) {
+                html += `<button class="btn" style="background:#c0392b; padding:5px; font-size:11px; margin-top:5px;" onclick="disbandGuild()">길드 해산</button>`;
+            } else {
+                html += `<button class="btn" style="background:#c0392b; padding:5px; font-size:11px; margin-top:5px;" onclick="leaveGuild()">길드 탈퇴</button>`;
+            }
+            infoArea.innerHTML = html;
+        });
+
+        function leaveGuild() { socket.emit('leaveGuild'); }
+        function disbandGuild() { socket.emit('disbandGuild'); }
+
+        // --- 거래소 및 실시간 1:1 거래 핸들러 ---
+        function openMarketModal() {
+            socket.emit('getMarketList');
+            document.getElementById('marketModal').style.display = 'flex';
+        }
         function closeMarketModal() { document.getElementById('marketModal').style.display = 'none'; }
+
+        function openMarketRegisterModal() {
+            const grid = document.getElementById('marketRegisterInventoryGrid');
+            grid.innerHTML = '';
+            if (!myData || !myData.inventory) return;
+            myData.inventory.forEach((item, idx) => {
+                if (!item || myData.equippedIndex === idx) return;
+                const slot = document.createElement('div');
+                slot.className = 'slot';
+                slot.style.height = 'auto';
+                slot.innerHTML = `<div>${item.icon || '⚔️'}</div><div>+${item.enhance||0}</div>`;
+                slot.onclick = () => {
+                    selectedMarketItemIdx = idx;
+                    document.querySelectorAll('#marketRegisterInventoryGrid .slot').forEach(s => s.style.border = '1px solid #444');
+                    slot.style.border = '2px solid #27ae60';
+                };
+                grid.appendChild(slot);
+            });
+            document.getElementById('marketRegisterModal').style.display = 'flex';
+        }
+        function closeMarketRegisterModal() { document.getElementById('marketRegisterModal').style.display = 'none'; }
+
+        function confirmMarketRegister() {
+            if (selectedMarketItemIdx === null) { alert('등록할 아이템을 선택하세요.'); return; }
+            const price = parseInt(document.getElementById('marketPriceInput').value);
+            if (!price || price <= 0) { alert('올바른 가격을 입력하세요.'); return; }
+            socket.emit('registerMarketItem', { itemIndex: selectedMarketItemIdx, price });
+            closeMarketRegisterModal();
+        }
+
+        socket.on('marketListResult', (listings) => {
+            const container = document.getElementById('marketListContainer');
+            container.innerHTML = '';
+            if (Object.keys(listings).length === 0) {
+                container.innerHTML = '<p style="text-align:center; color:#888;">등록된 매물이 없습니다.</p>';
+                return;
+            }
+            for (let id in listings) {
+                let l = listings[id];
+                const div = document.createElement('div');
+                div.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:6px; background:#111; margin-bottom:4px; border-radius:4px;';
+                div.innerHTML = `<span>${l.item.icon} ${l.item.name} (+${l.item.enhance||0}) - ${l.price.toLocaleString()}G (판매자: ${l.sellerName})</span> <button class="btn" style="background:#27ae60; padding:3px 8px; font-size:10px; width:auto;" onclick="buyMarketItem('${id}')">구매</button>`;
+                container.appendChild(div);
+            }
+        });
+
+        function buyMarketItem(marketId) { socket.emit('buyMarketItem', marketId); }
 
         function openOnlineUserList() {
             socket.emit('getOnlineUsers');
@@ -355,3 +462,4 @@
     </script>
 </body>
 </html>
+
