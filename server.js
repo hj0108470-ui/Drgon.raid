@@ -178,7 +178,7 @@ io.on('connection', (socket) => {
         io.emit('updateState', gameState);
     });
 
-    // 💰 다중 선택 판매 핸들러 (내림차순 정렬로 인덱스 밀림 방지)
+    // 💰 단건 및 다중 판매 핸들러
     socket.on('sellItems', (indices) => {
         const p = gameState.players[socket.id];
         if (!p || !Array.isArray(indices) || indices.length === 0) return;
@@ -207,7 +207,7 @@ io.on('connection', (socket) => {
         io.emit('updateState', gameState);
     });
 
-    // 🗑️ 다중 선택 삭제 핸들러
+    // 🗑️ 단건 및 다중 삭제 핸들러
     socket.on('deleteItems', (indices) => {
         const p = gameState.players[socket.id];
         if (!p || !Array.isArray(indices) || indices.length === 0) return;
