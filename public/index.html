@@ -18,7 +18,6 @@
             position: relative;
         }
         
-        /* UI 가독성을 위한 어두운 오버레이 레이어 (배경과 UI 카드 사이) */
         body::before {
             content: "";
             position: fixed;
@@ -42,7 +41,6 @@
         }
         .boss-card { border: 2px solid #e74c3c; text-align: center; }
         
-        /* 👾 보스 위아래로 둥실둥실 움직이는 애니메이션 */
         @keyframes floatBoss {
             0% { transform: translateY(0px); }
             50% { transform: translateY(-8px); }
@@ -69,17 +67,19 @@
         .hp-bar-bg { background: #111; height: 24px; border-radius: 12px; overflow: hidden; margin: 10px 0; border: 1px solid #444; }
         .hp-bar-fill { background: linear-gradient(90deg, #c0392b, #e74c3c); height: 100%; width: 100%; transition: width 0.2s; }
         
-        /* 공격 / 스킬 버튼 나란히 배치 */
         .action-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-top: 10px; }
         .btn { background: #d35400; border: none; padding: 14px; color: #fff; font-size: 16px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; box-shadow: 0 3px 6px rgba(0,0,0,0.3); transition: 0.1s; }
         .btn:active { transform: scale(0.97); }
         .btn-skill { background: #8e44ad; }
         .btn-gacha { background: #f1c40f; color: #000; }
         .btn-party { background: #2980b9; font-size: 13px; padding: 6px 12px; width: auto; }
+        .btn-sell { background: #e74c3c; margin-top: 8px; font-size: 14px; padding: 10px; }
 
         .inventory-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; margin-top: 10px; }
-        .slot { background: #15171e; border: 1px solid #2f354a; height: 50px; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; cursor: pointer; }
+        .slot { background: #15171e; border: 1px solid #2f354a; height: 50px; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; cursor: pointer; position: relative; }
         .slot.equipped { border-color: #f1c40f; background: #3d3512; }
+        .slot.selected { border-color: #3498db; background: #1b365d; box-shadow: 0 0 5px #3498db; }
+        
         .ranking-list { text-align: left; font-size: 13px; max-height: 110px; overflow-y: auto; margin: 0; padding-left: 15px; }
         
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 100; }
@@ -90,13 +90,17 @@
     </style>
 </head>
 <body>
-    <!-- 닉네임 설정 모달 -->
-    <div id="nicknameModal" class="modal" style="display: flex;">
+    <!-- 🔐 로그인 및 회원가입 모달 (최초 진입점) -->
+    <div id="authModal" class="modal" style="display: flex;">
         <div class="modal-content">
-            <h3 style="color:#f1c40f; margin-top:0;">✨ 용사 닉네임 설정</h3>
-            <p style="font-size: 12px; color: #aaa;">랭킹에 표시될 이름을 입력해주세요!</p>
-            <input type="text" id="nicknameInput" placeholder="닉네임 입력 (최대 12글자)" maxlength="12">
-            <button class="btn" style="padding: 10px;" onclick="saveNickname()">확인</button>
+            <h3 style="color:#f1c40f; margin-top:0;">🔐 계정 로그인 / 회원가입</h3>
+            <p style="font-size: 11px; color: #aaa;">닉네임과 비밀번호를 입력하여 시작하세요!</p>
+            <input type="text" id="authNickInput" placeholder="닉네임 입력 (최대 12글자)" maxlength="12">
+            <input type="password" id="authPwInput" placeholder="비밀번호 입력">
+            <div style="display:flex; gap:5px;">
+                <button class="btn" style="padding: 10px; background:#27ae60;" onclick="requestLogin()">로그인</button>
+                <button class="btn" style="padding: 10px; background:#2980b9;" onclick="requestRegister()">회원가입</button>
+            </div>
         </div>
     </div>
 
@@ -130,7 +134,7 @@
         <!-- 4. 내 정보 (골드, 닉네임, HP, 파티 내용) -->
         <div class="card">
             <h3 style="margin-top:0; color:#3498db;">🛡️ 내 정보 & 파티</h3>
-            <p style="margin: 6px 0;">닉네임: <strong id="myName" style="color:#f1c40f;">-</strong> <button style="font-size:10px; padding:2px 6px;" onclick="openNicknameModal()">변경</button></p>
+            <p style="margin: 6px 0;">닉네임: <strong id="myName" style="color:#f1c40f;">-</strong></p>
             <p style="margin: 6px 0;">💰 골드: <span id="myGold">500</span> G | ❤️ HP: <span id="myHp">100</span>/100</p>
             
             <div id="partyBox" style="margin-top: 8px; font-size: 13px; border-top: 1px dashed #444; padding-top: 8px; display: flex; justify-content: space-between; align-items: center;">
@@ -158,10 +162,14 @@
             </div>
         </div>
 
-        <!-- 6. 그 아래 무기고 (36칸) -->
+        <!-- 6. 무기고 및 다중 선택 판매 기능 추가 -->
         <div class="card">
-            <h3 style="margin-top:0;">🎒 무기고 (36칸)</h3>
+            <h3 style="margin-top:0; display:flex; justify-content:space-between; align-items:center;">
+                <span>🎒 무기고 (36칸)</span>
+                <span style="font-size:11px; color:#aaa;">슬롯 클릭: 다중선택/해제</span>
+            </h3>
             <div class="inventory-grid" id="inventoryGrid"></div>
+            <button class="btn btn-sell" onclick="sellSelectedItems()">💰 선택한 무기 일괄 판매</button>
         </div>
     </div>
 
@@ -178,19 +186,33 @@
         const socket = io({ transports: ['websocket', 'polling'] });
         let myId = null;
         let currentPartyId = null;
+        let selectedIndices = []; // 다중 선택된 인벤토리 인덱스 관리 배열
 
         socket.on('connect', () => { myId = socket.id; });
 
-        function saveNickname() {
-            const name = document.getElementById('nicknameInput').value.trim();
-            if (!name) { alert('닉네임을 입력해주세요!'); return; }
-            socket.emit('setNickname', name);
-            document.getElementById('nicknameModal').style.display = 'none';
+        // 계정 회원가입 및 로그인 요청 함수들
+        function requestRegister() {
+            const nickname = document.getElementById('authNickInput').value.trim();
+            const password = document.getElementById('authPwInput').value.trim();
+            if (!nickname || !password) { alert('닉네임과 비밀번호를 모두 입력해주세요!'); return; }
+            socket.emit('register', { nickname, password });
         }
 
-        function openNicknameModal() {
-            document.getElementById('nicknameModal').style.display = 'flex';
+        function requestLogin() {
+            const nickname = document.getElementById('authNickInput').value.trim();
+            const password = document.getElementById('authPwInput').value.trim();
+            if (!nickname || !password) { alert('닉네임과 비밀번호를 모두 입력해주세요!'); return; }
+            socket.emit('login', { nickname, password });
         }
+
+        socket.on('authResult', (res) => { alert(res.message); });
+
+        socket.on('loginSuccess', (res) => {
+            if (res.success) {
+                document.getElementById('authModal').style.display = 'none';
+                alert('로그인 성공! 환영합니다.');
+            }
+        });
 
         function triggerHitEffect() {
             const bossIcon = document.getElementById('bossIcon');
@@ -256,6 +278,21 @@
             else { triggerHitEffect(); alert(res.message); }
         });
 
+        // 💰 선택한 여러 아이템 판매 요청 함수
+        function sellSelectedItems() {
+            if (selectedIndices.length === 0) {
+                alert("판매할 무기를 슬롯에서 선택(클릭)해주세요!");
+                return;
+            }
+            socket.emit('sellItems', selectedIndices);
+            selectedIndices = []; // 전송 후 선택 초기화
+        }
+
+        socket.on('sellResult', (res) => {
+            alert(res.message);
+            selectedIndices = [];
+        });
+
         socket.on('updateState', (state) => {
             if (!state || !state.boss) return;
 
@@ -312,11 +349,33 @@
                     const slot = document.createElement('div');
                     slot.className = 'slot';
                     const item = me.inventory[i];
+                    
                     if (item) {
                         if (me.equippedIndex === i) slot.classList.add('equipped');
+                        if (selectedIndices.includes(i)) slot.classList.add('selected');
+
                         slot.innerHTML = '<div>' + item.icon + '</div><div>+' + (item.enhance||0) + '</div>';
-                        slot.onclick = () => showItemMenu(i, item);
-                    } else { slot.innerText = '빈칸'; }
+                        
+                        // 슬롯 클릭 시 다중선택 토글 + 개별 장착/강화 메뉴 동시 처리
+                        slot.onclick = (e) => {
+                            // Ctrl키나 모바일 편의를 위해 다중 선택 토글 기능 부여
+                            const idxPos = selectedIndices.indexOf(i);
+                            if (idxPos > -1) {
+                                selectedIndices.splice(idxPos, 1);
+                                slot.classList.remove('selected');
+                            } else {
+                                selectedIndices.push(i);
+                                slot.classList.add('selected');
+                            }
+                        };
+
+                        // 더블클릭이나 길게 누를 때 기존 장착/강화 메뉴 팝업 연동
+                        slot.ondblclick = () => {
+                            showItemMenu(i, item);
+                        };
+                    } else { 
+                        slot.innerText = '빈칸'; 
+                    }
                     grid.appendChild(slot);
                 }
             }
@@ -338,10 +397,10 @@
         function closeModal() { document.getElementById('fullModal').style.display = 'none'; }
         
         function showItemMenu(index, item) {
-            const act = prompt('[' + item.name + ' +' + (item.enhance||0) + ']\n1. 장착/해제\n2. 강화 (' + ((item.enhance+1)*400) + 'G)\n3. 판매 (' + item.sellPrice + 'G)');
+            const act = prompt('[' + item.name + ' +' + (item.enhance||0) + ']\n1. 장착/해제\n2. 강화 (' + ((item.enhance+1)*400) + 'G)\n3. 단건 판매 (' + item.sellPrice + 'G)');
             if (act === '1') socket.emit('equipItem', index);
             if (act === '2') socket.emit('enhanceItem', index);
-            if (act === '3') socket.emit('sellItem', index);
+            if (act === '3') socket.emit('sellItems', [index]); // 단건도 다중선택 판매 API 활용
         }
     </script>
 </body>
