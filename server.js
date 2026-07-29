@@ -26,8 +26,7 @@ const BOSS_LIST = [
 ];
 
 // -------------------------------------------------------------
-// 2. 무기 및 아이템 DB (지팡이 힐/대상 수, 방패 무적 스킬 지속 시간 설정)
-// - 방패 스킬 지속 시간 (shieldDuration): Common(10초) 기준 등급별 증가
+// 2. 무기 및 아이템 DB (방패 무적 스킬 지속 시간 설정)
 // -------------------------------------------------------------
 const WEAPON_DB = {
     knife_common: { name: '녹슨 도살도', type: 'knife', rarity: 'Common', atk: 10, sellPrice: 50, icon: '🔪' },
@@ -36,7 +35,6 @@ const WEAPON_DB = {
     knife_legendary: { name: '피빛의 소울리퍼', type: 'knife', rarity: 'Legendary', atk: 140, sellPrice: 10000, icon: '⚔️🩸' },
     knife_mythic: { name: '심연의 핏빛 멸살검', type: 'knife', rarity: 'Mythic', atk: 350, sellPrice: 100000, icon: '🗡️💀' },
 
-    // 방패 (무적 스킬 계열: shieldDuration 초 단위, 5초 쿨타임 적용)
     shield_common: { name: '나무 냄비뚜껑', type: 'shield', rarity: 'Common', atk: 6, shieldDuration: 10, sellPrice: 50, icon: '🛡️' },
     shield_rare: { name: '수호자의 가디언 실드', type: 'shield', rarity: 'Rare', atk: 18, shieldDuration: 12, sellPrice: 250, icon: '🛡️✨' },
     shield_epic: { name: '불멸의 가고일 방패', type: 'shield', rarity: 'Epic', atk: 45, shieldDuration: 14, sellPrice: 2500, icon: '🛡️🗿' },
@@ -49,7 +47,6 @@ const WEAPON_DB = {
     bow_legendary: { name: '천둥의 스톰브링어', type: 'bow', rarity: 'Legendary', atk: 125, sellPrice: 10000, icon: '🏹⚡' },
     bow_mythic: { name: '태양의 신궁 아폴론', type: 'bow', rarity: 'Mythic', atk: 300, sellPrice: 100000, icon: '🏹🌌' },
 
-    // 지팡이 (힐 템: 등급별 힐량 10, 15, 20, 25, 30 및 신화 2명 타겟)[span_4](start_span)[span_4](end_span)
     staff_common: { name: '새싹의 허브 지팡이', type: 'staff', rarity: 'Common', atk: 4, heal: 10, targets: 1, sellPrice: 50, icon: '🌿' },
     staff_rare: { name: '축복의 성수 지팡이', type: 'staff', rarity: 'Rare', atk: 12, heal: 15, targets: 1, sellPrice: 250, icon: '💧✨' },
     staff_epic: { name: '요정의 생명 지팡이', type: 'staff', rarity: 'Epic', atk: 35, heal: 20, targets: 1, sellPrice: 2500, icon: '🔮🌿' },
@@ -73,15 +70,21 @@ let gameState = {
     parties: {}
 };
 
+// -------------------------------------------------------------
+// 3. 조정된 뽑기 확률 적용 (신화 1.5% 체감형 개선)
+// -------------------------------------------------------------
 function getRandomWeaponKey() {
     const types = ['knife', 'shield', 'bow', 'staff'];
     const selectedType = types[Math.floor(Math.random() * types.length)];
-    const rand = Math.random();
+    const rand = Math.random() * 100; // 0 ~ 100 사이 값
+    
     let rarity = 'Common';
-    if (rand < 0.001) rarity = 'Mythic';
-    else if (rand < 0.020) rarity = 'Legendary';
-    else if (rand < 0.100) rarity = 'Epic';
-    else if (rand < 0.300) rarity = 'Rare';
+    if (rand < 1.5) rarity = 'Mythic';          // 1.5%
+    else if (rand < 1.5 + 5.5) rarity = 'Legendary'; // 5.5%
+    else if (rand < 1.5 + 5.5 + 13.0) rarity = 'Epic'; // 13.0%
+    else if (rand < 1.5 + 5.5 + 13.0 + 30.0) rarity = 'Rare'; // 30.0%
+    else rarity = 'Common';                     // 50.0%
+
     return `${selectedType}_${rarity.toLowerCase()}`;
 }
 
@@ -106,33 +109,28 @@ function calculateDamage(p) {
     return Math.round(baseAtk + (p.bonusAtk || 0));
 }
 
-// -------------------------------------------------------------
-// 3. 사망 버그 수정, 즉시 부활 및 무기 드랍 루프
-// -------------------------------------------------------------
+// 사망 버그 수정 및 즉시 부활 루프
 setInterval(() => {
     let updated = false;
     let now = Date.now();
     Object.values(gameState.players).forEach(p => {
-        // 방패 무적 상태 체크 해제
         if (p.isInvincible && now > p.invincibleUntil) {
             p.isInvincible = false;
             updated = true;
         }
 
         if (p.hp > 0) {
-            // 무적 상태가 아닐 때만 틱 데미지 감소
             if (!p.isInvincible) {
                 p.hp = Math.max(0, p.hp - 5);
                 updated = true;
             }
             
-            // 사망 시 처리 (장착 무기 드랍 및 즉시 부활)[span_5](start_span)[span_5](end_span)
             if (p.hp === 0) {
                 if (p.equippedIndex !== null && p.inventory[p.equippedIndex]) {
                     p.inventory.splice(p.equippedIndex, 1);
                     p.equippedIndex = null;
                 }
-                p.hp = p.maxHp; // 즉시 부활[span_6](start_span)[span_6](end_span)
+                p.hp = p.maxHp; // 즉시 부활[span_4](start_span)[span_4](end_span)
                 updated = true;
             }
         }
@@ -188,9 +186,7 @@ io.on('connection', (socket) => {
         io.emit('updateState', gameState);
     });
 
-    // -------------------------------------------------------------
-    // 4. 무기별 스킬 분기 처리 (지팡이 힐 vs 방패 무적 적용)
-    // -------------------------------------------------------------
+    // 스킬 로직 (지팡이 힐 및 방패 무적 적용)
     socket.on('useSkill', (data) => {
         const p = gameState.players[socket.id];
         if (!p || p.hp <= 0) return;
@@ -201,7 +197,6 @@ io.on('connection', (socket) => {
         let rarityMul = eq ? getRarityMultiplier(eq.rarity) : 1.0;
         let baseAtk = eq ? eq.atk : 10;
 
-        // 방패 쿨타임: 무적 지속시간 + 5초 대기 시간 검증
         let currentCooldown = (weaponType === 'shield') ? ((eq.shieldDuration || 10) + 5) * 1000 : 5000;
         if (now - (p.lastSkillTime || 0) < currentCooldown) {
             socket.emit('skillResult', { success: false, message: '⏳ 스킬 쿨타임 중입니다!' });
@@ -210,7 +205,6 @@ io.on('connection', (socket) => {
         p.lastSkillTime = now;
 
         if (weaponType === 'staff') {
-            // 지팡이 힐 스킬 (등급별 힐량 및 타겟 수 적용)[span_7](start_span)[span_7](end_span)
             let targetIds = (data && data.targetIds && Array.isArray(data.targetIds)) ? data.targetIds : [socket.id];
             let maxTargets = eq.targets || 1; 
             let validTargets = targetIds.slice(0, maxTargets);
@@ -236,7 +230,6 @@ io.on('connection', (socket) => {
             socket.emit('skillResult', { success: true, message: `🌿 [치유의 파동] 발동! [${healedNames.join(', ')}] 체력 ${totalHealAmt} 회복!` });
 
         } else if (weaponType === 'shield') {
-            // 방패 무적 스킬 (등급별 지속 시간 적용, 이후 5초 쿨타임)
             let durationSec = eq.shieldDuration || 10;
             p.isInvincible = true;
             p.invincibleUntil = now + (durationSec * 1000);
@@ -274,6 +267,36 @@ io.on('connection', (socket) => {
             gameState.boss = { ...BOSS_LIST[Math.floor(Math.random() * BOSS_LIST.length)] };
         }
     }
+
+    // -------------------------------------------------------------
+    // 4. 아이템 판매 시 금액 합산 및 판매 완료 창(sellResult) 연동
+    // -------------------------------------------------------------
+    socket.on('sellItem', (idx) => {
+        const p = gameState.players[socket.id];
+        if (p && p.inventory[idx]) {
+            const soldItem = p.inventory[idx];
+            const earnGold = soldItem.sellPrice || 0;
+            
+            p.gold += earnGold;
+            p.inventory.splice(idx, 1);
+            
+            if (p.equippedIndex === idx) {
+                p.equippedIndex = null;
+            } else if (p.equippedIndex > idx) {
+                p.equippedIndex--;
+            }
+
+            // 클라이언트로 판매 결과 및 금액 전송 (업창 연동용)
+            socket.emit('sellResult', {
+                success: true,
+                earnedGold: earnGold,
+                itemName: soldItem.name,
+                message: `💰 [${soldItem.name}]을(를) 판매하여 ${earnGold.toLocaleString()} 골드를 획득했습니다!`
+            });
+
+            io.emit('updateState', gameState);
+        }
+    });
 
     socket.on('createParty', (partyName) => {
         const p = gameState.players[socket.id];
@@ -351,17 +374,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('sellItem', (idx) => {
-        const p = gameState.players[socket.id];
-        if (p && p.inventory[idx]) {
-            const sold = p.inventory.splice(idx, 1)[0];
-            p.gold += sold.sellPrice;
-            if (p.equippedIndex === idx) p.equippedIndex = null;
-            else if (p.equippedIndex > idx) p.equippedIndex--;
-            io.emit('updateState', gameState);
-        }
-    });
-
     socket.on('enhanceItem', (idx) => {
         const p = gameState.players[socket.id];
         if (p && p.inventory[idx]) {
@@ -384,6 +396,9 @@ io.on('connection', (socket) => {
         }
     });
 
+    // -------------------------------------------------------------
+    // 5. 어드민 무기 지급 버그 수정 완료 (정확한 무기 키 매핑 및 인벤토리 한도 검증)
+    // -------------------------------------------------------------
     socket.on('adminAction', (data) => {
         const { action, payload } = data;
         if (action === 'spawnBoss') {
@@ -391,10 +406,32 @@ io.on('connection', (socket) => {
             if (map[payload] !== undefined) gameState.boss = { ...BOSS_LIST[map[payload]] };
         }
         if (action === 'killBoss') gameState.boss.currentHp = 0;
-        if (action === 'giveGold') { const t = gameState.players[payload.targetId]; if(t) t.gold += payload.amount; }
-        if (action === 'giveMythic') { const t = gameState.players[payload.targetId]; if(t && t.inventory.length < 36) t.inventory.push({ ...WEAPON_DB.knife_mythic, id: Date.now(), enhance: 0 }); }
-        if (action === 'boostAtk') { const t = gameState.players[payload.targetId]; if(t) t.bonusAtk = (t.bonusAtk || 0) + payload.amount; }
-        if (action === 'setRankScore') { const t = gameState.players[payload.targetId]; if(t) t.totalDamage = payload.score; }
+        if (action === 'giveGold') { 
+            const t = gameState.players[payload.targetId]; 
+            if(t) t.gold += payload.amount; 
+        }
+        if (action === 'giveMythic') { 
+            const t = gameState.players[payload.targetId]; 
+            if(t && t.inventory.length < 36) {
+                t.inventory.push({ ...WEAPON_DB.knife_mythic, id: Date.now() + Math.random(), enhance: 0 }); 
+            }
+        }
+        // 특정 무기 직접 지급 추가 (어드민 패널 연동용)
+        if (action === 'giveSpecificWeapon') {
+            const t = gameState.players[payload.targetId];
+            const wKey = payload.weaponKey;
+            if (t && WEAPON_DB[wKey] && t.inventory.length < 36) {
+                t.inventory.push({ ...WEAPON_DB[wKey], id: Date.now() + Math.random(), enhance: 0 });
+            }
+        }
+        if (action === 'boostAtk') { 
+            const t = gameState.players[payload.targetId]; 
+            if(t) t.bonusAtk = (t.bonusAtk || 0) + payload.amount; 
+        }
+        if (action === 'setRankScore') { 
+            const t = gameState.players[payload.targetId]; 
+            if(t) t.totalDamage = payload.score; 
+        }
         io.emit('updateState', gameState);
     });
 
