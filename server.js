@@ -11,10 +11,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 
 const BOSS_LIST = [
-    { name: '🐷 꿀신', maxHp: 157500, currentHp: 157500, expReward: 2000, type: 'normal' },
-    { name: '🗿 골리앗', maxHp: 367500, currentHp: 367500, expReward: 4500, type: 'normal' },
-    { name: '🦖 이라소', maxHp: 840000, currentHp: 840000, expReward: 7500, type: 'normal' },
-    { name: '🐉 드래곤', maxHp: 2100000, currentHp: 2100000, expReward: 15000, type: 'normal' }
+    { name: '🐷 꿀신', maxHp: 157500, currentHp: 157500, expReward: 10000, type: 'normal' }, // 경험치 10,000으로 상향
+    { name: '🗿 골리앗', maxHp: 367500, currentHp: 367500, expReward: 30000, type: 'normal' }, // 경험치 30,000으로 상향
+    { name: '🦖 이라소', maxHp: 840000, currentHp: 840000, expReward: 150000, type: 'normal' }, // 경험치 150,000으로 상향
+    { name: '🐉 드래곤', maxHp: 2100000, currentHp: 2100000, expReward: 500000, type: 'normal' } // 경험치 500,000으로 상향
 ];
 
 const UPPER_BOSS_LIST = [
@@ -55,7 +55,7 @@ const WEAPON_DB = {
     secret_void_blade: { name: '공허의 파멸검', type: 'knife', rarity: 'Secret', atk: 999999, sellPrice: 1000000, icon: '🗡️' },
     secret_meteor_bow: { name: '유성우의 시위', type: 'bow', rarity: 'Secret', atk: 950000, sellPrice: 1000000, icon: '🏹' },
     secret_titan_wall: { name: '타이탄의 불멸벽', type: 'shield', rarity: 'Secret', atk: 850000, shieldDuration: 30, sellPrice: 1000000, icon: '🛡️' },
-    secret_goddess_grail: { name: '여신의 눈물 성배', type: 'staff', rarity: 'staff', rarity: 'Secret', atk: 800000, heal: 5000, sellPrice: 1000000, icon: '🍷' },
+    secret_goddess_grail: { name: '여신의 눈물 성배', type: 'staff', rarity: 'Secret', atk: 800000, heal: 5000, sellPrice: 1000000, icon: '🍷' },
     secret_arcana_stone: { name: '아르카나의 파괴석', type: 'special', rarity: 'Secret', atk: 1200000, sellPrice: 1500000, icon: '💎' },
 
     // 🏺 유물 종류 및 판매 골드
@@ -100,6 +100,8 @@ function saveAccountState(p) {
         gameState.registeredAccounts[p.name].inventory = p.inventory;
         gameState.registeredAccounts[p.name].equippedIndex = p.equippedIndex;
         gameState.registeredAccounts[p.name].totalDamage = p.totalDamage;
+        // 길드 정보 실시간 저장 싱크
+        gameState.registeredAccounts[p.name].guildId = p.guildId;
     }
 }
 
@@ -130,7 +132,6 @@ function updateRankings() {
 function getRandomArtifactKey(isUpper = false) {
     const tierRand = Math.random() * 100;
     let chosenTier = 'Common';
-    // 상위 던전인 경우 유물 확률 보정
     let mythicRate = isUpper ? 3.0 : 1.0;
     let legendaryRate = isUpper ? 10.0 : 5.0;
     let epicRate = isUpper ? 25.0 : 15.0;
@@ -148,25 +149,21 @@ function getRandomArtifactKey(isUpper = false) {
 
 function getRandomWeaponKey(isUpper = false) {
     const rand = Math.random() * 100;
-    // 커먼 50%, 레어 32%, 에픽 15%, 레전더리 2.9%, 신화 0.08%, 시크릿 0.02%
     let rarity = 'Common';
-    if (isUpper && rand < 0.1) { // 상위 던전 시크릿 확률 소폭 보정 또는 기본 0.02%
-        rarity = 'Secret';
-    } else if (!isUpper && rand < 0.02) {
-        rarity = 'Secret';
-    } else if (rand < (0.02 + 0.08)) {
+    if (isUpper && rand < 0.02) {
+        rarity = 'Secret'; // 상위 던전 전용 시크릿 (0.02% 확률)
+    } else if (rand < 0.08) {
         rarity = 'Mythic';
-    } else if (rand < (0.02 + 0.08 + 2.9)) {
+    } else if (rand < 2.9) {
         rarity = 'Legendary';
-    } else if (rand < (0.02 + 0.08 + 2.9 + 15)) {
+    } else if (rand < 15) {
         rarity = 'Epic';
-    } else if (rand < (0.02 + 0.08 + 2.9 + 15 + 32)) {
+    } else if (rand < 32) {
         rarity = 'Rare';
     } else {
         rarity = 'Common';
     }
 
-    // 시크릿은 상위던전 전용이므로 일반던전에서 나오면 Mythic이나 최상위로 대체 혹은 시크릿 매칭
     if (rarity === 'Secret' && !isUpper) rarity = 'Mythic';
 
     let keys = Object.keys(WEAPON_DB).filter(k => WEAPON_DB[k].type !== 'artifact' && WEAPON_DB[k].rarity === rarity);
@@ -202,13 +199,13 @@ function addExp(p, amount) {
         return;
     }
     p.exp += amount;
-    // 1렙 -> 2렙 필요 경험치 360부터 시작, 1렙씩 올라갈때마다 1.5배
     let reqExp = Math.round(360 * Math.pow(1.5, p.level - 1));
     while (p.level < 100 && p.exp >= reqExp) {
         p.exp -= reqExp;
         p.level++;
-        p.maxHp += 10; // 레벨업당 체력 +10
+        p.maxHp += 10;
         p.hp = p.maxHp;
+        p.gold += 5000; // ⭐ 레벨업 당 5000코인 지급 추가
         reqExp = Math.round(360 * Math.pow(1.5, p.level - 1));
     }
     if (p.level >= 100) {
@@ -231,7 +228,6 @@ setInterval(() => {
                 updated = true;
             }
             if (p.hp === 0) {
-                // 사망 시 처리: 상위 던전이면 장착 중인 무기 파괴 및 로비 강제 이동
                 if (p.isInUpperDungeon) {
                     if (p.equippedIndex !== null && p.inventory[p.equippedIndex]) {
                         p.inventory.splice(p.equippedIndex, 1);
@@ -260,7 +256,7 @@ io.on('connection', (socket) => {
         }
         gameState.registeredAccounts[nickname] = {
             nickname, password, hp: 100, maxHp: 100, gold: 500, exp: 0, level: 1,
-            inventory: [], equippedIndex: null, totalDamage: 0, bonusAtk: 0
+            inventory: [], equippedIndex: null, totalDamage: 0, bonusAtk: 0, guildId: null
         };
         socket.emit('authResult', { success: true, message: '회원가입 성공! 로그인해주세요.' });
     });
@@ -287,8 +283,9 @@ io.on('connection', (socket) => {
             lastSkillTime: 0,
             isInvincible: false,
             invincibleUntil: 0,
-            guildId: null,
-            isInUpperDungeon: false
+            guildId: account.guildId || null,
+            isInUpperDungeon: false,
+            sessionDamage: 0 // 보스전 세션별 누적 딜량 측정용
         };
 
         socket.emit('loginSuccess', { success: true, player: gameState.players[socket.id] });
@@ -303,13 +300,15 @@ io.on('connection', (socket) => {
 
         if (p.isInUpperDungeon) {
             gameState.upperBoss.currentHp -= dmg;
+            p.sessionDamage = (p.sessionDamage || 0) + dmg;
         } else {
             gameState.boss.currentHp -= dmg;
+            p.sessionDamage = (p.sessionDamage || 0) + dmg;
         }
 
         p.totalDamage = (p.totalDamage || 0) + dmg;
         p.gold += 15;
-        addExp(p, Math.max(1, Math.floor(dmg / 10))); // 타격 시 딜량 비례 경험치
+        addExp(p, Math.max(1, Math.floor(dmg / 10)));
 
         saveAccountState(p);
         updateRankings();
@@ -357,8 +356,10 @@ io.on('connection', (socket) => {
             let skillDmg = Math.round((baseAtk * rarityMul * 2.5) + (p.bonusAtk || 0));
             if (p.isInUpperDungeon) {
                 gameState.upperBoss.currentHp -= skillDmg;
+                p.sessionDamage = (p.sessionDamage || 0) + skillDmg;
             } else {
                 gameState.boss.currentHp -= skillDmg;
+                p.sessionDamage = (p.sessionDamage || 0) + skillDmg;
             }
             p.totalDamage += skillDmg;
             p.gold += 50;
@@ -374,43 +375,56 @@ io.on('connection', (socket) => {
         io.emit('updateState', gameState);
     });
 
+    // ⭐ 보스 체력의 10% 이상 타격 조건 검증 로직 추가
     function checkBossKill(p) {
         if (gameState.boss.currentHp <= 0) {
-            let rewardExp = 15000;
-            if (gameState.boss.name.includes('꿀신')) rewardExp = 2000;
-            else if (gameState.boss.name.includes('골리앗')) rewardExp = 4500;
-            else if (gameState.boss.name.includes('이라소')) rewardExp = 7500;
-            addExp(p, rewardExp);
+            let currentBoss = BOSS_LIST.find(b => b.name === gameState.boss.name) || BOSS_LIST[0];
+            let requiredDamage = currentBoss.maxHp * 0.10; // 보스 체력의 10%
 
-            const artifactKey = getRandomArtifactKey(false);
-            const droppedItem = { ...WEAPON_DB[artifactKey], id: Date.now() + Math.random(), enhance: 0 };
-            
-            if (p.inventory.length < 36) {
-                p.inventory.push(droppedItem);
-                socket.emit('itemObtained', { weapon: droppedItem, full: false });
+            if ((p.sessionDamage || 0) >= requiredDamage) {
+                // 조건 충족 시 EXP 및 유물 보상 지급
+                let rewardExp = currentBoss.expReward;
+                addExp(p, rewardExp);
+
+                const artifactKey = getRandomArtifactKey(false);
+                const droppedItem = { ...WEAPON_DB[artifactKey], id: Date.now() + Math.random(), enhance: 0 };
+                
+                if (p.inventory.length < 36) {
+                    p.inventory.push(droppedItem);
+                    socket.emit('itemObtained', { weapon: droppedItem, full: false });
+                } else {
+                    socket.emit('itemObtained', { weapon: droppedItem, full: true });
+                }
             } else {
-                socket.emit('itemObtained', { weapon: droppedItem, full: true });
+                socket.emit('tradeAlert', { success: false, message: `보스 체력의 10% 이상을 기여하지 못해 보상을 받지 못했습니다!` });
             }
 
             gameState.boss = { ...BOSS_LIST[Math.floor(Math.random() * BOSS_LIST.length)] };
+            p.sessionDamage = 0; // 세션 딜량 초기화
             saveAccountState(p);
         }
     }
 
     function checkUpperBossKill(p) {
         if (gameState.upperBoss.currentHp <= 0) {
-            addExp(p, 50000);
-            const artifactKey = getRandomArtifactKey(true);
-            const droppedItem = { ...WEAPON_DB[artifactKey], id: Date.now() + Math.random(), enhance: 0 };
-            
-            if (p.inventory.length < 36) {
-                p.inventory.push(droppedItem);
-                socket.emit('itemObtained', { weapon: droppedItem, full: false });
+            let currentUpperBoss = UPPER_BOSS_LIST.find(b => b.name === gameState.upperBoss.name) || UPPER_BOSS_LIST[0];
+            let requiredDamage = currentUpperBoss.maxHp * 0.10; // 상위 보스 체력의 10%
+
+            if ((p.sessionDamage || 0) >= requiredDamage) {
+                addExp(p, 500000); // 상위 보스 처치 경험치 상향 반영
+                const artifactKey = getRandomArtifactKey(true);
+                const droppedItem = { ...WEAPON_DB[artifactKey], id: Date.now() + Math.random(), enhance: 0 };
+                
+                if (p.inventory.length < 36) {
+                    p.inventory.push(droppedItem);
+                    socket.emit('itemObtained', { weapon: droppedItem, full: false });
+                } else {
+                    socket.emit('itemObtained', { weapon: droppedItem, full: true });
+                }
             } else {
-                socket.emit('itemObtained', { weapon: droppedItem, full: true });
+                socket.emit('tradeAlert', { success: false, message: `상위 보스 체력의 10% 이상을 기여하지 못해 보상을 받지 못했습니다!` });
             }
 
-            // 상위 보스 등장 확률 (우흐라 45%, 기호전 25%, 사이키 15%, 개념의 눈알 15%)
             const r = Math.random() * 100;
             let nextBossIdx = 0;
             if (r < 45) nextBossIdx = 0;
@@ -419,11 +433,12 @@ io.on('connection', (socket) => {
             else nextBossIdx = 3;
 
             gameState.upperBoss = { ...UPPER_BOSS_LIST[nextBossIdx] };
+            p.sessionDamage = 0;
             saveAccountState(p);
         }
     }
 
-    // 상위 던전 입장
+    // 상위 던전 입장 (입장비 6,000,000 골드 적용)
     socket.on('enterUpperDungeon', () => {
         const p = gameState.players[socket.id];
         if (!p) return;
@@ -431,12 +446,13 @@ io.on('connection', (socket) => {
             socket.emit('upperDungeonResult', { success: false, message: '50레벨 이상만 입장 가능합니다!' });
             return;
         }
-        if (p.gold < 600000) {
-            socket.emit('upperDungeonResult', { success: false, message: '입장 골드(600,000G)가 부족합니다!' });
+        if (p.gold < 6000000) { // 10배 상향된 600만 골드 적용
+            socket.emit('upperDungeonResult', { success: false, message: '입장 골드(6,000,000G)가 부족합니다!' });
             return;
         }
-        p.gold -= 600000;
+        p.gold -= 6000000;
         p.isInUpperDungeon = true;
+        p.sessionDamage = 0;
         saveAccountState(p);
         socket.emit('upperDungeonResult', { success: true, message: '상위 던전에 입장했습니다!' });
         io.emit('updateState', gameState);
@@ -450,7 +466,7 @@ io.on('connection', (socket) => {
         io.emit('updateState', gameState);
     });
 
-    // ⚖️ 1대1 실시간 거래 시스템
+    // ⚖️ 1대1 실시간 거래 시스템 (이름 및 아이템 명시)
     socket.on('requestTrade', (targetName) => {
         const sender = gameState.players[socket.id];
         if (!sender) return;
@@ -466,7 +482,7 @@ io.on('connection', (socket) => {
             return;
         }
         io.to(targetSocketId).emit('tradeRequestReceived', { senderId: socket.id, senderName: sender.name });
-        socket.emit('tradeAlert', { success: true, message: `${targetName}님께 1대1 거래를 요청했습니다.` });
+        socket.emit('tradeAlert', { success: true, message: `${targetName}님께 [실시간] 1대1 거래를 요청했습니다.` });
     });
 
     socket.on('acceptTrade', (senderId) => {
@@ -479,6 +495,8 @@ io.on('connection', (socket) => {
             id: tradeId,
             p1: senderId,
             p2: socket.id,
+            p1Name: sender.name,
+            p2Name: acceptor.name,
             p1Offer: { items: [], gold: 0, locked: false },
             p2Offer: { items: [], gold: 0, locked: false }
         };
@@ -487,6 +505,7 @@ io.on('connection', (socket) => {
         io.to(socket.id).emit('tradeStarted', { tradeId, partnerName: sender.name });
     });
 
+    // ⭐ 거래창에서 골드 직접 제시 및 모든 종류의 무기/유물 대가 설정 반영
     socket.on('updateTradeOffer', ({ tradeId, offerItems, offerGold }) => {
         const trade = gameState.trades[tradeId];
         const p = gameState.players[socket.id];
@@ -551,8 +570,8 @@ io.on('connection', (socket) => {
                 saveAccountState(p1);
                 saveAccountState(p2);
 
-                io.to(trade.p1).emit('tradeComplete', { success: true, message: '🤝 1대1 거래가 성공적으로 완료되었습니다!' });
-                io.to(trade.p2).emit('tradeComplete', { success: true, message: '🤝 1대1 거래가 성공적으로 완료되었습니다!' });
+                io.to(trade.p1).emit('tradeComplete', { success: true, message: `🤝 [${trade.p2Name}]님과 1대1 거래가 완료되었습니다!` });
+                io.to(trade.p2).emit('tradeComplete', { success: true, message: `🤝 [${trade.p1Name}]님과 1대1 거래가 완료되었습니다!` });
             }
             delete gameState.trades[tradeId];
             io.emit('updateState', gameState);
@@ -579,6 +598,7 @@ io.on('connection', (socket) => {
         const listingId = 'market_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
         gameState.marketListings[listingId] = {
             id: listingId, sellerId: socket.id, sellerName: p.name, item: itemToSell,
+            itemName: itemToSell.name,
             priceGold: parseInt(priceGold) || 0
         };
         saveAccountState(p);
@@ -621,14 +641,12 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 무기 잠금(Lock) 설정
     socket.on('toggleLockItem', (idx) => {
         const p = gameState.players[socket.id];
         if (!p || !p.inventory[idx]) return;
         p.inventory[idx].isLocked = !p.inventory[idx].isLocked;
-        // 중요 무기는 최상단 정렬을 위해 정렬 로직 적용 가능 (락 걸린 아이템 우선 정렬)
         p.inventory.sort((a, b) => (b.isLocked ? 1 : 0) - (a.isLocked ? 1 : 0));
-        p.equippedIndex = null; // 장착 인덱스 초기화 방지/재설정
+        p.equippedIndex = null;
         saveAccountState(p);
         io.emit('updateState', gameState);
     });
@@ -650,6 +668,7 @@ io.on('connection', (socket) => {
         io.emit('updateState', gameState);
     });
 
+    // ⭐ 길드 정보 실시간 저장 반영
     socket.on('createGuild', ({ guildName, maxMembers }) => {
         const p = gameState.players[socket.id];
         if (!p || p.guildId) return;
@@ -659,6 +678,7 @@ io.on('connection', (socket) => {
             leaderId: socket.id, subLeaderId: null, members: [socket.id]
         };
         p.guildId = guildId;
+        saveAccountState(p);
         updateRankings();
         io.emit('updateState', gameState);
     });
@@ -690,6 +710,7 @@ io.on('connection', (socket) => {
         if (!p || !guild || p.guildId || guild.members.length >= guild.maxMembers) return;
         guild.members.push(socket.id);
         p.guildId = guildId;
+        saveAccountState(p);
         updateRankings();
         io.emit('updateState', gameState);
     });
@@ -704,6 +725,7 @@ io.on('connection', (socket) => {
             else if (guild.leaderId === socket.id) guild.leaderId = guild.members[0];
         }
         p.guildId = null;
+        saveAccountState(p);
         updateRankings();
         io.emit('updateState', gameState);
     });
@@ -734,7 +756,7 @@ io.on('connection', (socket) => {
         if (!p || !Array.isArray(indices)) return;
         [...new Set(indices)].sort((a, b) => b - a).forEach(idx => {
             if (idx >= 0 && idx < p.inventory.length) {
-                if (p.inventory[idx].isLocked) return; // 락 걸린 아이템 판매 방지
+                if (p.inventory[idx].isLocked) return;
                 p.gold += (p.inventory[idx].sellPrice || 0);
                 p.inventory.splice(idx, 1);
                 if (p.equippedIndex === idx) p.equippedIndex = null;
@@ -750,7 +772,7 @@ io.on('connection', (socket) => {
         if (!p || !Array.isArray(indices)) return;
         [...new Set(indices)].sort((a, b) => b - a).forEach(idx => {
             if (idx >= 0 && idx < p.inventory.length) {
-                if (p.inventory[idx].isLocked) return; // 락 걸린 아이템 삭제 방지
+                if (p.inventory[idx].isLocked) return;
                 p.inventory.splice(idx, 1);
                 if (p.equippedIndex === idx) p.equippedIndex = null;
                 else if (p.equippedIndex !== null && p.equippedIndex > idx) p.equippedIndex--;
