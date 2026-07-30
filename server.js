@@ -225,21 +225,22 @@ io.on('connection', (socket) => {
         io.emit('updateState', gameState);
     });
 
-    // 실시간 거래소 핸들러
+    // 실시간 거래소 매물 조회
     socket.on('getMarketList', () => {
         socket.emit('marketListResult', gameState.marketListings);
     });
 
+    // 실시간 거래소 매물 등록
     socket.on('listMarketItem', ({ inventoryIndex, priceGold, desiredItemType, desiredItemRarity }) => {
         const p = gameState.players[socket.id];
         if (!p || inventoryIndex < 0 || inventoryIndex >= p.inventory.length) return;
 
-        const itemToSell = p.inventory[inventoryIndex];
         if (p.equippedIndex === inventoryIndex) {
             socket.emit('marketResult', { success: false, message: '장착 중인 아이템은 등록할 수 없습니다.' });
             return;
         }
 
+        const itemToSell = p.inventory[inventoryIndex];
         p.inventory.splice(inventoryIndex, 1);
         if (p.equippedIndex !== null && p.equippedIndex > inventoryIndex) {
             p.equippedIndex--;
@@ -262,6 +263,7 @@ io.on('connection', (socket) => {
         io.emit('marketListResult', gameState.marketListings);
     });
 
+    // 매물 취소/회수
     socket.on('cancelMarketItem', (listingId) => {
         const p = gameState.players[socket.id];
         const listing = gameState.marketListings[listingId];
@@ -281,6 +283,7 @@ io.on('connection', (socket) => {
         io.emit('marketListResult', gameState.marketListings);
     });
 
+    // 매물 구매 (골드 혹은 물물교환)
     socket.on('buyMarketItem', ({ listingId, payWithGold, payWithInventoryIndex }) => {
         const buyer = gameState.players[socket.id];
         const listing = gameState.marketListings[listingId];
@@ -366,7 +369,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 1:1 실시간 거래 핸들러
     socket.on('getOnlineUsers', () => {
         const users = Object.values(gameState.players)
             .filter(p => p.id !== socket.id)
@@ -760,3 +762,4 @@ io.on('connection', (socket) => {
 });
 
 server.listen(3000, () => console.log('서버 실행 중 포트: 3000'));
+
