@@ -52,7 +52,6 @@
         .btn-sub { background: #2980b9; font-size: 12px; padding: 6px 10px; width: auto; }
         .btn-action { background: #27ae60; margin-top: 6px; font-size: 13px; padding: 8px; }
 
-        /* 무기 테두리 색상 규칙 */
         .slot { background: #15171e; border: 2px solid #2f354a; height: 48px; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; cursor: pointer; position: relative; }
         .slot.common { border-color: #2ecc71; }
         .slot.rare { border-color: #3498db; }
@@ -208,15 +207,15 @@
                 </div>
 
                 <div style="display:flex; gap:6px; margin-top:8px;">
-                    <button class="btn" style="background:#27ae60; padding:10px;" onclick="toggleTradeReady()">✅ 거래 동의 (준비)</button>
-                    <button class="btn" style="background:#c0392b; padding:10px;" onclick="cancelTradeSession()">❌ 거래 취소</button>
+                    <button class="btn" style="background:#27ae60; padding:10px;" onclick="toggleTradeReady()">✅ 거래 동의 (수락)</button>
+                    <button class="btn" style="background:#c0392b; padding:10px;" onclick="cancelTradeSession()">❌ 거절 (취소)</button>
                 </div>
             </div>
 
             <div class="card">
-                <h4 style="margin:0 0 6px 0; font-size:13px; color:#f1c40f;">🎒 무기고에서 거래할 무기 선택</h4>
+                <h4 style="margin:0 0 6px 0; font-size:13px; color:#f1c40f;">🎒 나의 무기고</h4>
                 <div class="inventory-grid" id="tradeInventoryGrid"></div>
-                <button class="btn btn-action" onclick="addSelectedToTrade()">➕ 선택한 무기를 거래 칸에 올리기</button>
+                <button class="btn btn-action" onclick="addSelectedToTrade()">➕ 거래창에 올리기</button>
             </div>
         </div>
 
@@ -225,6 +224,14 @@
             <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
                 <button class="btn btn-sub" style="background:#555;" onclick="goToLobby()">🏠 로비</button>
                 <button class="btn btn-sub" style="background:#9b59b6;" onclick="enterUpperDungeon()">🔥 상위 레이드 던전 (Lv.50+)</button>
+            </div>
+
+            <!-- 💡 레벨 & 경험치바 내 정보칸 배치 -->
+            <div class="card" style="border: 2px solid #3498db;">
+                <h4 style="margin:0 0 6px 0; color:#3498db; font-size:13px;">🛡️ 내 정보 & 경험치</h4>
+                <p style="margin: 4px 0; font-size: 12px;">⭐ Lv.<span id="myLevel">1</span> | ❤️ 체력: <span id="myHp">100</span>/<span id="myMaxHp">100</span> | 💰 <span id="myGold">500</span> G</p>
+                <div class="hp-bar-bg" style="height: 14px; margin: 4px 0;"><div id="myExpFill" class="exp-bar-fill"></div></div>
+                <p id="myExpText" style="margin:0; font-size:10px; color:#aaa; text-align:right;">EXP: 0 / 360</p>
             </div>
 
             <div class="card boss-card" id="bossCardArea">
@@ -236,13 +243,6 @@
                     <button class="btn" onclick="attack()">⚔️ 일반 공격</button>
                     <button id="skillBtn" class="btn btn-skill" onclick="useSkill()">⚡ 스킬</button>
                 </div>
-            </div>
-
-            <div class="card">
-                <h4 style="margin:0 0 6px 0; color:#3498db; font-size:13px;">🛡️ 내 정보 & 경험치</h4>
-                <p style="margin: 4px 0; font-size: 12px;">⭐ Lv.<span id="myLevel">1</span> | ❤️ 체력: <span id="myHp">100</span>/<span id="myMaxHp">100</span> | 💰 <span id="myGold">500</span> G</p>
-                <div class="hp-bar-bg" style="height: 14px; margin: 4px 0;"><div id="myExpFill" class="exp-bar-fill"></div></div>
-                <p id="myExpText" style="margin:0; font-size:10px; color:#aaa; text-align:right;">EXP: 0 / 360</p>
             </div>
 
             <div class="card" style="border: 2px solid #f1c40f;">
@@ -501,7 +501,7 @@
                 chip.innerHTML = `<span>${item.icon}</span><span>+${item.enhance||0}</span>`;
                 mySlots.appendChild(chip);
             });
-            document.getElementById('myTradeStatusText').innerText = data.ready1 ? '준비 완료 ✅' : '대기 중...';
+            document.getElementById('myTradeStatusText').innerText = data.ready1 ? '수락 완료 ✅' : '대기 중...';
 
             const partnerSlots = document.getElementById('partnerTradeSlots');
             partnerSlots.innerHTML = '';
@@ -511,7 +511,7 @@
                 chip.innerHTML = `<span>${item.icon}</span><span>+${item.enhance||0}</span>`;
                 partnerSlots.appendChild(chip);
             });
-            document.getElementById('partnerTradeStatusText').innerText = data.ready2 ? '준비 완료 ✅' : '대기 중...';
+            document.getElementById('partnerTradeStatusText').innerText = data.ready2 ? '수락 완료 ✅' : '대기 중...';
         });
 
         let isTradeReady = false;
@@ -661,12 +661,11 @@
                 document.getElementById('myMaxHp').innerText = me.maxHp;
                 document.getElementById('myGold').innerText = me.gold.toLocaleString();
 
-                // 경험치바 계산
-                let reqExp = 360 * Math.pow(1.5, me.level - 1);
-                if (me.level >= 100) reqExp = me.exp;
-                let expPct = Math.min(100, (me.exp / reqExp) * 100);
+                // 💡 레벨 1 기준 360부터 시작 및 1.5배 증가 경험치 계산 공식 적용
+                let reqExp = me.level >= 100 ? me.exp : Math.round(360 * Math.pow(1.5, me.level - 1));
+                let expPct = reqExp > 0 ? Math.min(100, (me.exp / reqExp) * 100) : 100;
                 document.getElementById('myExpFill').style.width = expPct + '%';
-                document.getElementById('myExpText').innerText = `EXP: ${me.exp.toLocaleString()} / ${Math.round(reqExp).toLocaleString()} (${Math.floor(expPct)}%)`;
+                document.getElementById('myExpText').innerText = `EXP: ${me.exp.toLocaleString()} / ${reqExp.toLocaleString()} (${Math.floor(expPct)}%)`;
                 
                 latestInventory = me.inventory || [];
                 equippedIndex = me.equippedIndex;
