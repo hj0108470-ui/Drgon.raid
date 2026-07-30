@@ -503,7 +503,7 @@ io.on('connection', (socket) => {
         io.emit('updateState', gameState);
     });
 
-    // --- [요청 반영] 상자 모으기 로직 (최대 25개) ---
+    // --- [수정] 상자 모으기 로직 (내부 아이템 가치 합산 반영) ---
     socket.on('packItemsIntoBox', ({ indices, boxName }) => {
         const p = gameState.players[socket.id];
         if (!p || !Array.isArray(indices) || indices.length === 0) return;
@@ -514,6 +514,7 @@ io.on('connection', (socket) => {
 
         let cleanIndices = [...new Set(indices)].sort((a, b) => b - a);
         let packedItems = [];
+        let totalSellPrice = 500; // 기본 상자 가격 베이스
 
         for (let idx of cleanIndices) {
             if (idx >= 0 && idx < p.inventory.length) {
@@ -526,30 +527,33 @@ io.on('connection', (socket) => {
                     socket.emit('tradeAlert', { success: false, message: '장착 중인 아이템은 상자에 담을 수 없습니다.' });
                     return;
                 }
-                packedItems.push(p.inventory.splice(idx, 1)[0]);
+                let extracted = p.inventory.splice(idx, 1)[0];
+                packedItems.push(extracted);
+                // 각 아이템의 판매 가격(sellPrice)을 합산 (기본값 50원 보장)
+                totalSellPrice += (extracted.sellPrice || 50);
             }
         }
 
         p.equippedIndex = null;
 
-        // 상자 아이템 객체 생성
+        // 상자 아이템 객체 생성 (합산된 sellPrice 적용)
         const newBox = {
             id: Date.now() + Math.random(),
             name: boxName && boxName.trim() !== '' ? boxName.trim() : '무기 보관 상자',
             type: 'box',
             rarity: 'Epic',
-            sellPrice: 500,
+            sellPrice: totalSellPrice, // 👈 상자 안에 든 무기 가치들의 총합 적용
             icon: '📦',
             items: packedItems
         };
 
         p.inventory.push(newBox);
         saveAccountState(p);
-        socket.emit('tradeAlert', { success: true, message: `📦 [${newBox.name}] 상자 제작 완료! (${packedItems.length}개 담김)` });
+        socket.emit('tradeAlert', { success: true, message: `📦 [${newBox.name}] 상자 제작 완료! (가치 합산: ${totalSellPrice.toLocaleString()}G)` });
         io.emit('updateState', gameState);
     });
 
-    // --- [요청 반영] 상자 풀기 로직 및 무기고 슬롯 초과 검사 (25개 초과 시 경고) ---
+    // --- 상자 풀기 로직 및 무기고 슬롯 초과 검사 ---
     socket.on('unpackBox', (boxIndex) => {
         const p = gameState.players[socket.id];
         if (!p || boxIndex < 0 || boxIndex >= p.inventory.length) return;
@@ -561,17 +565,13 @@ io.on('connection', (socket) => {
         }
 
         let itemsCount = boxItem.items.length;
-        // 현재 인벤토리에서 상자 칸을 하나 뺀 상태에서 남은 빈 슬롯 계산 (총 36칸 기준)
         let currentEmptySlots = 36 - p.inventory.length;
 
-        // "만약 무기고에 남은 슬롯이 25개 초과면 [ 무기고 꽉 찼습니다 ! ] 뜨게 해줘"
-        // (상자를 풀었을 때 인벤토리가 수용할 수 있는 공간보다 해제할 아이템이 많거나, 빈 슬롯이 부족한 경우 등)
         if (currentEmptySlots + 1 < itemsCount || p.inventory.length + itemsCount - 1 > 36) {
             socket.emit('tradeAlert', { success: false, message: '[ 무기고 꽉 찼습니다 ! ]' });
             return;
         }
 
-        // 상자 제거 후 내부 아이템들 복원
         p.inventory.splice(boxIndex, 1);
         p.inventory.push(...boxItem.items);
         p.equippedIndex = null;
