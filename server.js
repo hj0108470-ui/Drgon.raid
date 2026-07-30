@@ -183,7 +183,7 @@ function calculateDamage(p) {
     let eq = p.equippedIndex !== null ? p.inventory[p.equippedIndex] : null;
     let baseAtk = 80;
     let rarityMul = 1.0;
-    if (eq && eq.type !== 'artifact') {
+    if (eq && eq.type !== 'artifact' && eq.type !== 'box') {
         rarityMul = getRarityMultiplier(eq.rarity);
         baseAtk = (eq.atk * (1 + (eq.enhance || 0) * 0.15)) * rarityMul;
     }
@@ -503,6 +503,80 @@ io.on('connection', (socket) => {
         io.emit('updateState', gameState);
     });
 
+    socket.on('packItemsIntoBox', ({ indices, boxName }) => {
+        const p = gameState.players[socket.id];
+        if (!p || !Array.isArray(indices) || indices.length === 0) return;
+        if (indices.length > 25) {
+            socket.emit('tradeAlert', { success: false, message: '상자에는 최대 25개까지만 담을 수 있습니다!' });
+            return;
+        }
+
+        let cleanIndices = [...new Set(indices)].sort((a, b) => b - a);
+        let packedItems = [];
+        let totalSellPrice = 500;
+
+        for (let idx of cleanIndices) {
+            if (idx >= 0 && idx < p.inventory.length) {
+                let item = p.inventory[idx];
+                if (item.isLocked) {
+                    socket.emit('tradeAlert', { success: false, message: '잠겨 있는(락) 아이템은 상자에 담을 수 없습니다.' });
+                    return;
+                }
+                if (p.equippedIndex === idx) {
+                    socket.emit('tradeAlert', { success: false, message: '장착 중인 아이템은 상자에 담을 수 없습니다.' });
+                    return;
+                }
+                let extracted = p.inventory.splice(idx, 1)[0];
+                packedItems.push(extracted);
+                totalSellPrice += (extracted.sellPrice || 50);
+            }
+        }
+
+        p.equippedIndex = null;
+
+        const newBox = {
+            id: Date.now() + Math.random(),
+            name: boxName && boxName.trim() !== '' ? boxName.trim() : '무기 보관 상자',
+            type: 'box',
+            rarity: 'Epic',
+            sellPrice: totalSellPrice,
+            icon: '📦',
+            items: packedItems
+        };
+
+        p.inventory.push(newBox);
+        saveAccountState(p);
+        socket.emit('tradeAlert', { success: true, message: `📦 [${newBox.name}] 상자 제작 완료! (가치 합산: ${totalSellPrice.toLocaleString()}G)` });
+        io.emit('updateState', gameState);
+    });
+
+    socket.on('unpackBox', (boxIndex) => {
+        const p = gameState.players[socket.id];
+        if (!p || boxIndex < 0 || boxIndex >= p.inventory.length) return;
+        const boxItem = p.inventory[boxIndex];
+        
+        if (!boxItem || boxItem.type !== 'box' || !boxItem.items) {
+            socket.emit('tradeAlert', { success: false, message: '유효한 상자가 아닙니다.' });
+            return;
+        }
+
+        let itemsCount = boxItem.items.length;
+        let currentEmptySlots = 36 - p.inventory.length;
+
+        if (currentEmptySlots + 1 < itemsCount || p.inventory.length + itemsCount - 1 > 36) {
+            socket.emit('tradeAlert', { success: false, message: '[ 무기고가 꽉 찼습니다! ]' });
+            return;
+        }
+
+        p.inventory.splice(boxIndex, 1);
+        p.inventory.push(...boxItem.items);
+        p.equippedIndex = null;
+
+        saveAccountState(p);
+        socket.emit('tradeAlert', { success: true, message: '📦 상자를 성공적으로 풀었습니다!' });
+        io.emit('updateState', gameState);
+    });
+
     socket.on('requestTrade', (targetName) => {
         const sender = gameState.players[socket.id];
         if (!sender) return;
@@ -556,8 +630,18 @@ io.on('connection', (socket) => {
             trade.p2Offer.gold = parseInt(offerGold) || 0;
         }
 
-        io.to(trade.p1).emit('tradeStateUpdate', trade);
-        io.to(trade.p2).emit('tradeStateUpdate', trade);
+        const p1 = gameState.players[trade.p1];
+        const p2 = gameState.players[trade.p2];
+
+        // 상대방에게 보낼 때 내 아이템들의 '이름' 정보를 함께 전달하도록 구성
+        let tradeUpdatePayload = {
+            ...trade,
+            p1ItemsName: p1 ? trade.p1Offer.items.map(idx => p1.inventory[idx] ? p1.inventory[idx].name : '알 수 없음') : [],
+            p2ItemsName: p2 ? trade.p2Offer.items.map(idx => p2.inventory[idx] ? p2.inventory[idx].name : '알 수 없음') : []
+        };
+
+        io.to(trade.p1).emit('tradeStateUpdate', tradeUpdatePayload);
+        io.to(trade.p2).emit('tradeStateUpdate', tradeUpdatePayload);
     });
 
     socket.on('lockTradeOffer', (tradeId) => {
@@ -567,13 +651,19 @@ io.on('connection', (socket) => {
         if (trade.p1 === socket.id) trade.p1Offer.locked = true;
         else if (trade.p2 === socket.id) trade.p2Offer.locked = true;
 
-        io.to(trade.p1).emit('tradeStateUpdate', trade);
-        io.to(trade.p2).emit('tradeStateUpdate', trade);
+        const p1 = gameState.players[trade.p1];
+        const p2 = gameState.players[trade.p2];
+
+        let tradeUpdatePayload = {
+            ...trade,
+            p1ItemsName: p1 ? trade.p1Offer.items.map(idx => p1.inventory[idx] ? p1.inventory[idx].name : '알 수 없음') : [],
+            p2ItemsName: p2 ? trade.p2Offer.items.map(idx => p2.inventory[idx] ? p2.inventory[idx].name : '알 수 없음') : []
+        };
+
+        io.to(trade.p1).emit('tradeStateUpdate', tradeUpdatePayload);
+        io.to(trade.p2).emit('tradeStateUpdate', tradeUpdatePayload);
 
         if (trade.p1Offer.locked && trade.p2Offer.locked) {
-            const p1 = gameState.players[trade.p1];
-            const p2 = gameState.players[trade.p2];
-
             if (p1 && p2) {
                 let p1Items = trade.p1Offer.items.map(idx => p1.inventory[idx]);
                 let p2Items = trade.p2Offer.items.map(idx => p2.inventory[idx]);
@@ -691,7 +781,7 @@ io.on('connection', (socket) => {
         if (!p || weaponIndex < 0 || artifactIndex < 0) return;
         const weapon = p.inventory[weaponIndex];
         const artifact = p.inventory[artifactIndex];
-        if (!weapon || !artifact || weapon.type === 'artifact' || artifact.type !== 'artifact' || weaponIndex === artifactIndex) return;
+        if (!weapon || !artifact || weapon.type === 'artifact' || weapon.type === 'box' || artifact.type !== 'artifact' || weaponIndex === artifactIndex) return;
 
         p.inventory.splice(artifactIndex, 1);
         if (p.equippedIndex === artifactIndex) p.equippedIndex = null;
