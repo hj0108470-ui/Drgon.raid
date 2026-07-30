@@ -202,14 +202,14 @@ function addExp(p, amount) {
         return;
     }
     p.exp += amount;
-    let reqExp = Math.round(360 * Math.pow(1.2, p.level - 1));
+    let reqExp = Math.round(360 * Math.pow(1.5, p.level - 1));
     while (p.level < 100 && p.exp >= reqExp) {
         p.exp -= reqExp;
         p.level++;
         p.maxHp += 10;
         p.hp = p.maxHp;
         p.gold += 5000;
-        reqExp = Math.round(360 * Math.pow(1.2, p.level - 1));
+        reqExp = Math.round(360 * Math.pow(1.5, p.level - 1));
     }
     if (p.level >= 100) {
         p.level = 100;
@@ -827,25 +827,21 @@ io.on('connection', (socket) => {
         socket.emit('guildDetailResult', { guildName: g.name, isLeader: (g.leaderId === socket.id), isSubLeader: (g.subLeaderId === socket.id), members: memberDetails });
     });
 
-    // 길드 마스터가 부마스터를 임명 또는 해제하는 기능
     socket.on('setSubLeader', (targetSocketId) => {
         const p = gameState.players[socket.id];
         if (!p || !p.guildId || !gameState.guilds[p.guildId]) return;
         const guild = gameState.guilds[p.guildId];
 
-        // 요청자가 길드 마스터인지 확인
         if (guild.leaderId !== socket.id) {
             socket.emit('tradeAlert', { success: false, message: '길드마스터만 부마스터를 임명할 수 있습니다.' });
             return;
         }
 
-        // 대상이 해당 길드의 멤버인지 확인
         if (!guild.members.includes(targetSocketId)) {
             socket.emit('tradeAlert', { success: false, message: '해당 유저는 우리 길드원이 아닙니다.' });
             return;
         }
 
-        // 이미 부마스터인 사람을 다시 지정하면 해제, 아니면 새로 임명
         if (guild.subLeaderId === targetSocketId) {
             guild.subLeaderId = null;
             socket.emit('tradeAlert', { success: true, message: '부마스터 직위가 해제되었습니다.' });
