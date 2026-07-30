@@ -3,27 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>방치형 보스 레이드 & 실시간 거래소</title>
+    <title>컴팩트 방치형 성장 RPG</title>
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
     <style>
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            margin: 0; 
-            padding: 8px; 
-            background: #0b0c10;
-            color: #fff;
-            box-sizing: border-box;
-        }
-        .container { max-width: 480px; margin: 0 auto; width: 100%; }
-        .card { 
-            background: rgba(22, 24, 32, 0.95); 
-            border-radius: 10px; 
-            padding: 12px; 
-            margin-bottom: 10px; 
-            border: 1px solid #3a3f52; 
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-            text-align: left;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Malgun Gothic', sans-serif; }
+        body { background-color: #0b0c10; color: #e0e0e0; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        .game-container { width: 480px; height: 850px; background-color: #1e1e1e; border: 2px solid #333; display: flex; flex-direction: column; position: relative; box-shadow: 0 0 20px rgba(0,0,0,0.8); }
+        
+        /* 헤더 및 탭 네비게이션 */
+        header { background-color: #2c2c2c; padding: 12px; text-align: center; border-bottom: 2px solid #444; font-size: 16px; font-weight: bold; color: #ffaa00; }
+        .nav-bar { display: flex; background-color: #252525; border-bottom: 1px solid #333; }
+        .nav-btn { flex: 1; padding: 10px 4px; background: none; border: none; color: #aaa; cursor: pointer; font-size: 12px; font-weight: bold; transition: 0.2s; }
+        .nav-btn.active { color: #fff; background-color: #1e1e1e; border-bottom: 2px solid #ffaa00; }
+        
+        /* 컨텐츠 영역 */
+        .content { flex: 1; overflow-y: auto; padding: 15px; display: none; }
+        .content.active { display: block; }
+        
+        /* 로비 스타일 */
+        .lobby-status { background: #252525; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #3d3d3d; }
+        .lobby-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+        .action-btn { padding: 15px; background-color: #333; color: white; border: 1px solid #555; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; text-align: center; }
+        .action-btn:hover { background-color: #444; border-color: #777; }
+        .action-btn.special { background-color: #b8860b; border-color: #ffd700; }
+
+        /* 인벤토리 격자 스타일 */
+        .inventory-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-top: 8px; }
+        .slot { background: #15171e; border: 2px solid #2f354a; height: 52px; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; cursor: pointer; position: relative; }
+        .slot.common { border-color: #2ecc71; }
+        .slot.rare { border-color: #3498db; }
+        .slot.epic { border-color: #9b59b6; }
+        .slot.legendary { border-color: #f1c40f; }
+        .slot.mythic { border-color: #e74c3c; }
+        .slot.secret { border-color: #95a5a6; box-shadow: 0 0 6px #fff; }
+        .slot.selected { border-color: #00ffff !important; background: #1b365d; }
+        .slot.equipped { background: #3d3512; }
+
+        /* 거래소 및 공통 카드 스타일 */
+        .card { background: rgba(22, 24, 32, 0.95); border-radius: 10px; padding: 12px; margin-bottom: 10px; border: 1px solid #3a3f52; box-shadow: 0 4px 12px rgba(0,0,0,0.5); text-align: left; }
         .boss-card { border: 2px solid #e74c3c; text-align: center; }
         .upper-boss-card { border: 2px solid #9b59b6; background: rgba(30, 20, 40, 0.95); }
 
@@ -52,31 +69,16 @@
         .btn-sub { background: #2980b9; font-size: 12px; padding: 6px 10px; width: auto; }
         .btn-action { background: #27ae60; margin-top: 6px; font-size: 13px; padding: 8px; }
 
-        .slot { background: #15171e; border: 2px solid #2f354a; height: 48px; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; cursor: pointer; position: relative; }
-        .slot.common { border-color: #2ecc71; }
-        .slot.rare { border-color: #3498db; }
-        .slot.epic { border-color: #9b59b6; }
-        .slot.legendary { border-color: #f1c40f; }
-        .slot.mythic { border-color: #e74c3c; }
-        .slot.secret { border-color: #95a5a6; box-shadow: 0 0 6px #fff; }
-        .slot.selected { border-color: #00ffff !important; background: #1b365d; }
-        .slot.equipped { background: #3d3512; }
-
-        .inventory-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-top: 8px; }
-        
         .ranking-container { display: flex; gap: 8px; font-size: 11px; }
         .ranking-box { flex: 1; background: #15171e; padding: 6px; border-radius: 6px; max-height: 100px; overflow-y: auto; }
         .ranking-list { text-align: left; margin: 0; padding-left: 12px; }
         
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 100; }
-        .modal-content { background: #1e222d; padding: 15px; border-radius: 10px; width: 320px; border: 1px solid #555; text-align: center; max-height: 90vh; overflow-y: auto; box-sizing: border-box; }
+        .modal-content { background: #1e222d; padding: 15px; border-radius: 10px; width: 340px; border: 1px solid #555; text-align: center; max-height: 90vh; overflow-y: auto; box-sizing: border-box; }
         input, select { padding: 8px; border-radius: 4px; border: 1px solid #444; background: #111; color: #fff; width: 90%; margin-bottom: 8px; font-size: 14px; }
         
         .guild-item-row, .user-row, .market-row { background: #2a2e3d; padding: 8px; border-radius: 6px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
         .popup-btn { background: #34495e; color: white; border: none; padding: 10px; margin: 3px 0; width: 100%; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 13px; }
-
-        .screen { display: none; }
-        .screen.active { display: block; }
 
         .trade-container { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 8px 0; }
         .trade-box { background: #15171e; border: 1px solid #444; border-radius: 6px; padding: 8px; min-height: 90px; text-align: center; }
@@ -85,7 +87,19 @@
     </style>
 </head>
 <body>
-    <!-- 로그인 모달 -->
+
+<div class="game-container">
+    <header>COMPACT IDLE RPG</header>
+
+    <!-- 네비게이션 탭 -->
+    <div class="nav-bar">
+        <button class="nav-btn active" onclick="switchTab('lobbyScreen', event)">로비</button>
+        <button class="nav-btn" onclick="switchTab('battleScreen', event)">보스전</button>
+        <button class="nav-btn" onclick="switchTab('tradeScreen', event)">거래소</button>
+        <button class="nav-btn" onclick="openGuildModal()">길드</button>
+    </div>
+
+    <!-- 1. 로그인 모달 -->
     <div id="authModal" class="modal" style="display: flex;">
         <div class="modal-content">
             <h3 style="color:#f1c40f; margin-top:0;">🔐 로그인 / 회원가입</h3>
@@ -120,20 +134,48 @@
         </div>
     </div>
 
-    <!-- 매물 등록 팝업 (골드/유물/무기 가치 선택 추가) -->
+    <!-- 매물 등록 팝업 (요청사항 반영: 무기고 더블클릭 또는 무기 선택 시 가치 리스트 연동) -->
     <div id="marketRegisterModal" class="modal">
         <div class="modal-content" style="width: 340px;">
-            <h3 style="color:#27ae60; margin-top:0;">🏷️ 거래소에 무기 올리기</h3>
-            <p style="font-size:11px; color:#aaa;">무기고에서 등록할 무기를 선택한 뒤 아래에서 화폐/가치 유형과 가격을 입력하세요.</p>
+            <h3 style="color:#27ae60; margin-top:0;">🏷️ 거래소에 물품 올리기</h3>
+            <p style="font-size:11px; color:#aaa; margin-bottom:8px;">아래 무기고에서 팔고자 하는 물건을 두 번 클릭하거나 선택하세요.</p>
+            
+            <div style="text-align:left; margin-bottom:8px;">
+                <label style="font-size:11px; color:#aaa;">선택된 내 무기:</label>
+                <div id="marketSelectedSlotText" style="background:#15171e; padding:6px; border-radius:4px; font-size:12px; color:#f1c40f; margin-top:2px;">선택된 물품 없음</div>
+            </div>
+
+            <div style="text-align:left; margin-bottom:8px;">
+                <label style="font-size:11px; color:#aaa;">나의 무기고 슬롯 (클릭 또는 더블클릭)</label>
+                <div id="marketInvenMiniGrid" class="inventory-grid" style="grid-template-columns: repeat(4, 1fr); max-height: 120px; overflow-y:auto; background:#15171e; padding:4px; border-radius:4px;"></div>
+            </div>
+
             <div style="margin-bottom:8px; text-align:left;">
-                <label style="font-size:11px; color:#aaa;">거래 화폐 / 가치 유형</label>
-                <select id="marketCurrencyType" style="width:100%; margin-top:3px;">
+                <label style="font-size:11px; color:#aaa;">원하는 가치/화폐 선택</label>
+                <select id="marketCurrencyType" style="width:100%; margin-top:3px;" onchange="onChangeMarketCurrencyType()">
+                    <option value="itemValue">무기, 유물 (가치 교환)</option>
                     <option value="gold">골드 (G)</option>
-                    <option value="artifact">유물 가치</option>
-                    <option value="weapon">무기 가치</option>
                 </select>
             </div>
-            <input type="number" id="marketPriceInput" placeholder="판매 가격 또는 수치 입력">
+
+            <!-- 무기, 유물 선택 시 나타나는 전체 무기/유물 팝업 리스트 -->
+            <div id="marketItemValueBox" style="margin-bottom:8px; text-align:left;">
+                <label style="font-size:11px; color:#aaa;">교환할 게임 내 무기/유물 선택</label>
+                <div id="allGameItemsContainer" style="max-height: 110px; overflow-y: auto; background:#15171e; padding:4px; border-radius:4px; border:1px solid #444;">
+                    <div class="popup-item-row" onclick="selectExchangeItem('전설의 성검 (무기)')">⚔️ 전설의 성검 (무기)</div>
+                    <div class="popup-item-row" onclick="selectExchangeItem('고대 마법의 유물 (유물)')">🗿 고대 마법의 유물 (유물)</div>
+                    <div class="popup-item-row" onclick="selectExchangeItem('화염의 단검 (무기)')">🗡️ 화염의 단검 (무기)</div>
+                    <div class="popup-item-row" onclick="selectExchangeItem('드래곤의 심장 (유물)')">🔥 드래곤의 심장 (유물)</div>
+                </div>
+                <input type="hidden" id="selectedExchangeItemVal" value="전설의 성검 (무기)">
+            </div>
+
+            <!-- 골드 선택 시 나타나는 입력창 -->
+            <div id="marketGoldInputBox" style="margin-bottom:8px; text-align:left; display:none;">
+                <label style="font-size:11px; color:#aaa;">원하는 골드량 입력</label>
+                <input type="number" id="marketGoldPriceInput" placeholder="예: 1000" style="width:100%; margin-top:3px;">
+            </div>
+
             <button class="popup-btn" style="background:#27ae60;" onclick="confirmListMarket()">등록하기</button>
             <button class="popup-btn" style="background:#555;" onclick="closeSubModals()">돌아가기</button>
         </div>
@@ -185,9 +227,10 @@
         </div>
     </div>
 
-    <div class="container">
+    <!-- 컨텐츠 영역들 -->
+    <div style="flex: 1; overflow-y: auto; position: relative;">
         <!-- 로비 화면 -->
-        <div id="lobbyScreen" class="screen">
+        <div id="lobbyScreen" class="content active">
             <div class="card" style="text-align: center;">
                 <h2 style="color:#f1c40f; margin: 5px 0;">🌟 LOBBY</h2>
                 <div style="background: #15171e; padding: 10px; border-radius: 8px; margin: 10px 0; text-align: left; font-size: 13px;">
@@ -198,50 +241,17 @@
                 </div>
                 <div id="lobbyGuildControl" style="margin-bottom: 8px;"></div>
                 <button class="btn" style="background:#e67e22; margin-bottom: 8px; padding: 12px;" onclick="openMarketModal()">🛒 실시간 거래소 (1:1 & 매물)</button>
-                <button class="btn" style="background:#27ae60; padding: 14px; font-size: 16px;" onclick="goToBattle()">⚔️ 보스 레이드 입장하기</button>
-            </div>
-        </div>
-
-        <!-- 1:1 거래 화면 -->
-        <div id="tradeScreen" class="screen">
-            <div class="card" style="border: 2px solid #e67e22; text-align: center;">
-                <h3 style="color:#e67e22; margin-top:0;">🤝 1:1 실시간 거래 중</h3>
-                <p style="font-size: 11px; color:#aaa;">상대방: <strong id="tradePartnerName" style="color:#fff;">-</strong></p>
-                
-                <div class="trade-container">
-                    <div class="trade-box">
-                        <div style="font-size:11px; color:#3498db; font-weight:bold;">나의 거래 칸</div>
-                        <div id="myTradeSlots" class="trade-slot-grid"></div>
-                        <div id="myTradeStatusText" style="margin-top:4px; font-size:10px; color:#e74c3c;">대기 중...</div>
-                    </div>
-                    <div class="trade-box">
-                        <div style="font-size:11px; color:#e67e22; font-weight:bold;">상대방 거래 칸</div>
-                        <div id="partnerTradeSlots" class="trade-slot-grid"></div>
-                        <div id="partnerTradeStatusText" style="margin-top:4px; font-size:10px; color:#e74c3c;">대기 중...</div>
-                    </div>
-                </div>
-
-                <div style="display:flex; gap:6px; margin-top:8px;">
-                    <button class="btn" style="background:#27ae60; padding:10px;" onclick="toggleTradeReady()">✅ 거래 동의 (수락)</button>
-                    <button class="btn" style="background:#c0392b; padding:10px;" onclick="cancelTradeSession()">❌ 거절 (취소)</button>
-                </div>
-            </div>
-
-            <div class="card">
-                <h4 style="margin:0 0 6px 0; font-size:13px; color:#f1c40f;">🎒 나의 무기고</h4>
-                <div class="inventory-grid" id="tradeInventoryGrid"></div>
-                <button class="btn btn-action" onclick="addSelectedToTrade()">➕ 거래창에 올리기</button>
+                <button class="btn" style="background:#27ae60; padding: 14px; font-size: 16px;" onclick="switchTab('battleScreen', null)">⚔️ 보스 레이드 입장하기</button>
             </div>
         </div>
 
         <!-- 전투 화면 -->
-        <div id="battleScreen" class="screen">
+        <div id="battleScreen" class="content">
             <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-                <button class="btn btn-sub" style="background:#555;" onclick="goToLobby()">🏠 로비</button>
+                <button class="btn btn-sub" style="background:#555;" onclick="switchTab('lobbyScreen', null)">🏠 로비</button>
                 <button class="btn btn-sub" style="background:#9b59b6;" onclick="enterUpperDungeon()">🔥 상위 레이드 던전 (Lv.50+)</button>
             </div>
 
-            <!-- 레벨 & 경험치바 내 정보칸 배치 -->
             <div class="card" style="border: 2px solid #3498db;">
                 <h4 style="margin:0 0 6px 0; color:#3498db; font-size:13px;">🛡️ 내 정보 & 경험치</h4>
                 <p style="margin: 4px 0; font-size: 12px;">⭐ Lv.<span id="myLevel">1</span> | ❤️ 체력: <span id="myHp">100</span>/<span id="myMaxHp">100</span> | 💰 <span id="myGold">500</span> G</p>
@@ -293,456 +303,564 @@
                 <button class="btn btn-action" onclick="openActionModal()">⚙️ 선택한 무기 관리 / 일괄 처리</button>
             </div>
         </div>
-    </div>
 
-    <script>
-        const socket = io({ transports: ['websocket', 'polling'] });
-        let myId = null;
-        let selectedIndices = []; 
-        let latestInventory = [];
-        let equippedIndex = null;
-        let currentGuildId = null;
-
-        let activeTradeId = null;
-        let tradeSelectedIndices = [];
-        let myOfferedIndices = [];
-
-        socket.on('connect', () => { myId = socket.id; });
-
-        function showScreen(screenId) {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById(screenId).classList.add('active');
-        }
-
-        function goToLobby() { showScreen('lobbyScreen'); }
-        function goToBattle() { showScreen('battleScreen'); }
-
-        function requestRegister() {
-            const nickname = document.getElementById('authNickInput').value.trim();
-            const password = document.getElementById('authPwInput').value.trim();
-            if (!nickname || !password) { alert('정보를 입력해주세요!'); return; }
-            socket.emit('register', { nickname, password });
-        }
-
-        function requestLogin() {
-            const nickname = document.getElementById('authNickInput').value.trim();
-            const password = document.getElementById('authPwInput').value.trim();
-            if (!nickname || !password) { alert('정보를 입력해주세요!'); return; }
-            socket.emit('login', { nickname, password });
-        }
-
-        socket.on('authResult', (res) => { alert(res.message); });
-        socket.on('loginSuccess', (res) => {
-            if (res.success) {
-                document.getElementById('authModal').style.display = 'none';
-                goToLobby();
-            }
-        });
-
-        function triggerHitEffect() {
-            const bossCard = document.getElementById('bossCardArea');
-            bossCard.classList.remove('hit-anim');
-            void bossCard.offsetWidth; 
-            bossCard.classList.add('hit-anim');
-        }
-
-        function attack() { triggerHitEffect(); socket.emit('attack'); }
-        function useSkill() { socket.emit('useSkill'); }
-        function gacha() { socket.emit('drawGacha'); }
-        function useCoupon() {
-            const code = document.getElementById('couponInput').value.trim();
-            if (code) socket.emit('useCoupon', code);
-        }
-
-        function enterUpperDungeon() { socket.emit('enterUpperDungeon'); }
-        socket.on('dungeonResult', (res) => {
-            alert(res.message);
-            if (res.success) goToBattle();
-        });
-
-        // 거래소 모달 제어
-        function openMarketModal() { document.getElementById('marketModal').style.display = 'flex'; }
-        function closeMarketModal() { document.getElementById('marketModal').style.display = 'none'; }
-        function closeSubModals() {
-            document.getElementById('marketListModal').style.display = 'none';
-            document.getElementById('marketRegisterModal').style.display = 'none';
-            document.getElementById('tradeUserModal').style.display = 'none';
-            openMarketModal();
-        }
-
-        function openMarketListTab() {
-            closeMarketModal();
-            socket.emit('getMarketList');
-            document.getElementById('marketListModal').style.display = 'flex';
-        }
-
-        socket.on('marketListResult', (listings) => {
-            const container = document.getElementById('marketListContainer');
-            container.innerHTML = '';
-            const keys = Object.keys(listings);
-            if (keys.length === 0) {
-                container.innerHTML = '<p style="color:#aaa; font-size:12px;">등록된 매물이 없습니다.</p>';
-                return;
-            }
-            keys.forEach(k => {
-                const l = listings[k];
-                const row = document.createElement('div');
-                row.className = 'market-row';
-                let currencyLabel = l.currencyType === 'artifact' ? '유물 가치' : (l.currencyType === 'weapon' ? '무기 가치' : '골드(G)');
-                row.innerHTML = `
-                    <div>
-                        <strong>${l.item.icon} ${l.item.name}</strong> (+${l.item.enhance||0})<br>
-                        <span style="font-size:10px; color:#aaa;">판매자: ${l.sellerName} | 요금: ${l.price.toLocaleString()} (${currencyLabel})</span>
+        <!-- 1:1 거래 화면 -->
+        <div id="tradeScreen" class="content">
+            <div class="card" style="border: 2px solid #e67e22; text-align: center;">
+                <h3 style="color:#e67e22; margin-top:0;">🤝 1:1 실시간 거래 중</h3>
+                <p style="font-size: 11px; color:#aaa;">상대방: <strong id="tradePartnerName" style="color:#fff;">-</strong></p>
+                
+                <div class="trade-container">
+                    <div class="trade-box">
+                        <div style="font-size:11px; color:#3498db; font-weight:bold;">나의 거래 칸</div>
+                        <div id="myTradeSlots" class="trade-slot-grid"></div>
+                        <div id="myTradeStatusText" style="margin-top:4px; font-size:10px; color:#e74c3c;">대기 중...</div>
                     </div>
-                    <button class="btn" style="padding:4px 8px; font-size:11px; width:auto; background:#27ae60;" onclick="buyMarketItem('${l.id}')">구매</button>
-                `;
-                container.appendChild(row);
-            });
+                    <div class="trade-box">
+                        <div style="font-size:11px; color:#e67e22; font-weight:bold;">상대방 거래 칸</div>
+                        <div id="partnerTradeSlots" class="trade-slot-grid"></div>
+                        <div id="partnerTradeStatusText" style="margin-top:4px; font-size:10px; color:#e74c3c;">대기 중...</div>
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:6px; margin-top:8px;">
+                    <button class="btn" style="background:#27ae60; padding:10px;" onclick="toggleTradeReady()">✅ 거래 동의 (수락)</button>
+                    <button class="btn" style="background:#c0392b; padding:10px;" onclick="cancelTradeSession()">❌ 거절 (취소)</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h4 style="margin:0 0 6px 0; font-size:13px; color:#f1c40f;">🎒 나의 무기고</h4>
+                <div class="inventory-grid" id="tradeInventoryGrid"></div>
+                <button class="btn btn-action" onclick="addSelectedToTrade()">➕ 거래창에 올리기</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const socket = io({ transports: ['websocket', 'polling'] });
+    let myId = null;
+    let selectedIndices = []; 
+    let latestInventory = [];
+    let equippedIndex = null;
+    let currentGuildId = null;
+
+    let activeTradeId = null;
+    let tradeSelectedIndices = [];
+    let myOfferedIndices = [];
+    let marketSelectedSlotIndex = null;
+
+    socket.on('connect', () => { myId = socket.id; });
+
+    function switchTab(tabId, event) {
+        document.querySelectorAll('.content').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.nav-btn').forEach(s => s.classList.remove('active'));
+        
+        document.getElementById(tabId).classList.add('active');
+        if (event && event.currentTarget) {
+            event.currentTarget.classList.add('active');
+        } else {
+            const navButtons = document.querySelectorAll('.nav-btn');
+            if (tabId === 'lobbyScreen' && navButtons[0]) navButtons[0].classList.add('active');
+            if (tabId === 'battleScreen' && navButtons[1]) navButtons[1].classList.add('active');
+            if (tabId === 'tradeScreen' && navButtons[2]) navButtons[2].classList.add('active');
+        }
+    }
+
+    function requestRegister() {
+        const nickname = document.getElementById('authNickInput').value.trim();
+        const password = document.getElementById('authPwInput').value.trim();
+        if (!nickname || !password) { alert('정보를 입력해주세요!'); return; }
+        socket.emit('register', { nickname, password });
+    }
+
+    function requestLogin() {
+        const nickname = document.getElementById('authNickInput').value.trim();
+        const password = document.getElementById('authPwInput').value.trim();
+        if (!nickname || !password) { alert('정보를 입력해주세요!'); return; }
+        socket.emit('login', { nickname, password });
+    }
+
+    socket.on('authResult', (res) => { alert(res.message); });
+    socket.on('loginSuccess', (res) => {
+        if (res.success) {
+            document.getElementById('authModal').style.display = 'none';
+            switchTab('lobbyScreen');
+        }
+    });
+
+    function triggerHitEffect() {
+        const bossCard = document.getElementById('bossCardArea');
+        bossCard.classList.remove('hit-anim');
+        void bossCard.offsetWidth; 
+        bossCard.classList.add('hit-anim');
+    }
+
+    function attack() { triggerHitEffect(); socket.emit('attack'); }
+    function useSkill() { socket.emit('useSkill'); }
+    function gacha() { socket.emit('drawGacha'); }
+    function useCoupon() {
+        const code = document.getElementById('couponInput').value.trim();
+        if (code) socket.emit('useCoupon', code);
+    }
+
+    function enterUpperDungeon() { socket.emit('enterUpperDungeon'); }
+    socket.on('dungeonResult', (res) => {
+        alert(res.message);
+        if (res.success) switchTab('battleScreen');
+    });
+
+    // 거래소 관련 함수 및 모달 제어
+    function openMarketModal() { document.getElementById('marketModal').style.display = 'flex'; }
+    function closeMarketModal() { document.getElementById('marketModal').style.display = 'none'; }
+    function closeSubModals() {
+        document.getElementById('marketListModal').style.display = 'none';
+        document.getElementById('marketRegisterModal').style.display = 'none';
+        document.getElementById('tradeUserModal').style.display = 'none';
+        openMarketModal();
+    }
+
+    function openMarketListTab() {
+        closeMarketModal();
+        socket.emit('getMarketList');
+        document.getElementById('marketListModal').style.display = 'flex';
+    }
+
+    socket.on('marketListResult', (listings) => {
+        const container = document.getElementById('marketListContainer');
+        container.innerHTML = '';
+        const keys = Object.keys(listings);
+        if (keys.length === 0) {
+            container.innerHTML = '<p style="color:#aaa; font-size:12px;">등록된 매물이 없습니다.</p>';
+            return;
+        }
+        keys.forEach(k => {
+            const l = listings[k];
+            const row = document.createElement('div');
+            row.className = 'market-row';
+            let currencyLabel = l.currencyType || '골드(G)';
+            row.innerHTML = `
+                <div>
+                    <strong>${l.item.icon} ${l.item.name}</strong> (+${l.item.enhance||0})<br>
+                    <span style="font-size:10px; color:#aaa;">판매자: ${l.sellerName} | 요구: ${l.price} (${currencyLabel})</span>
+                </div>
+                <button class="btn" style="padding:4px 8px; font-size:11px; width:auto; background:#27ae60;" onclick="buyMarketItem('${l.id}')">구매</button>
+            `;
+            container.appendChild(row);
         });
+    });
 
-        function buyMarketItem(listingId) {
-            socket.emit('buyMarketItem', { listingId });
-        }
+    function buyMarketItem(listingId) { socket.emit('buyMarketItem', { listingId }); }
 
-        function openMarketRegisterTab() {
-            closeMarketModal();
-            document.getElementById('marketRegisterModal').style.display = 'flex';
-        }
+    function openMarketRegisterTab() {
+        closeMarketModal();
+        marketSelectedSlotIndex = null;
+        document.getElementById('marketSelectedSlotText').innerText = '선택된 물품 없음';
+        renderMarketMiniInventory();
+        document.getElementById('marketRegisterModal').style.display = 'flex';
+    }
 
-        function confirmListMarket() {
-            if (selectedIndices.length !== 1) { alert('등록할 무기를 무기고에서 정확히 1개 선택해주세요!'); return; }
-            const price = document.getElementById('marketPriceInput').value;
-            const currencyType = document.getElementById('marketCurrencyType').value;
-            if (!price) { alert('판매 가격 또는 가치 수치를 입력해주세요!'); return; }
-            socket.emit('listMarketItem', { inventoryIndex: selectedIndices[0], price: price, currencyType: currencyType });
-            selectedIndices = [];
-            closeSubModals();
-        }
-
-        socket.on('marketResult', (res) => { alert(res.message); });
-
-        // 1:1 유저 거래
-        function openTradeUserModal() {
-            closeMarketModal();
-            socket.emit('getOnlineUsers');
-            document.getElementById('tradeUserModal').style.display = 'flex';
-        }
-
-        socket.on('onlineUsersResult', (users) => {
-            const container = document.getElementById('onlineUsersContainer');
-            container.innerHTML = '';
-            if (users.length === 0) {
-                container.innerHTML = '<p style="color:#aaa; font-size:12px;">접속 중인 다른 유저가 없습니다.</p>';
-                return;
+    function renderMarketMiniInventory() {
+        const grid = document.getElementById('marketInvenMiniGrid');
+        grid.innerHTML = '';
+        for (let i = 0; i < 36; i++) {
+            const slot = document.createElement('div');
+            slot.className = 'slot';
+            const item = latestInventory[i];
+            if (item) {
+                slot.innerHTML = `<div>${item.icon || '⚔️'}</div><div>+${item.enhance||0}</div>`;
+                // 클릭 혹은 더블클릭 시 매물 등록 무기 선택
+                slot.onclick = () => selectMarketTargetSlot(i);
+                slot.ondblclick = () => {
+                    selectMarketTargetSlot(i);
+                    confirmListMarket();
+                };
+            } else {
+                slot.style.opacity = '0.3';
+                slot.innerText = '빈칸';
             }
-            users.forEach(u => {
-                const row = document.createElement('div');
-                row.className = 'user-row';
-                row.innerHTML = `<span>👤 ${u.name}</span><button class="btn" style="padding:4px 8px; font-size:11px; width:auto; background:#2980b9;" onclick="sendTradeRequest('${u.id}')">거래 신청</button>`;
-                container.appendChild(row);
-            });
-        });
+            grid.appendChild(slot);
+        }
+    }
 
-        function sendTradeRequest(targetId) {
-            socket.emit('requestTrade', targetId);
-            alert('거래 요청을 전송했습니다.');
-            closeSubModals();
+    function selectMarketTargetSlot(idx) {
+        if (!latestInventory[idx]) { alert('비어있는 슬롯입니다!'); return; }
+        marketSelectedSlotIndex = idx;
+        const item = latestInventory[idx];
+        document.getElementById('marketSelectedSlotText').innerText = `[슬롯 ${idx}] ${item.name} (+${item.enhance||0})`;
+    }
+
+    function onChangeMarketCurrencyType() {
+        const type = document.getElementById('marketCurrencyType').value;
+        if (type === 'itemValue') {
+            document.getElementById('marketItemValueBox').style.display = 'block';
+            document.getElementById('marketGoldInputBox').style.display = 'none';
+        } else {
+            document.getElementById('marketItemValueBox').style.display = 'none';
+            document.getElementById('marketGoldInputBox').style.display = 'block';
+        }
+    }
+
+    function selectExchangeItem(itemName) {
+        document.getElementById('selectedExchangeItemVal').value = itemName;
+        alert(`교환 가치 대상이 [${itemName}]으로 선택되었습니다.`);
+    }
+
+    function confirmListMarket() {
+        if (marketSelectedSlotIndex === null || !latestInventory[marketSelectedSlotIndex]) {
+            alert('무기고에서 판매할 무기를 먼저 선택해주세요!');
+            return;
+        }
+        const currencyType = document.getElementById('marketCurrencyType').value;
+        let priceValue = "";
+        let currencyLabel = "";
+
+        if (currencyType === 'itemValue') {
+            priceValue = document.getElementById('selectedExchangeItemVal').value;
+            currencyLabel = "무기/유물 가치";
+        } else {
+            const goldAmt = document.getElementById('marketGoldPriceInput').value;
+            if (!goldAmt) { alert('원하는 골드량을 입력해주세요!'); return; }
+            priceValue = parseInt(goldAmt).toLocaleString() + " G";
+            currencyLabel = "골드";
         }
 
-        let pendingTradeFromId = null;
-        socket.on('tradeRequested', (data) => {
-            pendingTradeFromId = data.fromId;
-            document.getElementById('tradeRequestText').innerText = `[${data.fromName}] 님이 1:1 거래를 요청했습니다!`;
-            document.getElementById('tradeRequestModal').style.display = 'flex';
-        });
+        socket.emit('listMarketItem', { inventoryIndex: marketSelectedSlotIndex, price: priceValue, currencyType: currencyLabel });
+        marketSelectedSlotIndex = null;
+        closeSubModals();
+    }
 
-        function acceptTradeRequest() {
-            if (pendingTradeFromId) {
-                socket.emit('acceptTrade', pendingTradeFromId);
-                document.getElementById('tradeRequestModal').style.display = 'none';
-            }
+    socket.on('marketResult', (res) => { alert(res.message); });
+
+    // 1:1 유저 거래
+    function openTradeUserModal() {
+        closeMarketModal();
+        socket.emit('getOnlineUsers');
+        document.getElementById('tradeUserModal').style.display = 'flex';
+    }
+
+    socket.on('onlineUsersResult', (users) => {
+        const container = document.getElementById('onlineUsersContainer');
+        container.innerHTML = '';
+        if (users.length === 0) {
+            container.innerHTML = '<p style="color:#aaa; font-size:12px;">접속 중인 다른 유저가 없습니다.</p>';
+            return;
         }
-        function closeTradeRequestModal() {
+        users.forEach(u => {
+            const row = document.createElement('div');
+            row.className = 'user-row';
+            row.innerHTML = `<span>👤 ${u.name}</span><button class="btn" style="padding:4px 8px; font-size:11px; width:auto; background:#2980b9;" onclick="sendTradeRequest('${u.id}')">거래 신청</button>`;
+            container.appendChild(row);
+        });
+    });
+
+    function sendTradeRequest(targetId) {
+        socket.emit('requestTrade', targetId);
+        alert('거래 요청을 전송했습니다.');
+        closeSubModals();
+    }
+
+    let pendingTradeFromId = null;
+    socket.on('tradeRequested', (data) => {
+        pendingTradeFromId = data.fromId;
+        document.getElementById('tradeRequestText').innerText = `[${data.fromName}] 님이 1:1 거래를 요청했습니다!`;
+        document.getElementById('tradeRequestModal').style.display = 'flex';
+    });
+
+    function acceptTradeRequest() {
+        if (pendingTradeFromId) {
+            socket.emit('acceptTrade', pendingTradeFromId);
             document.getElementById('tradeRequestModal').style.display = 'none';
-            pendingTradeFromId = null;
+        }
+    }
+    function closeTradeRequestModal() {
+        document.getElementById('tradeRequestModal').style.display = 'none';
+        pendingTradeFromId = null;
+    }
+
+    socket.on('tradeStart', (data) => {
+        activeTradeId = data.tradeId;
+        document.getElementById('tradePartnerName').innerText = data.partnerName;
+        myOfferedIndices = [];
+        tradeSelectedIndices = [];
+        switchTab('tradeScreen');
+        renderTradeInventory();
+    });
+
+    function renderTradeInventory() {
+        const grid = document.getElementById('tradeInventoryGrid');
+        grid.innerHTML = '';
+        for (let i = 0; i < 36; i++) {
+            const slot = document.createElement('div');
+            slot.className = 'slot';
+            const item = latestInventory[i];
+            if (item) {
+                if (myOfferedIndices.includes(i)) {
+                    slot.style.opacity = '0.3';
+                    slot.innerText = '올림';
+                } else {
+                    if (tradeSelectedIndices.includes(i)) slot.classList.add('selected');
+                    slot.innerHTML = '<div>' + item.icon + '</div><div>+' + (item.enhance||0) + '</div>';
+                    slot.onclick = () => {
+                        const pos = tradeSelectedIndices.indexOf(i);
+                        if (pos > -1) { tradeSelectedIndices.splice(pos, 1); slot.classList.remove('selected'); }
+                        else { tradeSelectedIndices.push(i); slot.classList.add('selected'); }
+                    };
+                }
+            } else { slot.innerText = '빈칸'; }
+            grid.appendChild(slot);
+        }
+    }
+
+    function addSelectedToTrade() {
+        if (tradeSelectedIndices.length === 0) { alert('올릴 무기를 선택하세요!'); return; }
+        myOfferedIndices = [...myOfferedIndices, ...tradeSelectedIndices];
+        tradeSelectedIndices = [];
+        socket.emit('updateTradeOffer', { tradeId: activeTradeId, offeredIndices: myOfferedIndices });
+        renderTradeInventory();
+    }
+
+    socket.on('tradeStateUpdate', (data) => {
+        const mySlots = document.getElementById('myTradeSlots');
+        mySlots.innerHTML = '';
+        data.items1.forEach(item => {
+            const chip = document.createElement('div');
+            chip.className = 'trade-item-chip';
+            chip.innerHTML = `<span>${item.icon}</span><span>+${item.enhance||0}</span>`;
+            mySlots.appendChild(chip);
+        });
+        document.getElementById('myTradeStatusText').innerText = data.ready1 ? '수락 완료 ✅' : '대기 중...';
+
+        const partnerSlots = document.getElementById('partnerTradeSlots');
+        partnerSlots.innerHTML = '';
+        data.items2.forEach(item => {
+            const chip = document.createElement('div');
+            chip.className = 'trade-item-chip';
+            chip.innerHTML = `<span>${item.icon}</span><span>+${item.enhance||0}</span>`;
+            partnerSlots.appendChild(chip);
+        });
+        document.getElementById('partnerTradeStatusText').innerText = data.ready2 ? '수락 완료 ✅' : '대기 중...';
+    });
+
+    let isTradeReady = false;
+    function toggleTradeReady() {
+        isTradeReady = !isTradeReady;
+        socket.emit('setTradeReady', { tradeId: activeTradeId, ready: isTradeReady });
+    }
+
+    function cancelTradeSession() { if (activeTradeId) socket.emit('cancelTrade', activeTradeId); }
+    socket.on('tradeCancelled', (res) => { alert(res.message); activeTradeId = null; switchTab('lobbyScreen'); });
+    socket.on('tradeComplete', (res) => { alert(res.message); activeTradeId = null; isTradeReady = false; switchTab('lobbyScreen'); });
+
+    // 길드 시스템
+    function openGuildModal() {
+        socket.emit('getGuildList');
+        document.getElementById('guildListModal').style.display = 'flex';
+    }
+    function closeGuildModal() { document.getElementById('guildListModal').style.display = 'none'; }
+    
+    function confirmCreateGuild() {
+        const name = document.getElementById('guildNameInput').value.trim();
+        const maxMembers = parseInt(document.getElementById('guildMaxMemberInput').value) || 30;
+        if (!name) { alert('길드 이름을 입력해주세요!'); return; }
+        socket.emit('createGuild', { guildName: name, maxMembers: maxMembers });
+    }
+
+    function leaveGuild() { if (confirm('탈퇴하시겠습니까?')) socket.emit('leaveGuild'); }
+
+    socket.on('guildResult', (res) => { alert(res.message); socket.emit('getGuildList'); });
+    socket.on('guildListResult', (list) => {
+        const container = document.getElementById('guildListContainer');
+        container.innerHTML = '';
+        if (list.length === 0) { container.innerHTML = '<p style="color:#aaa; font-size:12px;">생성된 길드가 없습니다.</p>'; return; }
+        list.forEach(g => {
+            const row = document.createElement('div');
+            row.className = 'guild-item-row';
+            row.innerHTML = `<span>${g.name} (${g.currentCount}/${g.maxMembers})</span><button class="btn" style="padding:3px 8px; font-size:11px; width:auto;" onclick="socket.emit('joinGuild', '${g.id}'); closeGuildModal();">가입</button>`;
+            container.appendChild(row);
+        });
+    });
+
+    socket.on('skillResult', (res) => { if (res.success) { triggerHitEffect(); alert(res.message); } else alert(res.message); });
+
+    // 무기 관리 팝업 및 인벤토리 렌더링
+    function openActionModal() {
+        if (selectedIndices.length === 0) { alert("무기를 선택해주세요!"); return; }
+        const modal = document.getElementById('itemActionModal');
+        const title = document.getElementById('popupTitle');
+        const contentArea = document.getElementById('popupContentArea');
+        contentArea.innerHTML = '';
+        selectedIndices = [...new Set(selectedIndices)];
+
+        if (selectedIndices.length === 1) {
+            const idx = selectedIndices[0];
+            const item = latestInventory[idx];
+            if (!item) { selectedIndices = []; modal.style.display = 'none'; return; }
+
+            title.innerText = `🔍 ${item.name} (+${item.enhance || 0})`;
+            const isEquipped = (equippedIndex === idx);
+            const isArtifact = (item.type === 'artifact');
+            const isLocked = item.isLocked;
+            const enhanceCost = ((item.enhance || 0) + 1) * 400;
+
+            contentArea.innerHTML = `
+                <button class="popup-btn" style="background:${isLocked ? '#c0392b' : '#27ae60'};" onclick="toggleLock(${idx})">${isLocked ? '🔓 중요 무기 해제 (LOCK)' : '🔒 중요 무기 설정 (LOCK)'}</button>
+                <button class="popup-btn" style="background:#2980b9;" onclick="doSingleAction('equip', ${idx})">${isEquipped ? '장착 해제' : '무기 장착'}</button>
+                ${isArtifact ? '' : `<button class="popup-btn" style="background:#f39c12;" onclick="doSingleAction('enhance', ${idx})">✨ 강화 (${enhanceCost}G)</button>`}
+                <button class="popup-btn" style="background:#e67e22;" onclick="doSingleAction('sell', ${idx})">💰 판매 (${item.sellPrice}G)</button>
+                <button class="popup-btn" style="background:#c0392b;" onclick="doSingleAction('delete', ${idx})">🗑️ 삭제</button>
+            `;
+        } else {
+            title.innerText = `📦 다중 선택 관리 (${selectedIndices.length}개)`;
+            contentArea.innerHTML = `
+                <button class="popup-btn" style="background:#e67e22;" onclick="doBatchAction('sell')">💰 선택 일괄 판매</button>
+                <button class="popup-btn" style="background:#c0392b;" onclick="doBatchAction('delete')">🗑️ 선택 일괄 삭제</button>
+            `;
+        }
+        modal.style.display = 'flex';
+    }
+
+    function closeItemModal() { document.getElementById('itemActionModal').style.display = 'none'; }
+    function toggleLock(idx) { closeItemModal(); socket.emit('toggleLockItem', idx); selectedIndices = []; }
+    function doSingleAction(actionType, idx) {
+        closeItemModal();
+        if (actionType === 'equip') socket.emit('equipItem', idx);
+        if (actionType === 'enhance') socket.emit('enhanceItem', idx);
+        if (actionType === 'sell') socket.emit('sellItems', [idx]);
+        if (actionType === 'delete') socket.emit('deleteItems', [idx]);
+        selectedIndices = [];
+    }
+    function doBatchAction(actionType) {
+        closeItemModal();
+        if (actionType === 'sell') socket.emit('sellItems', selectedIndices);
+        if (actionType === 'delete') socket.emit('deleteItems', selectedIndices);
+        selectedIndices = [];
+    }
+
+    socket.on('sellResult', (res) => { alert(res.message); selectedIndices = []; });
+    socket.on('deleteResult', (res) => { alert(res.message); selectedIndices = []; });
+    socket.on('enhanceResult', (res) => { alert(res.message); });
+    socket.on('lockResult', (res) => { alert(res.message); });
+
+    // 서버 상태 수신 및 렌더링
+    socket.on('updateState', (state) => {
+        if (!state || !state.boss) return;
+
+        const bossParts = state.boss.name.split(' ');
+        if (bossParts.length >= 2) {
+            document.getElementById('bossIcon').innerText = bossParts[0];
+            document.getElementById('bossName').innerText = bossParts.slice(1).join(' ');
+        } else {
+            document.getElementById('bossName').innerText = state.boss.name;
         }
 
-        socket.on('tradeStart', (data) => {
-            activeTradeId = data.tradeId;
-            document.getElementById('tradePartnerName').innerText = data.partnerName;
-            myOfferedIndices = [];
-            tradeSelectedIndices = [];
-            showScreen('tradeScreen');
-            renderTradeInventory();
-        });
+        const bossCardArea = document.getElementById('bossCardArea');
+        if (state.boss.isUpper) bossCardArea.className = 'card boss-card upper-boss-card';
+        else bossCardArea.className = 'card boss-card';
 
-        function renderTradeInventory() {
-            const grid = document.getElementById('tradeInventoryGrid');
+        const bossHpPct = (state.boss.currentHp / state.boss.maxHp) * 100;
+        document.getElementById('bossHpFill').style.width = Math.max(0, bossHpPct) + '%';
+        document.getElementById('bossHpText').innerText = Math.max(0, state.boss.currentHp).toLocaleString() + ' / ' + state.boss.maxHp.toLocaleString();
+        
+        if (state.rankings) {
+            const pRankList = document.getElementById('playerRankingList');
+            pRankList.innerHTML = '';
+            (state.rankings.players || []).slice(0, 5).forEach((p) => {
+                const li = document.createElement('li');
+                const isMe = p.name === state.players[myId]?.name ? ' (나)' : '';
+                li.innerText = `${p.name}${isMe} - ${p.totalDamage.toLocaleString()}`;
+                pRankList.appendChild(li);
+            });
+
+            const gRankList = document.getElementById('guildRankingList');
+            gRankList.innerHTML = '';
+            (state.rankings.guilds || []).slice(0, 5).forEach((g) => {
+                const li = document.createElement('li');
+                li.innerText = `${g.name} - ${g.totalDamage.toLocaleString()}`;
+                gRankList.appendChild(li);
+            });
+        }
+
+        const me = state.players[myId];
+        if (me) {
+            document.getElementById('lobbyName').innerText = me.name;
+            document.getElementById('lobbyLevel').innerText = me.level;
+            document.getElementById('lobbyGold').innerText = me.gold.toLocaleString();
+            document.getElementById('lobbyInvenCount').innerText = me.inventory.length;
+            
+            document.getElementById('myLevel').innerText = me.level;
+            document.getElementById('myHp').innerText = me.hp;
+            document.getElementById('myMaxHp').innerText = me.maxHp;
+            document.getElementById('myGold').innerText = me.gold.toLocaleString();
+
+            let reqExp = me.level >= 100 ? me.exp : Math.round(360 * Math.pow(1.5, me.level - 1));
+            let expPct = reqExp > 0 ? Math.min(100, (me.exp / reqExp) * 100) : 100;
+            document.getElementById('myExpFill').style.width = expPct + '%';
+            document.getElementById('myExpText').innerText = `EXP: ${me.exp.toLocaleString()} / ${reqExp.toLocaleString()} (${Math.floor(expPct)}%)`;
+            
+            latestInventory = me.inventory || [];
+            equippedIndex = me.equippedIndex;
+            currentGuildId = me.guildId;
+
+            const lobbyGuildStatus = document.getElementById('lobbyGuildStatus');
+            const lobbyGuildControl = document.getElementById('lobbyGuildControl');
+
+            if (currentGuildId && state.guilds[currentGuildId]) {
+                const gInfo = state.guilds[currentGuildId];
+                lobbyGuildStatus.innerText = `[${gInfo.name}] (${gInfo.members.length}/${gInfo.maxMembers})`;
+                lobbyGuildStatus.style.color = '#2ecc71';
+                lobbyGuildControl.innerHTML = `<button class="btn btn-sub" style="background:#e74c3c;" onclick="leaveGuild()">길드 탈퇴</button>`;
+            } else {
+                lobbyGuildStatus.innerText = '미소속';
+                lobbyGuildStatus.style.color = '#e74c3c';
+                lobbyGuildControl.innerHTML = `<button class="btn btn-sub" style="background:#27ae60;" onclick="openGuildModal()">길드 만들기 / 가입</button>`;
+            }
+
+            if (activeTradeId) renderTradeInventory();
+
+            const grid = document.getElementById('inventoryGrid');
             grid.innerHTML = '';
             for (let i = 0; i < 36; i++) {
                 const slot = document.createElement('div');
                 slot.className = 'slot';
-                const item = latestInventory[i];
+                const item = me.inventory[i];
                 if (item) {
-                    if (myOfferedIndices.includes(i)) {
-                        slot.style.opacity = '0.3';
-                        slot.innerText = '올림';
-                    } else {
-                        if (tradeSelectedIndices.includes(i)) slot.classList.add('selected');
-                        slot.innerHTML = '<div>' + item.icon + '</div><div>+' + (item.enhance||0) + '</div>';
-                        slot.onclick = () => {
-                            const pos = tradeSelectedIndices.indexOf(i);
-                            if (pos > -1) { tradeSelectedIndices.splice(pos, 1); slot.classList.remove('selected'); }
-                            else { tradeSelectedIndices.push(i); slot.classList.add('selected'); }
-                        };
-                    }
+                    let rarityClass = 'common';
+                    if (item.rarity === 'Rare') rarityClass = 'rare';
+                    else if (item.rarity === 'Epic') rarityClass = 'epic';
+                    else if (item.rarity === 'Legendary') rarityClass = 'legendary';
+                    else if (item.rarity === 'Mythic') rarityClass = 'mythic';
+                    else if (item.rarity === 'Secret') rarityClass = 'secret';
+
+                    slot.classList.add(rarityClass);
+                    if (me.equippedIndex === i) slot.classList.add('equipped');
+                    if (selectedIndices.includes(i)) slot.classList.add('selected');
+
+                    let lockMark = item.isLocked ? '🔒' : '';
+                    slot.innerHTML = `<div>${lockMark}${item.icon || '⚔️'}</div><div>+${item.enhance||0}</div>`;
+                    slot.onclick = () => {
+                        const idxPos = selectedIndices.indexOf(i);
+                        if (idxPos > -1) { selectedIndices.splice(idxPos, 1); slot.classList.remove('selected'); }
+                        else { selectedIndices.push(i); slot.classList.add('selected'); }
+                    };
+                    // 더블클릭 시 거래소 등록 팝업 및 해당 무기 자동 선택
+                    slot.ondblclick = () => {
+                        openMarketModal();
+                        openMarketRegisterTab();
+                        selectMarketTargetSlot(i);
+                    };
                 } else { slot.innerText = '빈칸'; }
                 grid.appendChild(slot);
             }
         }
+    });
 
-        function addSelectedToTrade() {
-            if (tradeSelectedIndices.length === 0) { alert('올릴 무기를 선택하세요!'); return; }
-            myOfferedIndices = [...myOfferedIndices, ...tradeSelectedIndices];
-            tradeSelectedIndices = [];
-            socket.emit('updateTradeOffer', { tradeId: activeTradeId, offeredIndices: myOfferedIndices });
-            renderTradeInventory();
-        }
-
-        socket.on('tradeStateUpdate', (data) => {
-            const mySlots = document.getElementById('myTradeSlots');
-            mySlots.innerHTML = '';
-            data.items1.forEach(item => {
-                const chip = document.createElement('div');
-                chip.className = 'trade-item-chip';
-                chip.innerHTML = `<span>${item.icon}</span><span>+${item.enhance||0}</span>`;
-                mySlots.appendChild(chip);
-            });
-            document.getElementById('myTradeStatusText').innerText = data.ready1 ? '수락 완료 ✅' : '대기 중...';
-
-            const partnerSlots = document.getElementById('partnerTradeSlots');
-            partnerSlots.innerHTML = '';
-            data.items2.forEach(item => {
-                const chip = document.createElement('div');
-                chip.className = 'trade-item-chip';
-                chip.innerHTML = `<span>${item.icon}</span><span>+${item.enhance||0}</span>`;
-                partnerSlots.appendChild(chip);
-            });
-            document.getElementById('partnerTradeStatusText').innerText = data.ready2 ? '수락 완료 ✅' : '대기 중...';
-        });
-
-        let isTradeReady = false;
-        function toggleTradeReady() {
-            isTradeReady = !isTradeReady;
-            socket.emit('setTradeReady', { tradeId: activeTradeId, ready: isTradeReady });
-        }
-
-        function cancelTradeSession() { if (activeTradeId) socket.emit('cancelTrade', activeTradeId); }
-        socket.on('tradeCancelled', (res) => { alert(res.message); activeTradeId = null; goToLobby(); });
-        socket.on('tradeComplete', (res) => { alert(res.message); activeTradeId = null; isTradeReady = false; goToLobby(); });
-
-        // 길드 시스템 (인원 설정 포함)
-        function openGuildModal() {
-            socket.emit('getGuildList');
-            document.getElementById('guildListModal').style.display = 'flex';
-        }
-        function closeGuildModal() { document.getElementById('guildListModal').style.display = 'none'; }
-        
-        function confirmCreateGuild() {
-            const name = document.getElementById('guildNameInput').value.trim();
-            const maxMembers = parseInt(document.getElementById('guildMaxMemberInput').value) || 30;
-            if (!name) { alert('길드 이름을 입력해주세요!'); return; }
-            socket.emit('createGuild', { guildName: name, maxMembers: maxMembers });
-        }
-
-        function leaveGuild() { if (confirm('탈퇴하시겠습니까?')) socket.emit('leaveGuild'); }
-
-        socket.on('guildResult', (res) => { alert(res.message); socket.emit('getGuildList'); });
-        socket.on('guildListResult', (list) => {
-            const container = document.getElementById('guildListContainer');
-            container.innerHTML = '';
-            if (list.length === 0) { container.innerHTML = '<p style="color:#aaa; font-size:12px;">생성된 길드가 없습니다.</p>'; return; }
-            list.forEach(g => {
-                const row = document.createElement('div');
-                row.className = 'guild-item-row';
-                row.innerHTML = `<span>${g.name} (${g.currentCount}/${g.maxMembers})</span><button class="btn" style="padding:3px 8px; font-size:11px; width:auto;" onclick="socket.emit('joinGuild', '${g.id}'); closeGuildModal();">가입</button>`;
-                container.appendChild(row);
-            });
-        });
-
-        socket.on('skillResult', (res) => { if (res.success) { triggerHitEffect(); alert(res.message); } else alert(res.message); });
-
-        // 무기 관리 팝업 및 중요 무기(LOCK)
-        function openActionModal() {
-            if (selectedIndices.length === 0) { alert("무기를 선택해주세요!"); return; }
-            const modal = document.getElementById('itemActionModal');
-            const title = document.getElementById('popupTitle');
-            const contentArea = document.getElementById('popupContentArea');
-            contentArea.innerHTML = '';
-            selectedIndices = [...new Set(selectedIndices)];
-
-            if (selectedIndices.length === 1) {
-                const idx = selectedIndices[0];
-                const item = latestInventory[idx];
-                if (!item) { selectedIndices = []; modal.style.display = 'none'; return; }
-
-                title.innerText = `🔍 ${item.name} (+${item.enhance || 0})`;
-                const isEquipped = (equippedIndex === idx);
-                const isArtifact = (item.type === 'artifact');
-                const isLocked = item.isLocked;
-                const enhanceCost = ((item.enhance || 0) + 1) * 400;
-
-                contentArea.innerHTML = `
-                    <button class="popup-btn" style="background:${isLocked ? '#c0392b' : '#27ae60'};" onclick="toggleLock(${idx})">${isLocked ? '🔓 중요 무기 해제 (LOCK)' : '🔒 중요 무기 설정 (LOCK)'}</button>
-                    <button class="popup-btn" style="background:#2980b9;" onclick="doSingleAction('equip', ${idx})">${isEquipped ? '장착 해제' : '무기 장착'}</button>
-                    ${isArtifact ? '' : `<button class="popup-btn" style="background:#f39c12;" onclick="doSingleAction('enhance', ${idx})">✨ 강화 (${enhanceCost}G)</button>`}
-                    <button class="popup-btn" style="background:#e67e22;" onclick="doSingleAction('sell', ${idx})">💰 판매 (${item.sellPrice}G)</button>
-                    <button class="popup-btn" style="background:#c0392b;" onclick="doSingleAction('delete', ${idx})">🗑️ 삭제</button>
-                `;
-            } else {
-                title.innerText = `📦 다중 선택 관리 (${selectedIndices.length}개)`;
-                contentArea.innerHTML = `
-                    <button class="popup-btn" style="background:#e67e22;" onclick="doBatchAction('sell')">💰 선택 일괄 판매</button>
-                    <button class="popup-btn" style="background:#c0392b;" onclick="doBatchAction('delete')">🗑️ 선택 일괄 삭제</button>
-                `;
-            }
-            modal.style.display = 'flex';
-        }
-
-        function closeItemModal() { document.getElementById('itemActionModal').style.display = 'none'; }
-        function toggleLock(idx) { closeItemModal(); socket.emit('toggleLockItem', idx); selectedIndices = []; }
-        function doSingleAction(actionType, idx) {
-            closeItemModal();
-            if (actionType === 'equip') socket.emit('equipItem', idx);
-            if (actionType === 'enhance') socket.emit('enhanceItem', idx);
-            if (actionType === 'sell') socket.emit('sellItems', [idx]);
-            if (actionType === 'delete') socket.emit('deleteItems', [idx]);
-            selectedIndices = [];
-        }
-        function doBatchAction(actionType) {
-            closeItemModal();
-            if (actionType === 'sell') socket.emit('sellItems', selectedIndices);
-            if (actionType === 'delete') socket.emit('deleteItems', selectedIndices);
-            selectedIndices = [];
-        }
-
-        socket.on('sellResult', (res) => { alert(res.message); selectedIndices = []; });
-        socket.on('deleteResult', (res) => { alert(res.message); selectedIndices = []; });
-        socket.on('enhanceResult', (res) => { alert(res.message); });
-        socket.on('lockResult', (res) => { alert(res.message); });
-
-        // 서버 상태 수신 및 렌더링
-        socket.on('updateState', (state) => {
-            if (!state || !state.boss) return;
-
-            const bossParts = state.boss.name.split(' ');
-            if (bossParts.length >= 2) {
-                document.getElementById('bossIcon').innerText = bossParts[0];
-                document.getElementById('bossName').innerText = bossParts.slice(1).join(' ');
-            } else {
-                document.getElementById('bossName').innerText = state.boss.name;
-            }
-
-            const bossCardArea = document.getElementById('bossCardArea');
-            if (state.boss.isUpper) bossCardArea.className = 'card boss-card upper-boss-card';
-            else bossCardArea.className = 'card boss-card';
-
-            const bossHpPct = (state.boss.currentHp / state.boss.maxHp) * 100;
-            document.getElementById('bossHpFill').style.width = Math.max(0, bossHpPct) + '%';
-            document.getElementById('bossHpText').innerText = Math.max(0, state.boss.currentHp).toLocaleString() + ' / ' + state.boss.maxHp.toLocaleString();
-            
-            if (state.rankings) {
-                const pRankList = document.getElementById('playerRankingList');
-                pRankList.innerHTML = '';
-                (state.rankings.players || []).slice(0, 5).forEach((p) => {
-                    const li = document.createElement('li');
-                    const isMe = p.name === state.players[myId]?.name ? ' (나)' : '';
-                    li.innerText = `${p.name}${isMe} - ${p.totalDamage.toLocaleString()}`;
-                    pRankList.appendChild(li);
-                });
-
-                const gRankList = document.getElementById('guildRankingList');
-                gRankList.innerHTML = '';
-                (state.rankings.guilds || []).slice(0, 5).forEach((g) => {
-                    const li = document.createElement('li');
-                    li.innerText = `${g.name} - ${g.totalDamage.toLocaleString()}`;
-                    gRankList.appendChild(li);
-                });
-            }
-
-            const me = state.players[myId];
-            if (me) {
-                document.getElementById('lobbyName').innerText = me.name;
-                document.getElementById('lobbyLevel').innerText = me.level;
-                document.getElementById('lobbyGold').innerText = me.gold.toLocaleString();
-                document.getElementById('lobbyInvenCount').innerText = me.inventory.length;
-                
-                document.getElementById('myLevel').innerText = me.level;
-                document.getElementById('myHp').innerText = me.hp;
-                document.getElementById('myMaxHp').innerText = me.maxHp;
-                document.getElementById('myGold').innerText = me.gold.toLocaleString();
-
-                let reqExp = me.level >= 100 ? me.exp : Math.round(360 * Math.pow(1.5, me.level - 1));
-                let expPct = reqExp > 0 ? Math.min(100, (me.exp / reqExp) * 100) : 100;
-                document.getElementById('myExpFill').style.width = expPct + '%';
-                document.getElementById('myExpText').innerText = `EXP: ${me.exp.toLocaleString()} / ${reqExp.toLocaleString()} (${Math.floor(expPct)}%)`;
-                
-                latestInventory = me.inventory || [];
-                equippedIndex = me.equippedIndex;
-                currentGuildId = me.guildId;
-
-                const lobbyGuildStatus = document.getElementById('lobbyGuildStatus');
-                const lobbyGuildControl = document.getElementById('lobbyGuildControl');
-
-                if (currentGuildId && state.guilds[currentGuildId]) {
-                    const gInfo = state.guilds[currentGuildId];
-                    lobbyGuildStatus.innerText = `[${gInfo.name}] (${gInfo.members.length}/${gInfo.maxMembers})`;
-                    lobbyGuildStatus.style.color = '#2ecc71';
-                    lobbyGuildControl.innerHTML = `<button class="btn btn-sub" style="background:#e74c3c;" onclick="leaveGuild()">길드 탈퇴</button>`;
-                } else {
-                    lobbyGuildStatus.innerText = '미소속';
-                    lobbyGuildStatus.style.color = '#e74c3c';
-                    lobbyGuildControl.innerHTML = `<button class="btn btn-sub" style="background:#27ae60;" onclick="openGuildModal()">길드 만들기 / 가입</button>`;
-                }
-
-                if (activeTradeId) renderTradeInventory();
-
-                const grid = document.getElementById('inventoryGrid');
-                grid.innerHTML = '';
-                for (let i = 0; i < 36; i++) {
-                    const slot = document.createElement('div');
-                    slot.className = 'slot';
-                    const item = me.inventory[i];
-                    if (item) {
-                        let rarityClass = 'common';
-                        if (item.rarity === 'Rare') rarityClass = 'rare';
-                        else if (item.rarity === 'Epic') rarityClass = 'epic';
-                        else if (item.rarity === 'Legendary') rarityClass = 'legendary';
-                        else if (item.rarity === 'Mythic') rarityClass = 'mythic';
-                        else if (item.rarity === 'Secret') rarityClass = 'secret';
-
-                        slot.classList.add(rarityClass);
-                        if (me.equippedIndex === i) slot.classList.add('equipped');
-                        if (selectedIndices.includes(i)) slot.classList.add('selected');
-
-                        let lockMark = item.isLocked ? '🔒' : '';
-                        slot.innerHTML = `<div>${lockMark}${item.icon || '⚔️'}</div><div>+${item.enhance||0}</div>`;
-                        slot.onclick = () => {
-                            const idxPos = selectedIndices.indexOf(i);
-                            if (idxPos > -1) { selectedIndices.splice(idxPos, 1); slot.classList.remove('selected'); }
-                            else { selectedIndices.push(i); slot.classList.add('selected'); }
-                        };
-                    } else { slot.innerText = '빈칸'; }
-                    grid.appendChild(slot);
-                }
-            }
-        });
-
-        socket.on('couponResult', (res) => alert(res.message));
-        socket.on('gachaResult', (res) => {
-            if (!res.success) alert(res.message);
-            else alert('🎉 획득: ' + res.weapon.icon + ' [' + res.weapon.rarity + '] ' + res.weapon.name);
-        });
-    </script>
+    socket.on('couponResult', (res) => alert(res.message));
+    socket.on('gachaResult', (res) => {
+        if (!res.success) alert(res.message);
+        else alert('🎉 획득: ' + res.weapon.icon + ' [' + res.weapon.rarity + '] ' + res.weapon.name);
+    });
+</script>
 </body>
 </html>
