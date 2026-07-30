@@ -63,7 +63,7 @@
 
         .inventory-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-top: 8px; }
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 100; box-sizing: border-box; }
-        .modal-content { background: #1e222d; padding: 15px; border-radius: 10px; width: 330px; border: 1px solid #555; text-align: center; box-sizing: border-box; max-height: 90vh; overflow-y: auto; }
+        .modal-content { background: #1e222d; padding: 15px; border-radius: 10px; width: 340px; border: 1px solid #555; text-align: center; box-sizing: border-box; max-height: 90vh; overflow-y: auto; }
         input, select { padding: 8px; border-radius: 4px; border: 1px solid #444; background: #111; color: #fff; width: 90%; margin-bottom: 8px; box-sizing: border-box; }
         .popup-btn { background: #34495e; color: white; border: none; padding: 10px; margin: 3px 0; width: 100%; border-radius: 5px; cursor: pointer; font-weight: bold; box-sizing: border-box; }
         .screen { display: none; }
@@ -83,7 +83,7 @@
         </div>
     </div>
 
-    <!-- 1대1 거래 요청 수락 모달 -->
+    <!-- 1대1 거래 요청 모달 -->
     <div id="tradeRequestModal" class="modal">
         <div class="modal-content">
             <h3 style="color:#3498db; margin-top:0;">🤝 1:1 거래 요청</h3>
@@ -95,7 +95,7 @@
         </div>
     </div>
 
-    <!-- 거래소 및 상세 매물 등록 모달 -->
+    <!-- 거래소 및 상세 매물 등록 모달 (골드 or 무기/유물 선택 가능) -->
     <div id="marketModal" class="modal">
         <div class="modal-content" style="width: 360px;">
             <h3 style="color:#e67e22; margin-top:0;">🛒 실시간 거래소</h3>
@@ -105,17 +105,32 @@
             </div>
             <div id="marketListTab" style="max-height: 180px; overflow-y: auto; text-align: left;"></div>
             <div id="marketRegisterTab" style="display: none; text-align: left; font-size: 12px;">
-                <p>거래소에 올릴 무기/유물 선택 (인벤토리 슬롯 번호 0~35):</p>
-                <input type="number" id="marketRegInvenIdx" min="0" max="35" placeholder="슬롯 번호">
-                <p>설정할 가격 (골드):</p>
-                <input type="number" id="marketRegGold" placeholder="판매 금액 입력">
-                <button class="btn" style="background:#e67e22; padding: 10px;" onclick="submitMarketListing()">거래소에 상세 매물 등록</button>
+                <p>1. 판매할 무기/유물 슬롯 번호 (0~35):</p>
+                <input type="number" id="marketRegInvenIdx" min="0" max="35" placeholder="판매할 슬롯 번호">
+                
+                <p>2. 원하는 가격 유형 선택:</p>
+                <select id="marketPriceType" onchange="toggleMarketPriceInput()">
+                    <option value="gold">골드(Gold)로 받기</option>
+                    <option value="item">무기/유물(Item)로 교환하기</option>
+                </select>
+
+                <div id="marketGoldInputArea">
+                    <p>요청할 골드량:</p>
+                    <input type="number" id="marketRegGold" placeholder="골드 입력">
+                </div>
+                
+                <div id="marketItemInputArea" style="display: none;">
+                    <p>교환으로 받을 무기/유물 슬롯 번호 (0~35):</p>
+                    <input type="number" id="marketRegPriceItemIdx" min="0" max="35" placeholder="교환받을 인벤토리 슬롯 번호">
+                </div>
+
+                <button class="btn" style="background:#e67e22; padding: 10px; margin-top:6px;" onclick="submitMarketListing()">거래소에 매물 등록</button>
             </div>
             <button class="btn" style="background:#555; padding: 8px; margin-top: 8px;" onclick="closeMarketModal()">닫기</button>
         </div>
     </div>
 
-    <!-- 1대1 실시간 거래 페이지 모달 (하단 무기고 + 거래창에 올리기 버튼 포함) -->
+    <!-- 1대1 실시간 거래 페이지 모달 -->
     <div id="p2pTradeModal" class="modal">
         <div class="modal-content" style="width: 380px;">
             <h3 style="color:#3498db; margin-top:0;">🤝 1:1 실시간 거래소</h3>
@@ -135,7 +150,7 @@
         </div>
     </div>
 
-    <!-- 무기 관리 및 중요 설정 모달 -->
+    <!-- 무기 관리 모달 -->
     <div id="itemActionModal" class="modal">
         <div class="modal-content">
             <h3 id="popupTitle" style="color:#f1c40f; margin-top:0;">무기 관리</h3>
@@ -144,13 +159,16 @@
         </div>
     </div>
 
-    <!-- 길드 관리 모달 -->
+    <!-- 길드 관리 및 개설/가입 모달 -->
     <div id="guildModal" class="modal">
         <div class="modal-content">
             <h3 style="color:#f39c12; margin-top:0;">🛡️ 길드 시스템</h3>
-            <div id="guildContentArea" style="text-align: left; font-size: 12px; max-height: 200px; overflow-y: auto; margin-bottom: 8px;"></div>
-            <input type="text" id="guildNameInput" placeholder="생성할 길드 이름">
-            <button class="btn" style="background:#27ae60; padding: 8px; margin-bottom: 5px;" onclick="createGuild()">길드 창설 (신청)</button>
+            <div id="guildContentArea" style="text-align: left; font-size: 12px; max-height: 150px; overflow-y: auto; margin-bottom: 8px;"></div>
+            <hr style="border-color:#444;">
+            <p style="font-size:12px; margin:4px 0;">새 길드 창설하기:</p>
+            <input type="text" id="guildNameInput" placeholder="길드 이름 입력">
+            <button class="btn" style="background:#27ae60; padding: 8px; margin-bottom: 5px;" onclick="createGuild()">길드 개설</button>
+            <button class="btn btn-sub" style="background:#c0392b; padding: 6px; width:100%; margin-bottom:5px;" onclick="socket.emit('leaveGuild')">길드 탈퇴하기</button>
             <button class="popup-btn" style="background:#555;" onclick="closeGuildModal()">닫기</button>
         </div>
     </div>
@@ -208,7 +226,7 @@
                 </div>
             </div>
 
-            <!-- 전투 화면 내 정보 카드 (닉네임 옆 레벨, 골드량, 경험치바 포함) -->
+            <!-- 전투 화면 내 정보 카드 -->
             <div class="card">
                 <h3 style="margin-top:0; color:#3498db; font-size: 14px;">🛡️ 내 전투 정보</h3>
                 <p style="margin: 4px 0; font-size: 12px;">👤 <strong id="battleName">-</strong> <span id="battleLevel" style="color:#f1c40f; font-weight:bold;">(Lv.1)</span> | 💰 <span id="battleGold" style="color:#f1c40f;">0</span>G</p>
@@ -278,40 +296,56 @@
         function enterUpperDungeon() { socket.emit('enterUpperDungeon'); isUpperDungeonActive = true; }
         socket.on('alertMessage', msg => alert(msg));
 
-        // 스킬 및 뽑기 팝업 안내 반영
         socket.on('skillResult', res => alert(res.message));
         socket.on('gachaResult', res => alert(`[${res.name}]가 뽑혔습니다! ${res.icon}`));
 
         function openMarketModal() { document.getElementById('marketModal').style.display = 'flex'; switchMarketTab('list'); }
         function closeMarketModal() { document.getElementById('marketModal').style.display = 'none'; }
+        
         function switchMarketTab(tab) {
             document.getElementById('marketListTab').style.display = (tab === 'list') ? 'block' : 'none';
             document.getElementById('marketRegisterTab').style.display = (tab === 'register') ? 'block' : 'none';
             if (tab === 'list') socket.emit('getMarketList');
         }
+
+        function toggleMarketPriceInput() {
+            let pType = document.getElementById('marketPriceType').value;
+            document.getElementById('marketGoldInputArea').style.display = (pType === 'gold') ? 'block' : 'none';
+            document.getElementById('marketItemInputArea').style.display = (pType === 'item') ? 'block' : 'none';
+        }
+
         function submitMarketListing() {
-            socket.emit('listMarketItem', { inventoryIndex: parseInt(document.getElementById('marketRegInvenIdx').value), priceGold: parseInt(document.getElementById('marketRegGold').value) });
+            let invIdx = parseInt(document.getElementById('marketRegInvenIdx').value);
+            let pType = document.getElementById('marketPriceType').value;
+            let pGold = parseInt(document.getElementById('marketRegGold').value) || 0;
+            let pItemIdx = parseInt(document.getElementById('marketRegPriceItemIdx').value) || 0;
+
+            socket.emit('listMarketItem', { inventoryIndex: invIdx, priceType: pType, priceGold: pGold, priceItemIndex: pItemIdx });
             closeMarketModal();
         }
+
         socket.on('marketListResult', listings => {
             const container = document.getElementById('marketListTab');
             container.innerHTML = '';
-            Object.keys(listings).forEach(k => {
+            const keys = Object.keys(listings);
+            if (keys.length === 0) {
+                container.innerHTML = '<p style="font-size:12px; color:#888; text-align:center;">등록된 매물이 없습니다.</p>';
+                return;
+            }
+            keys.forEach(k => {
                 let l = listings[k];
-                container.innerHTML += `<div style="background:#2a2e3d; padding:6px; margin-bottom:4px; font-size:11px; display:flex; justify-content:space-between;">
-                    <span>${l.item.icon} ${l.item.name} (+${l.item.enhance||0}) - ${l.priceGold}G (${l.sellerName})</span>
-                    <button class="btn btn-sub" style="padding:2px 6px;" onclick="socket.emit('buyMarketItem', {listingId: '${l.id}'})">구매</button>
+                let priceDesc = (l.priceType === 'gold') ? `${l.priceGold.toLocaleString()} G` : `${l.priceItem.icon} ${l.priceItem.name}`;
+                container.innerHTML += `<div style="background:#2a2e3d; padding:6px; margin-bottom:4px; font-size:11px; display:flex; justify-content:space-between; align-items:center;">
+                    <span>${l.item.icon} <b>${l.item.name}</b> (+${l.item.enhance||0})<br>👉 가격: ${priceDesc} (${l.sellerName})</span>
+                    <button class="btn btn-sub" style="padding:4px 8px; background:#27ae60;" onclick="socket.emit('buyMarketItem', {listingId: '${l.id}'})">구매/교환</button>
                 </div>`;
             });
         });
 
-        // 1:1 실시간 거래 시스템 연동
         function openP2PModalMain() {
             let targetName = prompt("거래할 상대방의 닉네임을 입력하세요:");
             if (!targetName) return;
-            // 현재 접속 중인 플레이어 중 대상 찾기
-            socket.emit('requestP2PTradeByName', targetName); // 서버 로직 연동 또는 아래 직접 id 매칭
-            alert("상대방에게 거래 요청을 보냈습니다.");
+            socket.emit('requestP2PTradeByName', targetName.trim());
         }
 
         socket.on('p2pTradeRequested', data => {
@@ -331,12 +365,6 @@
             document.getElementById('p2pTradeModal').style.display = 'flex';
         });
 
-        socket.on('p2pTradeStateUpdate', trade => {
-            let myBox = document.getElementById('myTradeBox');
-            let targetBox = document.getElementById('targetTradeBox');
-            // 갱신 렌더링
-        });
-
         function acceptP2P() {
             if (activeTradeId) socket.emit('acceptP2PTrade', activeTradeId);
         }
@@ -345,22 +373,30 @@
             activeTradeId = null;
         }
 
-        // 길드 모달
+        // 길드 모달 및 시스템 연동
         function openGuildModal() {
             document.getElementById('guildModal').style.display = 'flex';
             socket.emit('getGuildList');
         }
         function closeGuildModal() { document.getElementById('guildModal').style.display = 'none'; }
+        
         function createGuild() {
             let name = document.getElementById('guildNameInput').value.trim();
-            if (name) socket.emit('createGuild', { guildName: name, maxMembers: 10 });
+            if (!name) { alert("길드 이름을 입력해주세요!"); return; }
+            socket.emit('createGuild', { guildName: name, maxMembers: 10 });
+            closeGuildModal();
         }
+
         socket.on('guildListResult', list => {
             let area = document.getElementById('guildContentArea');
             area.innerHTML = '';
+            if (list.length === 0) {
+                area.innerHTML = '<p style="color:#888; text-align:center;">생성된 길드가 없습니다.</p>';
+                return;
+            }
             list.forEach(g => {
-                area.innerHTML += `<div style="background:#252a38; padding:5px; margin-bottom:4px; display:flex; justify-content:space-between;">
-                    <span>${g.name} (${g.currentCount}/${g.maxMembers})</span>
+                area.innerHTML += `<div style="background:#252a38; padding:5px; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
+                    <span><b>${g.name}</b> (${g.currentCount}/${g.maxMembers})</span>
                     <button class="btn btn-sub" style="padding:2px 6px;" onclick="socket.emit('joinGuild', '${g.id}')">가입</button>
                 </div>`;
             });
@@ -395,15 +431,16 @@
 
             let me = state.players[myId];
             if (me) {
-                // 로비 내 정보 갱신
                 document.getElementById('lobbyName').innerText = me.name;
                 document.getElementById('lobbyLevel').innerText = `(Lv.${me.level})`;
                 document.getElementById('lobbyGold').innerText = me.gold.toLocaleString();
                 document.getElementById('lobbyHp').innerText = me.hp;
                 document.getElementById('lobbyMaxHp').innerText = me.maxHp;
-                document.getElementById('lobbyGuildName').innerText = me.guildId ? '길드 소속됨' : '소속 없음';
+                
+                // 길드 이름 표시 반영
+                let userGuild = me.guildId && state.guilds[me.guildId] ? state.guilds[me.guildId].name : '소속 없음';
+                document.getElementById('lobbyGuildName').innerText = userGuild;
 
-                // 전투 화면 내 정보 갱신
                 document.getElementById('battleName').innerText = me.name;
                 document.getElementById('battleLevel').innerText = `(Lv.${me.level})`;
                 document.getElementById('battleGold').innerText = me.gold.toLocaleString();
@@ -413,7 +450,6 @@
                 let reqExp = Math.floor(360 * Math.pow(1.5, me.level - 1));
                 let expPct = Math.min(100, (me.exp / reqExp) * 100);
                 
-                // 로비 및 전투 경험치바 동기화
                 document.getElementById('lobbyExpFill').style.width = expPct + '%';
                 document.getElementById('lobbyExpBarText').innerText = `${Math.floor(expPct)}%`;
                 document.getElementById('lobbyExpText').innerText = `${me.exp.toLocaleString()} / ${reqExp.toLocaleString()}`;
@@ -425,7 +461,6 @@
                 latestInventory = me.inventory || [];
                 equippedIndex = me.equippedIndex;
 
-                // 무기고 렌더링 (로비 & 전투 & 1:1 거래창 하단)
                 const gridIds = ['inventoryGrid', 'lobbyInventoryGrid', 'p2pInventoryGrid'];
                 gridIds.forEach(gridId => {
                     const grid = document.getElementById(gridId);
