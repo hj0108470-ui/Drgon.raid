@@ -47,7 +47,6 @@
         .hp-bar-bg { background: #111; height: 22px; border-radius: 11px; overflow: hidden; margin: 8px 0; border: 1px solid #444; }
         .hp-bar-fill { background: linear-gradient(90deg, #c0392b, #e74c3c); height: 100%; width: 100%; transition: width 0.2s; }
         
-        /* 경험치 바 스타일 */
         .exp-bar-bg { background: #111; height: 16px; border-radius: 8px; overflow: hidden; margin-top: 4px; border: 1px solid #333; position: relative; }
         .exp-bar-fill { background: linear-gradient(90deg, #27ae60, #2ecc71); height: 100%; width: 0%; transition: width 0.3s; }
         .exp-text { position: absolute; width: 100%; top: 0; font-size: 10px; line-height: 16px; text-align: center; color: #fff; font-weight: bold; text-shadow: 1px 1px 1px #000; }
@@ -187,13 +186,11 @@
                 </div>
             </div>
 
-            <!-- 내 정보 칸 (레벨 및 경험치바 포함) -->
             <div class="card">
                 <h3 style="margin-top:0; color:#3498db; font-size: 14px;">🛡️ 내 전투 정보</h3>
                 <p style="margin: 4px 0; font-size: 12px;">🌟 레벨: <span id="myLevelText" style="color:#f1c40f; font-weight:bold;">1</span> / 75 | ❤️ 체력: <span id="myHp">100</span> / <span id="myMaxHp">100</span></p>
                 <p style="margin: 4px 0; font-size: 12px;">💰 골드: <span id="myGold" style="color:#f1c40f;">500</span> G</p>
                 
-                <!-- 경험치 바 시각화 -->
                 <div style="margin-top: 8px; font-size: 11px;">
                     <div style="display:flex; justify-content:space-between;">
                         <span>경험치 진행도</span>
@@ -321,8 +318,6 @@
         function closeGuildDetailModal() { document.getElementById('guildDetailModal').style.display = 'none'; }
         function leaveGuild() { if (confirm('정말 길드를 탈퇴하시겠습니까?')) socket.emit('leaveGuild'); }
 
-        socket.on('guildResult', (res) => { alert(res.message); socket.emit('getGuildList'); });
-
         socket.on('guildListResult', (list) => {
             const container = document.getElementById('guildListContainer');
             container.innerHTML = '';
@@ -439,8 +434,6 @@
                 socket.emit('buyMarketItem', { listingId, payWithGold: true });
             }
         }
-
-        socket.on('marketResult', (res) => { alert(res.message); socket.emit('getMarketList'); });
 
         let selectedWeaponIdxForEnhance = null;
         function openActionModal() {
@@ -565,7 +558,6 @@
                 document.getElementById('myMaxHp').innerText = me.maxHp;
                 document.getElementById('myGold').innerText = me.gold.toLocaleString();
 
-                // 경험치 바 시각화 계산 (최대레벨 75제 반영)
                 if (me.level >= 75) {
                     document.getElementById('expBarFill').style.width = '100%';
                     document.getElementById('expBarText').innerText = 'MAX LEVEL (75)';
@@ -624,6 +616,16 @@
         });
 
         socket.on('couponResult', (res) => alert(res.message));
+        socket.on('skillResult', (res) => {
+            if (!res.success) alert(res.message);
+        });
+        socket.on('itemObtained', (res) => {
+            if (res.full) {
+                alert(`🎁 아이템 획득! [${res.weapon.name}] (인벤토리가 가득 차서 획득하지 못했습니다!)`);
+            } else {
+                alert(`🎁 아이템 획득! [${res.weapon.name}]이(가) 인벤토리에 추가되었습니다.`);
+            }
+        });
     </script>
 </body>
 </html>
