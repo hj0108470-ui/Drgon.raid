@@ -607,6 +607,10 @@
             if (code) socket.emit('useCoupon', code);
         }
 
+        socket.on('couponResult', (res) => {
+            alert(res.message);
+        });
+
         function promptCreateGuild() {
             const guildName = prompt('생성할 길드 이름을 입력해주세요:', '명예로운 기사단');
             if (!guildName) return;
@@ -627,8 +631,6 @@
         }
         function closeGuildDetailModal() { document.getElementById('guildDetailModal').style.display = 'none'; }
         function leaveGuild() { if (confirm('정말 길드를 탈퇴하시겠습니까?')) socket.emit('leaveGuild'); }
-
-        socket.on('guildResult', (res) => { alert(res.message); socket.emit('getGuildList'); });
 
         socket.on('guildListResult', (list) => {
             const container = document.getElementById('guildListContainer');
@@ -921,7 +923,7 @@
                     document.getElementById('expBarText').innerText = 'MAX LEVEL (100)';
                     document.getElementById('expRatioText').innerText = 'MAX';
                 } else {
-                    const reqExp = Math.round(360 * Math.pow(1.5, me.level - 1));
+                    const reqExp = Math.round(360 * Math.pow(1.2, me.level - 1));
                     const expPct = Math.min(100, (me.exp / reqExp) * 100);
                     document.getElementById('expBarFill').style.width = expPct + '%';
                     document.getElementById('expBarText').innerText = `${Math.floor(expPct)}%`;
@@ -967,16 +969,19 @@
                         slot.innerHTML = `<div>${lockBadge}${item.icon || '⚔️'}</div><div>+${item.enhance||0}</div>`;
                         slot.onclick = () => {
                             const idxPos = selectedIndices.indexOf(i);
-                            if (idxPos > -1) { selectedIndices.splice(idxPos, 1); slot.classList.remove('selected'); }
-                            else { selectedIndices.push(i); slot.classList.add('selected'); }
+                            if (idxPos > -1) { 
+                                selectedIndices.splice(idxPos, 1); 
+                                slot.classList.remove('selected'); 
+                            } else { 
+                                selectedIndices.push(i); 
+                                slot.classList.add('selected'); 
+                            }
                         };
                     } else { slot.innerText = '빈칸'; }
                     grid.appendChild(slot);
                 }
             }
         });
-
-        socket.on('couponResult', (res) => alert(res.message));
     </script>
 </body>
 </html>
