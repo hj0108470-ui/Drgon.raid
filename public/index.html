@@ -238,15 +238,13 @@
                 <button class="btn" style="background:#9b59b6; padding: 12px; font-size: 16px;" onclick="enterUpperDungeonCheck()">🦁 상위 던전 입장 (Lv.50+ / 600,000G)</button>
             </div>
 
-            <!-- 💬 로비 맨 아래 세로형 실시간 채팅창 추가 -->
-            <div class="card" style="border: 2px solid #3498db; display: flex; flex-direction: column;">
-                <h3 style="margin: 0 0 8px 0; font-size: 13px; color: #3498db;">💬 전체 실시간 대화</h3>
-                <div id="chatLogBox" style="background: #111; border: 1px solid #333; border-radius: 6px; height: 140px; overflow-y: auto; padding: 6px; font-size: 11px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 4px; text-align: left;">
-                    <div style="color: #7f8c8d;">시스템: 로비 채팅에 접속했습니다. 원활한 대화를 즐겨보세요!</div>
-                </div>
-                <div style="display: flex; gap: 4px;">
-                    <input type="text" id="chatInput" placeholder="메시지를 입력하세요..." style="margin-bottom: 0; font-size: 11px; flex: 1;" onkeypress="if(event.key==='Enter') sendChatMessage()">
-                    <button class="btn" style="width: auto; padding: 8px 12px; font-size: 12px; background: #3498db;" onclick="sendChatMessage()">전송</button>
+            <!-- 로비 페이지 아래쪽 채팅 기능 추가 -->
+            <div class="card" style="margin-top: 10px;">
+                <h3 style="margin-top:0; font-size: 13px; color:#3498db;">💬 실시간 전체 채팅</h3>
+                <div id="chatBox" style="background:#111; height: 100px; border-radius: 6px; padding: 6px; overflow-y: auto; font-size: 11px; margin-bottom: 6px; text-align: left; border: 1px solid #333;"></div>
+                <div style="display:flex; gap: 4px;">
+                    <input type="text" id="chatInput" placeholder="메시지를 입력하세요..." style="margin-bottom:0; font-size: 11px;" onkeypress="if(event.key==='Enter') sendChat()">
+                    <button class="btn" style="width: 60px; padding: 6px; font-size: 11px; background:#2980b9;" onclick="sendChat()">전송</button>
                 </div>
             </div>
         </div>
@@ -340,6 +338,24 @@
 
         socket.on('connect', () => { myId = socket.id; });
 
+        // 채팅 전송 및 수신 처리
+        function sendChat() {
+            const input = document.getElementById('chatInput');
+            const msg = input.value;
+            if (!msg || msg.trim() === '') return;
+            socket.emit('chatMessage', msg);
+            input.value = '';
+        }
+
+        socket.on('chatMessage', ({ name, message }) => {
+            const chatBox = document.getElementById('chatBox');
+            const div = document.createElement('div');
+            div.style.marginBottom = '3px';
+            div.innerHTML = `<strong style="color:#f1c40f;">[${name}]</strong>: ${message}`;
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        });
+
         function showScreen(screenId) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             document.getElementById(screenId).classList.add('active');
@@ -394,27 +410,6 @@
                 goToLobby();
             }
         });
-
-        // 💬 실시간 채팅 전송 및 수신 핸들러
-        function sendChatMessage() {
-            const input = document.getElementById('chatInput');
-            const val = input.value.trim();
-            if (!val) return;
-            socket.emit('chatMessage', val);
-            input.value = '';
-        }
-
-        socket.on('chatMessage', (data) => {
-            const chatLog = document.getElementById('chatLogBox');
-            const msgDiv = document.createElement('div');
-            msgDiv.innerHTML = `<span style="color:#f1c40f; font-weight:bold;">[${data.time}] ${data.sender}</span>: ${escapeHtml(data.message)}`;
-            chatLog.appendChild(msgDiv);
-            chatLog.scrollTop = chatLog.scrollHeight;
-        });
-
-        function escapeHtml(text) {
-            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        }
 
         function triggerHitEffect() {
             const bossIcon = document.getElementById('bossIcon');
