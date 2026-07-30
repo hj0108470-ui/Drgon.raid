@@ -11,10 +11,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 
 const BOSS_LIST = [
-    { name: '🐷 꿀신', maxHp: 157500, currentHp: 157500, expReward: 2000, type: 'normal' },
-    { name: '🗿 골리앗', maxHp: 367500, currentHp: 367500, expReward: 4500, type: 'normal' },
-    { name: '🦖 이라소', maxHp: 840000, currentHp: 840000, expReward: 7500, type: 'normal' },
-    { name: '🐉 드래곤', maxHp: 2100000, currentHp: 2100000, expReward: 15000, type: 'normal' }
+    { name: '🐷 꿀신', maxHp: 157500, currentHp: 157500, expReward: 10000, type: 'normal' },
+    { name: '🗿 골리앗', maxHp: 367500, currentHp: 367500, expReward: 30000, type: 'normal' },
+    { name: '🦖 이라소', maxHp: 840000, currentHp: 840000, expReward: 150000, type: 'normal' },
+    { name: '🐉 드래곤', maxHp: 2100000, currentHp: 2100000, expReward: 500000, type: 'normal' }
 ];
 
 const UPPER_BOSS_LIST = [
@@ -78,8 +78,8 @@ const COUPONS = {
 };
 
 let gameState = {
-    boss: { ...BOSS_LIST[0], maxHp: BOSS_LIST[0].maxHp, currentHp: BOSS_LIST[0].currentHp, bossMaxHp: BOSS_LIST[0].maxHp, damageRecords: {} },
-    upperBoss: { ...UPPER_BOSS_LIST[0], maxHp: UPPER_BOSS_LIST[0].maxHp, currentHp: UPPER_BOSS_LIST[0].currentHp, bossMaxHp: UPPER_BOSS_LIST[0].maxHp, damageRecords: {} },
+    boss: { ...BOSS_LIST[0] },
+    upperBoss: { ...UPPER_BOSS_LIST[0] },
     players: {},
     registeredAccounts: {},
     guilds: {},
@@ -98,6 +98,7 @@ function saveAccountState(p) {
         gameState.registeredAccounts[p.name].inventory = p.inventory;
         gameState.registeredAccounts[p.name].equippedIndex = p.equippedIndex;
         gameState.registeredAccounts[p.name].totalDamage = p.totalDamage;
+        gameState.registeredAccounts[p.name].guildId = p.guildId;
     }
 }
 
@@ -146,17 +147,15 @@ function getRandomArtifactKey(isUpper = false) {
 function getRandomWeaponKey(isUpper = false) {
     const rand = Math.random() * 100;
     let rarity = 'Common';
-    if (isUpper && rand < 0.1) {
+    if (isUpper && rand < 0.02) {
         rarity = 'Secret';
-    } else if (!isUpper && rand < 0.02) {
-        rarity = 'Secret';
-    } else if (rand < (0.02 + 0.08)) {
+    } else if (rand < 0.08) {
         rarity = 'Mythic';
-    } else if (rand < (0.02 + 0.08 + 2.9)) {
+    } else if (rand < 2.9) {
         rarity = 'Legendary';
-    } else if (rand < (0.02 + 0.08 + 2.9 + 15)) {
+    } else if (rand < 15) {
         rarity = 'Epic';
-    } else if (rand < (0.02 + 0.08 + 2.9 + 15 + 32)) {
+    } else if (rand < 32) {
         rarity = 'Rare';
     } else {
         rarity = 'Common';
@@ -203,6 +202,7 @@ function addExp(p, amount) {
         p.level++;
         p.maxHp += 10;
         p.hp = p.maxHp;
+        p.gold += 5000;
         reqExp = Math.round(360 * Math.pow(1.5, p.level - 1));
     }
     if (p.level >= 100) {
@@ -242,14 +242,6 @@ setInterval(() => {
 }, 10000);
 
 io.on('connection', (socket) => {
-    // 채팅 메시지 수신 처리
-    socket.on('chatMessage', (msg) => {
-        const p = gameState.players[socket.id];
-        if (!p || !msg || msg.trim() === '') return;
-        const sanitizedMsg = msg.trim().substring(0, 100);
-        io.emit('chatMessage', { name: p.name, message: sanitizedMsg });
-    });
-
     socket.on('register', ({ nickname, password }) => {
         if (!nickname || !password) {
             socket.emit('authResult', { success: false, message: '닉네임과 비밀번호를 입력해주세요.' });
@@ -261,7 +253,7 @@ io.on('connection', (socket) => {
         }
         gameState.registeredAccounts[nickname] = {
             nickname, password, hp: 100, maxHp: 100, gold: 500, exp: 0, level: 1,
-            inventory: [], equippedIndex: null, totalDamage: 0, bonusAtk: 0
+            inventory: [], equippedIndex: null, totalDamage: 0, bonusAtk: 0, guildId: null
         };
         socket.emit('authResult', { success: true, message: '회원가입 성공! 로그인해주세요.' });
     });
@@ -288,13 +280,33 @@ io.on('connection', (socket) => {
             lastSkillTime: 0,
             isInvincible: false,
             invincibleUntil: 0,
-            guildId: null,
-            isInUpperDungeon: false
+            guildId: account.guildId || null,
+            isInUpperDungeon: false,
+            sessionDamage: 0
         };
 
         socket.emit('loginSuccess', { success: true, player: gameState.players[socket.id] });
         updateRankings();
         io.emit('updateState', gameState);
+    });
+
+    // 💬 채팅 메시지 수신 및 배포 이벤트
+    socket.on('chatMessage', ({ channel, message }) => {
+        const p = gameState.players[socket.id];
+        if (!p || !message || message.trim() === '') return;
+        const cleanMsg = message.trim().substring(0, 150);
+
+        if (channel === 'guild') {
+            if (!p.guildId) return;
+            const guild = gameState.guilds[p.guildId];
+            if (guild) {
+                guild.members.forEach(mId => {
+                    io.to(mId).emit('chatMessage', { senderName: p.name, message: cleanMsg, channel: 'guild' });
+                });
+            }
+        } else {
+            io.emit('chatMessage', { senderName: p.name, message: cleanMsg, channel: 'all' });
+        }
     });
 
     socket.on('attack', () => {
@@ -304,12 +316,10 @@ io.on('connection', (socket) => {
 
         if (p.isInUpperDungeon) {
             gameState.upperBoss.currentHp -= dmg;
-            if (!gameState.upperBoss.damageRecords) gameState.upperBoss.damageRecords = {};
-            gameState.upperBoss.damageRecords[socket.id] = (gameState.upperBoss.damageRecords[socket.id] || 0) + dmg;
+            p.sessionDamage = (p.sessionDamage || 0) + dmg;
         } else {
             gameState.boss.currentHp -= dmg;
-            if (!gameState.boss.damageRecords) gameState.boss.damageRecords = {};
-            gameState.boss.damageRecords[socket.id] = (gameState.boss.damageRecords[socket.id] || 0) + dmg;
+            p.sessionDamage = (p.sessionDamage || 0) + dmg;
         }
 
         p.totalDamage = (p.totalDamage || 0) + dmg;
@@ -318,8 +328,8 @@ io.on('connection', (socket) => {
 
         saveAccountState(p);
         updateRankings();
-        if (p.isInUpperDungeon) checkUpperBossKill();
-        else checkBossKill();
+        if (p.isInUpperDungeon) checkUpperBossKill(p);
+        else checkBossKill(p);
 
         io.emit('updateState', gameState);
     });
@@ -362,12 +372,10 @@ io.on('connection', (socket) => {
             let skillDmg = Math.round((baseAtk * rarityMul * 2.5) + (p.bonusAtk || 0));
             if (p.isInUpperDungeon) {
                 gameState.upperBoss.currentHp -= skillDmg;
-                if (!gameState.upperBoss.damageRecords) gameState.upperBoss.damageRecords = {};
-                gameState.upperBoss.damageRecords[socket.id] = (gameState.upperBoss.damageRecords[socket.id] || 0) + skillDmg;
+                p.sessionDamage = (p.sessionDamage || 0) + skillDmg;
             } else {
                 gameState.boss.currentHp -= skillDmg;
-                if (!gameState.boss.damageRecords) gameState.boss.damageRecords = {};
-                gameState.boss.damageRecords[socket.id] = (gameState.boss.damageRecords[socket.id] || 0) + skillDmg;
+                p.sessionDamage = (p.sessionDamage || 0) + skillDmg;
             }
             p.totalDamage += skillDmg;
             p.gold += 50;
@@ -375,69 +383,60 @@ io.on('connection', (socket) => {
             skillResultData.message = `⚔️ 필살기 적중! ${skillDmg.toLocaleString()} 대미지 작렬!`;
             skillResultData.val = skillDmg;
             updateRankings();
-            if (p.isInUpperDungeon) checkUpperBossKill();
-            else checkBossKill();
+            if (p.isInUpperDungeon) checkUpperBossKill(p);
+            else checkBossKill(p);
         }
         saveAccountState(p);
         socket.emit('skillResultPop', skillResultData);
         io.emit('updateState', gameState);
     });
 
-    // 보스 체력 10% 이상 누적 타격한 모든 플레이어에게 보상 지급
-    function checkBossKill() {
+    function checkBossKill(p) {
         if (gameState.boss.currentHp <= 0) {
-            let baseExp = 15000;
-            if (gameState.boss.name.includes('꿀신')) baseExp = 2000;
-            else if (gameState.boss.name.includes('골리앗')) baseExp = 4500;
-            else if (gameState.boss.name.includes('이라소')) baseExp = 7500;
+            let currentBoss = BOSS_LIST.find(b => b.name === gameState.boss.name) || BOSS_LIST[0];
+            let requiredDamage = currentBoss.maxHp * 0.10;
 
-            let totalMaxHp = gameState.boss.maxHp;
-            let threshold = totalMaxHp * 0.1;
+            if ((p.sessionDamage || 0) >= requiredDamage) {
+                let rewardExp = currentBoss.expReward;
+                addExp(p, rewardExp);
 
-            for (let [sId, dmg] of Object.entries(gameState.boss.damageRecords || {})) {
-                if (dmg >= threshold && gameState.players[sId]) {
-                    let participant = gameState.players[sId];
-                    addExp(participant, baseExp);
-
-                    const artifactKey = getRandomArtifactKey(false);
-                    const droppedItem = { ...WEAPON_DB[artifactKey], id: Date.now() + Math.random(), enhance: 0 };
-                    
-                    if (participant.inventory.length < 36) {
-                        participant.inventory.push(droppedItem);
-                        io.to(sId).emit('itemObtained', { weapon: droppedItem, full: false });
-                    } else {
-                        io.to(sId).emit('itemObtained', { weapon: droppedItem, full: true });
-                    }
-                    saveAccountState(participant);
+                const artifactKey = getRandomArtifactKey(false);
+                const droppedItem = { ...WEAPON_DB[artifactKey], id: Date.now() + Math.random(), enhance: 0 };
+                
+                if (p.inventory.length < 36) {
+                    p.inventory.push(droppedItem);
+                    socket.emit('itemObtained', { weapon: droppedItem, full: false });
+                } else {
+                    socket.emit('itemObtained', { weapon: droppedItem, full: true });
                 }
+            } else {
+                socket.emit('tradeAlert', { success: false, message: `보스 체력의 10% 이상을 기여하지 못해 보상을 받지 못했습니다!` });
             }
 
-            let nextBossObj = BOSS_LIST[Math.floor(Math.random() * BOSS_LIST.length)];
-            gameState.boss = { ...nextBossObj, maxHp: nextBossObj.maxHp, currentHp: nextBossObj.maxHp, damageRecords: {} };
+            gameState.boss = { ...BOSS_LIST[Math.floor(Math.random() * BOSS_LIST.length)] };
+            p.sessionDamage = 0;
+            saveAccountState(p);
         }
     }
 
-    function checkUpperBossKill() {
+    function checkUpperBossKill(p) {
         if (gameState.upperBoss.currentHp <= 0) {
-            let totalMaxHp = gameState.upperBoss.maxHp;
-            let threshold = totalMaxHp * 0.1;
+            let currentUpperBoss = UPPER_BOSS_LIST.find(b => b.name === gameState.upperBoss.name) || UPPER_BOSS_LIST[0];
+            let requiredDamage = currentUpperBoss.maxHp * 0.10;
 
-            for (let [sId, dmg] of Object.entries(gameState.upperBoss.damageRecords || {})) {
-                if (dmg >= threshold && gameState.players[sId]) {
-                    let participant = gameState.players[sId];
-                    addExp(participant, 50000);
-
-                    const artifactKey = getRandomArtifactKey(true);
-                    const droppedItem = { ...WEAPON_DB[artifactKey], id: Date.now() + Math.random(), enhance: 0 };
-                    
-                    if (participant.inventory.length < 36) {
-                        participant.inventory.push(droppedItem);
-                        io.to(sId).emit('itemObtained', { weapon: droppedItem, full: false });
-                    } else {
-                        io.to(sId).emit('itemObtained', { weapon: droppedItem, full: true });
-                    }
-                    saveAccountState(participant);
+            if ((p.sessionDamage || 0) >= requiredDamage) {
+                addExp(p, 500000);
+                const artifactKey = getRandomArtifactKey(true);
+                const droppedItem = { ...WEAPON_DB[artifactKey], id: Date.now() + Math.random(), enhance: 0 };
+                
+                if (p.inventory.length < 36) {
+                    p.inventory.push(droppedItem);
+                    socket.emit('itemObtained', { weapon: droppedItem, full: false });
+                } else {
+                    socket.emit('itemObtained', { weapon: droppedItem, full: true });
                 }
+            } else {
+                socket.emit('tradeAlert', { success: false, message: `상위 보스 체력의 10% 이상을 기여하지 못해 보상을 받지 못했습니다!` });
             }
 
             const r = Math.random() * 100;
@@ -447,8 +446,9 @@ io.on('connection', (socket) => {
             else if (r < 85) nextBossIdx = 2;
             else nextBossIdx = 3;
 
-            let nextUpperObj = UPPER_BOSS_LIST[nextBossIdx];
-            gameState.upperBoss = { ...nextUpperObj, maxHp: nextUpperObj.maxHp, currentHp: nextUpperObj.maxHp, damageRecords: {} };
+            gameState.upperBoss = { ...UPPER_BOSS_LIST[nextBossIdx] };
+            p.sessionDamage = 0;
+            saveAccountState(p);
         }
     }
 
@@ -459,12 +459,13 @@ io.on('connection', (socket) => {
             socket.emit('upperDungeonResult', { success: false, message: '50레벨 이상만 입장 가능합니다!' });
             return;
         }
-        if (p.gold < 600000) {
-            socket.emit('upperDungeonResult', { success: false, message: '입장 골드(600,000G)가 부족합니다!' });
+        if (p.gold < 6000000) {
+            socket.emit('upperDungeonResult', { success: false, message: '입장 골드(6,000,000G)가 부족합니다!' });
             return;
         }
-        p.gold -= 600000;
+        p.gold -= 6000000;
         p.isInUpperDungeon = true;
+        p.sessionDamage = 0;
         saveAccountState(p);
         socket.emit('upperDungeonResult', { success: true, message: '상위 던전에 입장했습니다!' });
         io.emit('updateState', gameState);
@@ -493,7 +494,7 @@ io.on('connection', (socket) => {
             return;
         }
         io.to(targetSocketId).emit('tradeRequestReceived', { senderId: socket.id, senderName: sender.name });
-        socket.emit('tradeAlert', { success: true, message: `${targetName}님께 1대1 거래를 요청했습니다.` });
+        socket.emit('tradeAlert', { success: true, message: `${targetName}님께 [실시간] 1대1 거래를 요청했습니다.` });
     });
 
     socket.on('acceptTrade', (senderId) => {
@@ -506,6 +507,8 @@ io.on('connection', (socket) => {
             id: tradeId,
             p1: senderId,
             p2: socket.id,
+            p1Name: sender.name,
+            p2Name: acceptor.name,
             p1Offer: { items: [], gold: 0, locked: false },
             p2Offer: { items: [], gold: 0, locked: false }
         };
@@ -578,8 +581,8 @@ io.on('connection', (socket) => {
                 saveAccountState(p1);
                 saveAccountState(p2);
 
-                io.to(trade.p1).emit('tradeComplete', { success: true, message: '🤝 1대1 거래가 성공적으로 완료되었습니다!' });
-                io.to(trade.p2).emit('tradeComplete', { success: true, message: '🤝 1대1 거래가 성공적으로 완료되었습니다!' });
+                io.to(trade.p1).emit('tradeComplete', { success: true, message: `🤝 [${trade.p2Name}]님과 1대1 거래가 완료되었습니다!` });
+                io.to(trade.p2).emit('tradeComplete', { success: true, message: `🤝 [${trade.p1Name}]님과 1대1 거래가 완료되었습니다!` });
             }
             delete gameState.trades[tradeId];
             io.emit('updateState', gameState);
@@ -606,6 +609,7 @@ io.on('connection', (socket) => {
         const listingId = 'market_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
         gameState.marketListings[listingId] = {
             id: listingId, sellerId: socket.id, sellerName: p.name, item: itemToSell,
+            itemName: itemToSell.name,
             priceGold: parseInt(priceGold) || 0
         };
         saveAccountState(p);
@@ -684,6 +688,7 @@ io.on('connection', (socket) => {
             leaderId: socket.id, subLeaderId: null, members: [socket.id]
         };
         p.guildId = guildId;
+        saveAccountState(p);
         updateRankings();
         io.emit('updateState', gameState);
     });
@@ -715,6 +720,7 @@ io.on('connection', (socket) => {
         if (!p || !guild || p.guildId || guild.members.length >= guild.maxMembers) return;
         guild.members.push(socket.id);
         p.guildId = guildId;
+        saveAccountState(p);
         updateRankings();
         io.emit('updateState', gameState);
     });
@@ -729,6 +735,7 @@ io.on('connection', (socket) => {
             else if (guild.leaderId === socket.id) guild.leaderId = guild.members[0];
         }
         p.guildId = null;
+        saveAccountState(p);
         updateRankings();
         io.emit('updateState', gameState);
     });
