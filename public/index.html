@@ -83,19 +83,19 @@
         </div>
     </div>
 
-    <!-- 1대1 거래 요청 모달 -->
+    <!-- 1대1 거래 요청 받기 / 거절하기 팝업 모달 -->
     <div id="tradeRequestModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" style="width: 320px; text-align: center;">
             <h3 style="color:#3498db; margin-top:0;">🤝 1:1 거래 요청</h3>
-            <p id="tradeRequestText" style="font-size: 13px;"></p>
+            <p id="tradeRequestText" style="font-size: 13px; margin: 15px 0; color: #fff;"></p>
             <div style="display:flex; gap:8px;">
-                <button class="btn" style="background:#27ae60;" onclick="respondTrade(true)">수락</button>
-                <button class="btn" style="background:#c0392b;" onclick="respondTrade(false)">거절</button>
+                <button class="btn" style="background:#27ae60; padding: 10px;" onclick="respondTrade(true)">✅ 거래 받기 (수락)</button>
+                <button class="btn" style="background:#c0392b; padding: 10px;" onclick="respondTrade(false)">❌ 거절하기</button>
             </div>
         </div>
     </div>
 
-    <!-- 거래소 및 상세 매물 등록 모달 (골드 or 무기/유물 선택 가능) -->
+    <!-- 거래소 및 상세 매물 등록 모달 -->
     <div id="marketModal" class="modal">
         <div class="modal-content" style="width: 360px;">
             <h3 style="color:#e67e22; margin-top:0;">🛒 실시간 거래소</h3>
@@ -179,7 +179,6 @@
             <div class="card" style="text-align: center;">
                 <h1 style="color:#f1c40f; margin: 5px 0;">🌟 LOBBY</h1>
                 
-                <!-- 나의 정보 카드 (골드량, 닉네임, 경험치바, 레벨, 체력, 길드 정보 포함) -->
                 <div style="background: #15171e; padding: 12px; border-radius: 8px; margin: 10px 0; text-align: left; font-size: 13px;">
                     <p style="margin: 4px 0;">👤 닉네임: <strong id="lobbyName" style="color:#f1c40f;">-</strong> <span id="lobbyLevel" style="color:#e67e22; font-weight:bold;">(Lv.1)</span></p>
                     <p style="margin: 4px 0;">💰 보유 골드: <span id="lobbyGold" style="color:#f1c40f; font-weight:bold;">0</span> G</p>
@@ -197,7 +196,6 @@
                     </div>
                 </div>
 
-                <!-- 로비 내 무기고 추가 -->
                 <h3 style="margin: 8px 0 4px 0; font-size: 14px; text-align:left;">🎒 로비 무기고</h3>
                 <div class="inventory-grid" id="lobbyInventoryGrid"></div>
 
@@ -226,7 +224,6 @@
                 </div>
             </div>
 
-            <!-- 전투 화면 내 정보 카드 -->
             <div class="card">
                 <h3 style="margin-top:0; color:#3498db; font-size: 14px;">🛡️ 내 전투 정보</h3>
                 <p style="margin: 4px 0; font-size: 12px;">👤 <strong id="battleName">-</strong> <span id="battleLevel" style="color:#f1c40f; font-weight:bold;">(Lv.1)</span> | 💰 <span id="battleGold" style="color:#f1c40f;">0</span>G</p>
@@ -350,15 +347,24 @@
 
         socket.on('p2pTradeRequested', data => {
             activeTradeId = data.tradeId;
-            document.getElementById('tradeRequestText').innerText = `${data.senderName} 님이 1:1 거래를 요청하셨습니다.`;
+            document.getElementById('tradeRequestText').innerHTML = `<b>[${data.senderName}]</b> 님께서<br>1:1 실시간 거래를 요청하셨습니다!`;
             document.getElementById('tradeRequestModal').style.display = 'flex';
         });
 
         function respondTrade(accept) {
             document.getElementById('tradeRequestModal').style.display = 'none';
             socket.emit('respondP2PTrade', { tradeId: activeTradeId, accept });
-            if (accept) document.getElementById('p2pTradeModal').style.display = 'flex';
+            if (accept) {
+                document.getElementById('p2pTradeModal').style.display = 'flex';
+            } else {
+                activeTradeId = null;
+            }
         }
+
+        socket.on('p2pTradeRejected', () => {
+            alert("상대방이 1:1 거래를 거절했습니다.");
+            activeTradeId = null;
+        });
 
         socket.on('p2pTradeStarted', data => {
             activeTradeId = data.tradeId;
@@ -373,7 +379,6 @@
             activeTradeId = null;
         }
 
-        // 길드 모달 및 시스템 연동
         function openGuildModal() {
             document.getElementById('guildModal').style.display = 'flex';
             socket.emit('getGuildList');
@@ -437,7 +442,6 @@
                 document.getElementById('lobbyHp').innerText = me.hp;
                 document.getElementById('lobbyMaxHp').innerText = me.maxHp;
                 
-                // 길드 이름 표시 반영
                 let userGuild = me.guildId && state.guilds[me.guildId] ? state.guilds[me.guildId].name : '소속 없음';
                 document.getElementById('lobbyGuildName').innerText = userGuild;
 
@@ -496,3 +500,4 @@
     </script>
 </body>
 </html>
+
