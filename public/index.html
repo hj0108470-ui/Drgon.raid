@@ -128,19 +128,18 @@
         </div>
     </div>
 
-    <!-- 1대1 실시간 교환소 (상대방 물건 이름만 뜰 수 있도록 구현) -->
     <div id="tradeRoomModal" class="modal">
         <div class="modal-content" style="width: 380px;">
             <h3 style="color:#2ecc71; margin-top:0;">🤝 1대1 실시간 교환소</h3>
             <p id="tradePartnerTitle" style="font-size: 12px; color:#aaa; margin: 4px 0;">상대방과의 교환</p>
             <div style="display:flex; gap:8px; margin: 10px 0; font-size:11px;">
                 <div style="flex:1; background:#111; padding:6px; border-radius:6px; text-align:left;">
-                    <strong>나의 등록 품목/골드</strong>
+                    <strong>나의 올린 품목/골드</strong>
                     <div id="myTradeOfferSummary" style="margin-top:4px; color:#f1c40f;">없음</div>
                     <input type="number" id="myTradeGoldInput" placeholder="추가 골드 입력" style="margin-top:6px; width:100%; font-size:11px;" oninput="sendTradeOfferUpdate()">
                 </div>
                 <div style="flex:1; background:#111; padding:6px; border-radius:6px; text-align:left;">
-                    <strong>상대방 등록 물건 이름</strong>
+                    <strong>상대방 올린 품목/골드</strong>
                     <div id="partnerTradeOfferSummary" style="margin-top:4px; color:#3498db;">대기 중...</div>
                 </div>
             </div>
@@ -197,7 +196,6 @@
         </div>
     </div>
 
-    <!-- 아이템 관리 및 상자 모으기/풀기 모달 -->
     <div id="itemActionModal" class="modal">
         <div class="modal-content">
             <h3 id="popupTitle" style="color:#f1c40f; margin-top:0;">아이템 관리</h3>
@@ -559,7 +557,6 @@
             });
         }
 
-        // --- [요청 반영] 1:1 거래 시 상대방 올린 물건의 '이름'만 뜨도록 수정 ---
         socket.on('tradeStateUpdate', (trade) => {
             if (!activeTradeId || trade.id !== activeTradeId) return;
             const isP1 = (trade.p1 === myId);
@@ -569,32 +566,18 @@
             let mySummaryHtml = `골드: ${myOffer.gold.toLocaleString()}G<br>`;
             myOffer.items.forEach(idx => {
                 let itm = latestInventory[idx];
-                if (itm) mySummaryHtml += `${itm.icon} ${itm.name}<br>`;
+                if (itm) mySummaryHtml += `${itm.icon} ${itm.name} (+${itm.enhance||0})<br>`;
             });
             if (myOffer.items.length === 0 && myOffer.gold === 0) mySummaryHtml = '없음';
             if (myOffer.locked) mySummaryHtml += '<span style="color:#2ecc71; font-weight:bold;"> [잠금완료]</span>';
             document.getElementById('myTradeOfferSummary').innerHTML = mySummaryHtml;
 
-            // 상대방이 올린 품목은 오직 '이름'만 노출되도록 처리
             let partnerSummaryHtml = `골드: ${partnerOffer.gold.toLocaleString()}G<br>`;
             partnerOffer.items.forEach(idx => {
-                // 상대를 표현할 때 클라이언트가 상대 인벤토리를 직접 볼 수 없으므로 서버 데이터 구조 혹은 전달받은 이름 기준 처리
-                // 서버에서 보낸 아이템 객체의 이름 추출 (여기서는 partnerOffer에 실린 아이템들의 이름을 서버 연동 보완 또는 리스트 표현)
+                partnerSummaryHtml += `📦 아이템 슬롯 #${idx}<br>`;
             });
-            
-            // 실시간 교환창에서 상대방의 아이템 이름 목록 표시
-            if (partnerOffer.items && partnerOffer.items.length > 0) {
-                partnerSummaryHtml = `골드: ${partnerOffer.gold.toLocaleString()}G<br>` + partnerOffer.items.map(iIndex => {
-                    // 전달된 상대방 인벤토리 요약 혹은 서버에서 처리된 아이템 이름을 가져옵니다.
-                    return `• 물건 이름: <strong>${trade.partnerItemsName ? trade.partnerItemsName[iIndex] : '등록된 물건'}</strong>`;
-                }).join('<br>');
-            } else if (partnerOffer.gold > 0) {
-                partnerSummaryHtml = `골드: ${partnerOffer.gold.toLocaleString()}G<br>물건 없음`;
-            } else {
-                partnerSummaryHtml = '없음';
-            }
+            if (partnerOffer.items.length === 0 && partnerOffer.gold === 0) partnerSummaryHtml = '없음';
             if (partnerOffer.locked) partnerSummaryHtml += '<span style="color:#2ecc71; font-weight:bold;"> [상대방 잠금완료]</span>';
-            
             document.getElementById('partnerTradeOfferSummary').innerHTML = partnerSummaryHtml;
         });
 
@@ -765,8 +748,6 @@
         }
 
         let selectedWeaponIdxForEnhance = null;
-
-        // --- [요청 반영] 아이템 관리 메뉴 및 상자 모으기 / 풀기 기능 버튼 구현 ---
         function openActionModal() {
             if (selectedIndices.length === 0) { alert("관리할 무기를 슬롯에서 선택해주세요!"); return; }
             const modal = document.getElementById('itemActionModal');
@@ -775,34 +756,20 @@
             contentArea.innerHTML = '';
             selectedIndices = [...new Set(selectedIndices)];
 
-            // 단일 선택인 경우
             if (selectedIndices.length === 1) {
                 const idx = selectedIndices[0];
                 const item = latestInventory[idx];
                 if (!item) { alert("비어있는 슬롯입니다."); selectedIndices = []; modal.style.display = 'none'; return; }
 
                 const isLocked = item.isLocked || false;
-
-                // 만약 선택한 아이템이 '상자(box)'인 경우 -> 풀기 버튼 활성화
-                if (item.type === 'box') {
-                    title.innerText = `📦 상자 관리: ${item.name}`;
-                    contentArea.innerHTML = `
-                        <p style="font-size:11px; color:#aaa;">상자 내부 아이템 수: ${item.items.length}개</p>
-                        <button class="popup-btn" style="background:#27ae60;" onclick="doUnpackBox(${idx})">📦 상자 풀기 (해제)</button>
-                        <button class="popup-btn" style="background:#e67e22;" onclick="doSingleAction('sell', ${idx})">💰 상자 판매 (${item.sellPrice}G)</button>
-                    `;
-                } else if (item.type === 'artifact') {
+                if (item.type === 'artifact') {
                     title.innerText = `🏺 유물: ${item.name}`;
                     contentArea.innerHTML = `
                         <button class="popup-btn" style="background:#e67e22;" onclick="doSingleAction('sellArtifact', ${idx})">💰 유물 판매 (${item.sellPrice}G)</button>
                     `;
                 } else {
-                    // 일반 무기인 경우
                     title.innerText = `🔍 무기 관리: ${item.name} (+${item.enhance || 0})`;
                     const isEquipped = (equippedIndex === idx);
-                    let packButtonHtml = '';
-                    
-                    // 여러 개가 선택되었거나 다중 선택 상태 진입 전이지만 단일 관리 창에서 상자 모으기 버튼 추가 노출 가능
                     contentArea.innerHTML = `
                         <button class="popup-btn" style="background:#2980b9;" onclick="doSingleAction('equip', ${idx})">${isEquipped ? '장착 해제' : '무기 장착'}</button>
                         <button class="popup-btn" style="background:#8e44ad;" onclick="openArtifactEnhanceModalForWeapon(${idx})">🏺 유물로 강화하기</button>
@@ -812,24 +779,8 @@
                     `;
                 }
             } else {
-                // 다중 선택인 경우 (최대 25개 제한 검사 포함 상자 모으기 버튼 생성)
                 title.innerText = `📦 다중 선택 관리 (${selectedIndices.length}개)`;
-                
-                let boxCreateSection = '';
-                if (selectedIndices.length <= 25) {
-                    boxCreateSection = `
-                        <div style="margin: 8px 0; background:#111; padding:8px; border-radius:6px; text-align:left;">
-                            <p style="margin:0 0 4px 0; font-size:11px; color:#f1c40f;">📦 상자 이름 정하기:</p>
-                            <input type="text" id="customBoxNameInput" placeholder="상자 이름 입력 (예: 주력무기보관함)" style="width:100%; font-size:11px; margin-bottom:6px;">
-                            <button class="popup-btn" style="background:#27ae60;" onclick="doPackItemsIntoBox()">📦 모으기 (상자 생성)</button>
-                        </div>
-                    `;
-                } else {
-                    boxCreateSection = `<p style="color:#e74c3c; font-size:11px;">상자 모으기는 최대 25개까지만 선택할 수 있습니다!</p>`;
-                }
-
                 contentArea.innerHTML = `
-                    ${boxCreateSection}
                     <button class="popup-btn" style="background:#e67e22;" onclick="doBatchAction('sell')">💰 선택 일괄 판매 (락 아이템 제외)</button>
                     <button class="popup-btn" style="background:#c0392b;" onclick="doBatchAction('delete')">🗑️ 선택 일괄 삭제 (락 아이템 제외)</button>
                 `;
@@ -838,7 +789,6 @@
         }
 
         function closeItemModal() { document.getElementById('itemActionModal').style.display = 'none'; }
-        
         function doSingleAction(actionType, idx) {
             closeItemModal();
             if (actionType === 'equip') socket.emit('equipItem', idx);
@@ -847,24 +797,10 @@
             if (actionType === 'toggleLock') socket.emit('toggleLockItem', idx);
             selectedIndices = [];
         }
-
         function doBatchAction(actionType) {
             closeItemModal();
             if (actionType === 'sell') socket.emit('sellItems', selectedIndices);
             if (actionType === 'delete') socket.emit('deleteItems', selectedIndices);
-            selectedIndices = [];
-        }
-
-        function doPackItemsIntoBox() {
-            const boxName = document.getElementById('customBoxNameInput').value;
-            closeItemModal();
-            socket.emit('packItemsIntoBox', { indices: selectedIndices, boxName });
-            selectedIndices = [];
-        }
-
-        function doUnpackBox(boxIndex) {
-            closeItemModal();
-            socket.emit('unpackBox', boxIndex);
             selectedIndices = [];
         }
 
