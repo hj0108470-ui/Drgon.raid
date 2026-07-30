@@ -235,10 +235,10 @@
                 </div>
 
                 <button class="btn" style="background:#27ae60; margin-bottom: 8px; padding: 12px; font-size: 16px;" onclick="goToBattle()">⚔️ 일반 보스 레이드 입장</button>
-                <button class="btn" style="background:#9b59b6; padding: 12px; font-size: 16px;" onclick="enterUpperDungeonCheck()">🦁 상위 던전 입장 (Lv.50+ / 600,000G)</button>
+                <button class="btn" style="background:#9b59b6; padding: 12px; font-size: 16px;" onclick="enterUpperDungeonCheck()">🦁 상위 던전 입장 (Lv.50+ / 6,000,000G)</button>
             </div>
 
-            <!-- ⭐ 로비 페이지 아래쪽에 추가된 실시간 채팅 카드 -->
+            <!-- 실시간 채팅 카드 -->
             <div class="card" style="margin-top: 10px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                     <span style="font-size: 13px; font-weight: bold; color: #3498db;">💬 실시간 소통 채팅</span>
@@ -248,7 +248,7 @@
                     </div>
                 </div>
                 <div id="chatBoxContainer" style="background: #111; border: 1px solid #333; border-radius: 6px; height: 120px; overflow-y: auto; padding: 6px; font-size: 11px; margin-bottom: 6px; text-align: left; display: flex; flex-direction: column; gap: 4px;">
-                    <div style="color: #777; text-style: italic;">채팅방에 연결되었습니다. 대화를 시작해보세요!</div>
+                    <div style="color: #777; font-style: italic;">채팅방에 연결되었습니다. 대화를 시작해보세요!</div>
                 </div>
                 <div style="display: flex; gap: 4px;">
                     <input type="text" id="chatInput" placeholder="메시지를 입력하세요..." style="margin-bottom: 0; font-size: 11px; padding: 6px;" onkeypress="if(event.key === 'Enter') sendChatMessage()">
@@ -344,7 +344,6 @@
         let activeTradeId = null;
         let myTradeSelectedIndices = [];
 
-        // 채팅 관련 변수
         let currentChatChannel = 'all';
 
         socket.on('connect', () => { myId = socket.id; });
@@ -404,7 +403,6 @@
             }
         });
 
-        // 💬 채팅 채널 전환 및 메시지 전송 스크립트 로직
         function switchChatChannel(channel) {
             currentChatChannel = channel;
             const btnAll = document.getElementById('chatTabAll');
@@ -944,3 +942,4 @@
     </script>
 </body>
 </html>
+
