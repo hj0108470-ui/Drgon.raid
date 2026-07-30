@@ -196,20 +196,21 @@ function calculateDamage(p) {
     return Math.round(baseAtk + (p.bonusAtk || 0) + levelBonusAtk);
 }
 
+// 필요 경험치 계산 배율 1.2배로 수정 반영 (360 -> 432 공식 호환)
 function addExp(p, amount) {
     if (p.level >= 100) {
         p.exp = 0;
         return;
     }
     p.exp += amount;
-    let reqExp = Math.round(360 * Math.pow(1.5, p.level - 1));
+    let reqExp = Math.round(360 * Math.pow(1.2, p.level - 1));
     while (p.level < 100 && p.exp >= reqExp) {
         p.exp -= reqExp;
         p.level++;
         p.maxHp += 10;
         p.hp = p.maxHp;
         p.gold += 5000;
-        reqExp = Math.round(360 * Math.pow(1.5, p.level - 1));
+        reqExp = Math.round(360 * Math.pow(1.2, p.level - 1));
     }
     if (p.level >= 100) {
         p.level = 100;
@@ -633,11 +634,11 @@ io.on('connection', (socket) => {
         const p1 = gameState.players[trade.p1];
         const p2 = gameState.players[trade.p2];
 
-        // 상대방에게 보낼 때 내 아이템들의 '이름' 정보를 함께 전달하도록 구성
+        // 상대방에게 등록된 아이템들의 실제 데이터 이름(WEAPON_DB 또는 저장된 이름)을 제대로 조회하도록 수정
         let tradeUpdatePayload = {
             ...trade,
-            p1ItemsName: p1 ? trade.p1Offer.items.map(idx => p1.inventory[idx] ? p1.inventory[idx].name : '알 수 없음') : [],
-            p2ItemsName: p2 ? trade.p2Offer.items.map(idx => p2.inventory[idx] ? p2.inventory[idx].name : '알 수 없음') : []
+            p1ItemsName: p1 ? trade.p1Offer.items.map(idx => (p1.inventory[idx] ? p1.inventory[idx].name : '알 수 없음')) : [],
+            p2ItemsName: p2 ? trade.p2Offer.items.map(idx => (p2.inventory[idx] ? p2.inventory[idx].name : '알 수 없음')) : []
         };
 
         io.to(trade.p1).emit('tradeStateUpdate', tradeUpdatePayload);
@@ -656,8 +657,8 @@ io.on('connection', (socket) => {
 
         let tradeUpdatePayload = {
             ...trade,
-            p1ItemsName: p1 ? trade.p1Offer.items.map(idx => p1.inventory[idx] ? p1.inventory[idx].name : '알 수 없음') : [],
-            p2ItemsName: p2 ? trade.p2Offer.items.map(idx => p2.inventory[idx] ? p2.inventory[idx].name : '알 수 없음') : []
+            p1ItemsName: p1 ? trade.p1Offer.items.map(idx => (p1.inventory[idx] ? p1.inventory[idx].name : '알 수 없음')) : [],
+            p2ItemsName: p2 ? trade.p2Offer.items.map(idx => (p2.inventory[idx] ? p2.inventory[idx].name : '알 수 없음')) : []
         };
 
         io.to(trade.p1).emit('tradeStateUpdate', tradeUpdatePayload);
