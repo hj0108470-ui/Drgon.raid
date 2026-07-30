@@ -265,7 +265,6 @@ io.on('connection', (socket) => {
         p.totalDamage = (p.totalDamage || 0) + dmg;
         p.gold += 15;
         
-        // 무기 딜량에 비례한 경험치 지급
         addExp(p, Math.max(1, Math.floor(dmg * 0.1)));
         saveAccountState(p);
 
@@ -381,11 +380,18 @@ io.on('connection', (socket) => {
         }
     }
 
-    // 1대1 실시간 거래 시스템 (요청 전송, 수락 흐름)
-    socket.on('requestP2PTrade', ({ targetSocketId }) => {
+    // 1대1 실시간 거래 시스템
+    socket.on('requestP2PTradeByName', (targetName) => {
         const sender = gameState.players[socket.id];
-        const target = gameState.players[targetSocketId];
-        if (!sender || !target) return;
+        let targetSocketId = null;
+        Object.keys(gameState.players).forEach(sId => {
+            if (gameState.players[sId].name === targetName && sId !== socket.id) targetSocketId = sId;
+        });
+
+        if (!targetSocketId) {
+            socket.emit('alertMessage', '해당 닉네임의 유저가 접속 중이지 않습니다.');
+            return;
+        }
 
         const tradeId = 'trade_' + Date.now();
         gameState.p2pTrades[tradeId] = {
@@ -394,8 +400,6 @@ io.on('connection', (socket) => {
             user2: targetSocketId,
             user1Items: [],
             user2Items: [],
-            user1Gold: 0,
-            user2Gold: 0,
             user1Accepted: false,
             user2Accepted: false
         };
@@ -439,7 +443,6 @@ io.on('connection', (socket) => {
             const u1 = gameState.players[trade.user1];
             const u2 = gameState.players[trade.user2];
             
-            // 아이템 및 골드 교환 반영
             trade.user1Items.forEach(entry => {
                 let item = u1.inventory.splice(entry.invIndex, 1)[0];
                 if (item) u2.inventory.push(item);
@@ -507,19 +510,58 @@ io.on('connection', (socket) => {
         io.emit('updateState', gameState);
     });
 
-    // 상세 거래소 매물 시스템
+    // 상세 거래소 매물 시스템 (골드 또는 무기/유물 지정 가능)
     socket.on('getMarketList', () => { socket.emit('marketListResult', gameState.marketListings); });
-    socket.on('listMarketItem', ({ inventoryIndex, priceGold }) => {
+    
+    socket.on('listMarketItem', ({ inventoryIndex, priceType, priceGold, priceItemIndex }) => {
         const p = gameState.players[socket.id];
         if (!p || inventoryIndex < 0 || inventoryIndex >= p.inventory.length) return;
+        
         const itemToSell = p.inventory[inventoryIndex];
         if (itemToSell.isLocked || p.equippedIndex === inventoryIndex) return;
+
+        let reqGold = 0;
+        let reqItem = null;
+
+        if (priceType === 'gold') {
+            reqGold = parseInt(priceGold) || 0;
+        } else if (priceType === 'item') {
+            if (priceItemIndex < 0 || priceItemIndex >= p.inventory.length || priceItemIndex === inventoryIndex) {
+                socket.emit('alertMessage', '올바른 교환원하실 무기/유물 슬롯을 지정해주세요.');
+                return;
+            }
+            reqItem = p.inventory[priceItemIndex];
+            if (reqItem.isLocked || p.equippedIndex === priceItemIndex) {
+                socket.emit('alertMessage', '잠겨 있거나 장착 중인 아이템은 교환 가격으로 지정할 수 없습니다.');
+                return;
+            }
+        }
+
+        // 아이템 등록 진행 (판매자 인벤토리에서 차감)
         p.inventory.splice(inventoryIndex, 1);
+        if (p.equippedIndex === inventoryIndex) p.equippedIndex = null;
+        
+        // 만약 교환용 아이템을 내 인벤토리에서 지정했다면 그 아이템도 같이 등록용으로 묶어서 차감하거나 거래 시 처리
+        if (priceType === 'item' && reqItem) {
+            // 인덱스가 밀릴 수 있으므로 정확히 아이템 객체 기준으로 제거
+            const actualIdx = p.inventory.findIndex(it => it.id === reqItem.id);
+            if (actualIdx > -1) {
+                p.inventory.splice(actualIdx, 1);
+                if (p.equippedIndex === actualIdx) p.equippedIndex = null;
+            }
+        }
 
         const listingId = 'market_' + Date.now();
         gameState.marketListings[listingId] = {
-            id: listingId, sellerId: socket.id, sellerName: p.name, item: itemToSell, priceGold: parseInt(priceGold) || 0
+            id: listingId,
+            sellerId: socket.id,
+            sellerName: p.name,
+            item: itemToSell,
+            priceType: priceType, // 'gold' 또는 'item'
+            priceGold: reqGold,
+            priceItem: reqItem // 교환 요구 아이템 상세 정보
         };
+
         saveAccountState(p);
         io.emit('updateState', gameState);
         io.emit('marketListResult', gameState.marketListings);
@@ -528,27 +570,59 @@ io.on('connection', (socket) => {
     socket.on('buyMarketItem', ({ listingId }) => {
         const buyer = gameState.players[socket.id];
         const listing = gameState.marketListings[listingId];
-        if (!buyer || !listing || buyer.gold < listing.priceGold || buyer.inventory.length >= 36) return;
-        buyer.gold -= listing.priceGold;
-        buyer.inventory.push(listing.item);
-        
+        if (!buyer || !listing || buyer.inventory.length >= 36) return;
+
         const seller = gameState.players[listing.sellerId];
-        if (seller) {
-            seller.gold += listing.priceGold;
-            saveAccountState(seller);
+
+        if (listing.priceType === 'gold') {
+            if (buyer.gold < listing.priceGold) {
+                socket.emit('alertMessage', '골드가 부족합니다!');
+                return;
+            }
+            buyer.gold -= listing.priceGold;
+            buyer.inventory.push(listing.item);
+
+            if (seller) {
+                seller.gold += listing.priceGold;
+                saveAccountState(seller);
+            }
+        } else if (listing.priceType === 'item') {
+            // 구매자가 해당 요구 아이템을 가지고 있는지 확인
+            const reqIdx = buyer.inventory.findIndex(it => 
+                it.name === listing.priceItem.name && it.rarity === listing.priceItem.rarity && !it.isLocked
+            );
+            if (reqIdx === -1) {
+                socket.emit('alertMessage', '거래에 필요한 지정된 무기/유물 아이템이 인벤토리에 없습니다! (잠긴 아이템은 사용 불가)');
+                return;
+            }
+            // 구매자의 요구 아이템을 판매자에게 지급하고, 매물 아이템을 구매자에게 지급
+            const paymentItem = buyer.inventory.splice(reqIdx, 1)[0];
+            buyer.inventory.push(listing.item);
+
+            if (seller) {
+                if (seller.inventory.length < 36) {
+                    seller.inventory.push(paymentItem);
+                } else {
+                    // 판매자 인벤토리가 꽉 찼을 경우 보조 처리 혹은 골드로 환산 등
+                    seller.gold += (paymentItem.sellPrice || 100);
+                }
+                saveAccountState(seller);
+            }
         }
+
         delete gameState.marketListings[listingId];
         saveAccountState(buyer);
         io.emit('updateState', gameState);
         io.emit('marketListResult', gameState.marketListings);
     });
 
+    // 길드 시스템
     socket.on('createGuild', ({ guildName, maxMembers }) => {
         const p = gameState.players[socket.id];
         if (!p || p.guildId) return;
         const guildId = 'g_' + Math.random().toString(36).substring(2, 9);
         gameState.guilds[guildId] = {
-            id: guildId, name: guildName.trim(), maxMembers: Math.max(2, Math.min(20, maxMembers || 5)),
+            id: guildId, name: guildName.trim(), maxMembers: Math.max(2, Math.min(20, maxMembers || 10)),
             leaderId: socket.id, members: [socket.id]
         };
         p.guildId = guildId;
