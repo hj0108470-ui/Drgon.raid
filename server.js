@@ -886,13 +886,17 @@ io.on('connection', (socket) => {
 
     socket.on('useCoupon', (code) => {
         const p = gameState.players[socket.id];
-        if (!p || !COUPONS[code]) return;
+        if (!p || !COUPONS[code]) {
+            socket.emit('couponResult', { success: false, message: '유효하지 않은 쿠폰 코드입니다.' });
+            return;
+        }
         const c = COUPONS[code];
         if (c.type === 'gold') p.gold += c.reward;
         else if (c.type === 'weapon' && p.inventory.length < 36) {
             p.inventory.push({ ...WEAPON_DB[c.reward], id: Date.now(), enhance: 0 });
         }
         saveAccountState(p);
+        socket.emit('couponResult', { success: true, message: '쿠폰이 성공적으로 등록되었습니다!' });
         io.emit('updateState', gameState);
     });
 
