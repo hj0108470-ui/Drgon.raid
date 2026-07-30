@@ -44,10 +44,6 @@
         .hp-bar-bg { background: #111; height: 24px; border-radius: 12px; overflow: hidden; margin: 10px 0; border: 1px solid #444; }
         .hp-bar-fill { background: linear-gradient(90deg, #c0392b, #e74c3c); height: 100%; width: 100%; transition: width 0.2s; }
         
-        .exp-bar-bg { background: #111; height: 16px; border-radius: 8px; overflow: hidden; margin: 6px 0; border: 1px solid #444; position: relative; }
-        .exp-bar-fill { background: linear-gradient(90deg, #27ae60, #2ecc71); height: 100%; width: 0%; transition: width 0.3s; }
-        .exp-text { position: absolute; width: 100%; top: 0; left: 0; font-size: 10px; line-height: 16px; font-weight: bold; text-align: center; color: #fff; text-shadow: 1px 1px 2px #000; }
-
         .action-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-top: 10px; }
         .btn { background: #d35400; border: none; padding: 14px; color: #fff; font-size: 16px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; box-shadow: 0 3px 6px rgba(0,0,0,0.3); }
         .btn:active { transform: scale(0.97); }
@@ -69,14 +65,20 @@
         .modal-content { background: #1e222d; padding: 20px; border-radius: 10px; width: 340px; border: 1px solid #555; text-align: center; }
         input, select { padding: 8px; border-radius: 4px; border: 1px solid #444; background: #111; color: #fff; width: 85%; margin-bottom: 10px; }
         
-        .guild-item-row, .user-row, .market-row { background: #2a2e3d; padding: 10px; border-radius: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .guild-item-row, .user-row { background: #2a2e3d; padding: 10px; border-radius: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
         .popup-btn { background: #34495e; color: white; border: none; padding: 10px; margin: 4px 0; width: 100%; border-radius: 5px; cursor: pointer; font-weight: bold; }
 
         .screen { display: none; }
         .screen.active { display: block; }
+
+        .trade-container { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
+        .trade-box { background: #15171e; border: 1px solid #444; border-radius: 8px; padding: 10px; min-height: 110px; text-align: center; }
+        .trade-slot-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 8px; }
+        .trade-item-chip { background: #222; border: 1px solid #555; border-radius: 4px; font-size: 10px; padding: 4px; display:flex; flex-direction:column; align-items:center; }
     </style>
 </head>
 <body>
+    <!-- 로그인 모달 -->
     <div id="authModal" class="modal" style="display: flex;">
         <div class="modal-content">
             <h3 style="color:#f1c40f; margin-top:0;">🔐 계정 로그인 / 회원가입</h3>
@@ -90,90 +92,37 @@
         </div>
     </div>
 
+    <!-- 길드 참여 모달 -->
     <div id="guildListModal" class="modal">
         <div class="modal-content" style="width: 330px;">
-            <h3 style="color:#3498db; margin-top:0;">🏰 길드 목록</h3>
+            <h3 style="color:#3498db; margin-top:0;">🏰 길드 참여하기</h3>
             <div id="guildListContainer" style="max-height: 180px; overflow-y: auto; margin-bottom: 10px;"></div>
             <button class="btn" style="background:#555; padding: 8px;" onclick="closeGuildModal()">닫기</button>
         </div>
     </div>
 
-    <div id="guildInfoModal" class="modal">
-        <div class="modal-content" style="width: 360px;">
-            <h3 id="guildInfoTitle" style="color:#f1c40f; margin-top:0;">🏰 길드 정보</h3>
-            <div id="guildMemberListContainer" style="max-height: 220px; overflow-y: auto; margin-bottom: 10px; text-align: left;"></div>
-            <button class="btn" style="background:#555; padding: 8px; width:100%;" onclick="closeGuildInfoModal()">닫기</button>
-        </div>
-    </div>
-
-    <div id="onlineUsersModal" class="modal">
+    <!-- 유저 목록 모달 (1:1 거래용) -->
+    <div id="tradeUserModal" class="modal">
         <div class="modal-content" style="width: 340px;">
-            <h3 style="color:#3498db; margin-top:0;">👥 거래할 상대 선택</h3>
-            <div id="onlineUsersContainer" style="max-height: 200px; overflow-y: auto; margin-bottom: 10px;"></div>
-            <button class="btn" style="background:#555; padding: 8px;" onclick="closeOnlineUsersModal()">닫기</button>
+            <h3 style="color:#f1c40f; margin-top:0;">⚖️ 1:1 유저 거래</h3>
+            <div id="onlineUsersContainer" style="max-height: 180px; overflow-y: auto; margin-bottom: 10px;"></div>
+            <button class="btn" style="background:#555; padding: 8px;" onclick="closeTradeUserModal()">닫기</button>
         </div>
     </div>
 
+    <!-- 거래 요청 수락 모달 -->
     <div id="tradeRequestModal" class="modal">
         <div class="modal-content">
-            <h3 style="color:#e67e22; margin-top:0;">🤝 1:1 거래 요청</h3>
-            <p id="tradeRequestText" style="font-size: 13px; color: #fff;"></p>
-            <div style="display:flex; gap:10px; margin-top:15px;">
-                <button class="btn" style="background:#27ae60; padding:10px;" onclick="acceptIncomingTrade()">수락</button>
-                <button class="btn" style="background:#c0392b; padding:10px;" onclick="rejectIncomingTrade()">거절</button>
+            <h3 style="color:#e74c3c; margin-top:0;">🚨 거래 요청 도착!</h3>
+            <p id="tradeRequestText" style="font-size: 13px;"></p>
+            <div style="display:flex; gap:8px;">
+                <button class="btn" style="background:#27ae60; padding:10px;" onclick="acceptTradeRequest()">수락 ✅</button>
+                <button class="btn" style="background:#c0392b; padding:10px;" onclick="closeTradeRequestModal()">거절 ❌</button>
             </div>
         </div>
     </div>
 
-    <div id="tradeRoomModal" class="modal">
-        <div class="modal-content" style="width: 400px; text-align: left;">
-            <h3 style="color:#f1c40f; margin-top:0; text-align:center;">🤝 1:1 실시간 거래</h3>
-            <div style="display:flex; gap:6px; margin-bottom:10px;">
-                <div style="flex:1; background:#15171e; border:1px solid #3498db; padding:8px; border-radius:6px; text-align:center;">
-                    <div style="font-size:11px; color:#3498db; font-weight:bold;">나의 거래 물건</div>
-                    <div id="myTradeOfferSlot" style="height:45px; background:#111; border:1px solid #444; border-radius:4px; margin-top:5px; display:flex; align-items:center; justify-content:center; font-size:11px;">없음</div>
-                </div>
-                <div style="flex:1; background:#15171e; border:1px solid #e74c3c; padding:8px; border-radius:6px; text-align:center;">
-                    <div style="font-size:11px; color:#e74c3c; font-weight:bold;"><span id="partnerNameLabel">상대</span>의 거래 물건</div>
-                    <div id="partnerTradeOfferSlot" style="height:45px; background:#111; border:1px solid #444; border-radius:4px; margin-top:5px; display:flex; align-items:center; justify-content:center; font-size:11px;">없음</div>
-                </div>
-            </div>
-            <div style="display:flex; gap:10px; margin-bottom:10px;">
-                <button id="tradeReadyBtn" class="btn" style="flex:1; background:#27ae60; padding:10px; font-size:14px;" onclick="toggleTradeReady()">거래 수락 (준비)</button>
-                <button class="btn" style="flex:1; background:#c0392b; padding:10px; font-size:14px;" onclick="cancelTradeSession()">거래 취소</button>
-            </div>
-            <hr style="border-color:#444; margin:8px 0;">
-            <p style="font-size:11px; color:#aaa; margin:0 0 5px 0;">📦 무기고 (아이템 선택 후 올리기)</p>
-            <div class="inventory-grid" id="tradeInventoryGrid" style="max-height: 160px; overflow-y: auto;"></div>
-            <button class="btn" style="background:#e67e22; padding:10px; margin-top:8px; font-size:13px; width:100%;" onclick="putItemToTrade()">거래창에 올리기</button>
-        </div>
-    </div>
-
-    <div id="marketModal" class="modal">
-        <div class="modal-content" style="width: 380px; text-align: left;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h3 style="color:#e67e22; margin:0;">🛒 실시간 거래소</h3>
-                <button class="btn" style="padding:4px 8px; font-size:11px; width:auto; background:#27ae60;" onclick="openMarketRegisterModal()">매물 내놓기</button>
-            </div>
-            <hr style="border-color:#444; margin:10px 0;">
-            <div id="marketListContainer" style="max-height: 250px; overflow-y: auto; margin-bottom: 10px;"></div>
-            <button class="btn" style="background:#555; padding: 8px; width:100%;" onclick="closeMarketModal()">닫기</button>
-        </div>
-    </div>
-
-    <div id="marketRegisterModal" class="modal">
-        <div class="modal-content" style="width: 340px;">
-            <h3 style="color:#f1c40f; margin-top:0;">📦 거래소 매물 등록</h3>
-            <input type="number" id="marketSlotInput" placeholder="인벤토리 슬롯 번호 (0~35)" min="0" max="35">
-            <input type="number" id="marketPriceInput" placeholder="판매 가격 (골드)" min="0">
-            <select id="marketDesiredKey" style="display:none;"><option value="none">상관없음</option></select>
-            <div style="display:flex; gap:5px; margin-top:5px;">
-                <button class="btn" style="background:#27ae60; padding:10px;" onclick="submitMarketItem()">등록하기</button>
-                <button class="btn" style="background:#555; padding:10px;" onclick="closeMarketRegisterModal()">취소</button>
-            </div>
-        </div>
-    </div>
-
+    <!-- 아이템 관리 모달 -->
     <div id="itemActionModal" class="modal">
         <div class="modal-content">
             <h3 id="popupTitle" style="color:#f1c40f; margin-top:0;">아이템 관리</h3>
@@ -183,29 +132,55 @@
     </div>
 
     <div class="container">
+        <!-- 로비 화면 -->
         <div id="lobbyScreen" class="screen">
             <div class="card" style="text-align: center;">
                 <h1 style="color:#f1c40f; margin: 5px 0;">🌟 LOBBY</h1>
                 <div style="background: #15171e; padding: 12px; border-radius: 8px; margin: 15px 0; text-align: left;">
                     <p style="margin: 5px 0;">👤 닉네임: <strong id="lobbyName" style="color:#f1c40f;">-</strong></p>
-                    <p style="margin: 5px 0;">⭐ 레벨: <strong id="lobbyLevel" style="color:#2ecc71;">1</strong></p>
-                    <div class="exp-bar-bg">
-                        <div id="lobbyExpFill" class="exp-bar-fill"></div>
-                        <div id="lobbyExpText" class="exp-text">0 / 360 (0%)</div>
-                    </div>
-                    <p style="margin: 5px 0;">💰 골드: <span id="lobbyGold" style="color:#f1c40f;">0</span> G</p>
-                    <p style="margin: 5px 0;">🎒 인벤토리: <span id="lobbyInvenCount">0</span> / 36</p>
-                    <p style="margin: 5px 0;">🏰 길드: <span id="lobbyGuildStatus" style="color:#e74c3c;">미소속</span></p>
+                    <p style="margin: 5px 0;">💰 보유 골드: <span id="lobbyGold" style="color:#f1c40f;">0</span> G</p>
+                    <p style="margin: 5px 0;">🎒 인벤토리: <span id="lobbyInvenCount">0</span> / 36 칸</p>
+                    <p style="margin: 5px 0;">🏰 소속 길드: <span id="lobbyGuildStatus" style="color:#e74c3c;">미소속</span></p>
                 </div>
                 <div id="lobbyGuildControl" style="margin-bottom: 10px;"></div>
-                <div style="display:flex; gap:8px; margin-bottom:10px;">
-                    <button class="btn" style="background:#e67e22; flex:1; padding: 12px;" onclick="openMarketModal()">🛒 거래소</button>
-                    <button class="btn" style="background:#3498db; flex:1; padding: 12px;" onclick="openOnlineUsersModal()">👥 1:1 거래</button>
-                </div>
-                <button class="btn" style="background:#27ae60; padding: 15px; font-size: 18px;" onclick="goToBattle()">⚔️ 보스 레이드 입장</button>
+                <button class="btn" style="background:#e67e22; margin-bottom: 10px; padding: 12px;" onclick="openTradeMarket()">⚖️ 1:1 유저 거래하기</button>
+                <button class="btn" style="background:#27ae60; padding: 15px; font-size: 18px;" onclick="goToBattle()">⚔️ 보스 레이드 입장하기</button>
             </div>
         </div>
 
+        <!-- 1:1 거래 화면 -->
+        <div id="tradeScreen" class="screen">
+            <div class="card" style="border: 2px solid #e67e22; text-align: center;">
+                <h2 style="color:#e67e22; margin-top:0;">🤝 1:1 실시간 거래 중</h2>
+                <p style="font-size: 12px; color:#aaa;">상대방: <strong id="tradePartnerName" style="color:#fff;">-</strong></p>
+                
+                <div class="trade-container">
+                    <div class="trade-box">
+                        <div style="font-size:12px; color:#3498db; font-weight:bold;">나의 거래 칸</div>
+                        <div id="myTradeSlots" class="trade-slot-grid"></div>
+                        <div id="myTradeStatusText" style="margin-top:6px; font-size:11px; color:#e74c3c;">대기 중...</div>
+                    </div>
+                    <div class="trade-box">
+                        <div style="font-size:12px; color:#e67e22; font-weight:bold;">상대방 거래 칸</div>
+                        <div id="partnerTradeSlots" class="trade-slot-grid"></div>
+                        <div id="partnerTradeStatusText" style="margin-top:6px; font-size:11px; color:#e74c3c;">대기 중...</div>
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:8px; margin-top:10px;">
+                    <button class="btn" style="background:#27ae60; padding:10px;" onclick="toggleTradeReady()">✅ 거래 동의 (준비)</button>
+                    <button class="btn" style="background:#c0392b; padding:10px;" onclick="cancelTradeSession()">❌ 거래 취소</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 style="margin-top:0; font-size:14px; color:#f1c40f;">🎒 무기고에서 거래 칸에 올릴 무기 선택</h3>
+                <div class="inventory-grid" id="tradeInventoryGrid"></div>
+                <button class="btn btn-action" onclick="addSelectedToTrade()">➕ 선택한 무기를 거래 칸에 올리기</button>
+            </div>
+        </div>
+
+        <!-- 전투 화면 -->
         <div id="battleScreen" class="screen">
             <div style="text-align: left; margin-bottom: 8px;">
                 <button class="btn btn-sub" style="background:#555;" onclick="goToLobby()">🏠 로비로 돌아가기</button>
@@ -223,35 +198,31 @@
             </div>
 
             <div class="card">
-                <h3 style="margin-top:0; color:#3498db;">🛡️ 내 정보</h3>
-                <p style="margin: 4px 0;">⭐ 레벨: <strong id="battleLevel" style="color:#2ecc71;">1</strong> | ❤️ 체력: <span id="myHp">100</span>/<span id="myMaxHp">100</span> | 💰 골드: <span id="myGold">500</span> G</p>
-                <div class="exp-bar-bg" style="margin-top:6px;">
-                    <div id="battleExpFill" class="exp-bar-fill"></div>
-                    <div id="battleExpText" class="exp-text">0 / 360 (0%)</div>
-                </div>
+                <h3 style="margin-top:0; color:#3498db;">🛡️ 전투 상태</h3>
+                <p style="margin: 6px 0;">❤️ 체력: <span id="myHp">100</span>/100 | 💰 골드: <span id="myGold">500</span> G</p>
             </div>
 
             <div class="card" style="border: 2px solid #f1c40f;">
-                <h3 style="margin: 0 0 8px 0; color: #f1c40f; font-size: 15px;">🏆 실시간 랭킹</h3>
+                <h3 style="margin: 0 0 8px 0; color: #f1c40f; font-size: 15px;">🏆 실시간 랭킹보드</h3>
                 <div class="ranking-container">
                     <div class="ranking-box">
-                        <div style="font-weight:bold; color:#3498db; margin-bottom:4px;">👤 개인 랭킹</div>
+                        <div style="font-weight:bold; color:#3498db; margin-bottom:4px;">👤 개인 데미지 랭킹</div>
                         <ol id="playerRankingList" class="ranking-list"></ol>
                     </div>
                     <div class="ranking-box">
-                        <div style="font-weight:bold; color:#e67e22; margin-bottom:4px;">🏰 길드 랭킹</div>
+                        <div style="font-weight:bold; color:#e67e22; margin-bottom:4px;">🏰 길드 데미지 랭킹</div>
                         <ol id="guildRankingList" class="ranking-list"></ol>
                     </div>
                 </div>
             </div>
 
             <div class="card">
-                <h3 style="margin-top:0;">🎰 뽑기</h3>
-                <button class="btn btn-gacha" onclick="gacha()">🎲 무기 뽑기 (1,000G)</button>
+                <h3 style="margin-top:0;">🎰 무기 뽑기</h3>
+                <button class="btn btn-gacha" onclick="gacha()">🎲 행운의 룰렛 뽑기 (1,000G)</button>
             </div>
 
             <div class="card">
-                <h3 style="margin-top:0;">🎁 쿠폰</h3>
+                <h3 style="margin-top:0;">🎁 리딤 쿠폰 코드</h3>
                 <div style="display: flex; gap: 5px; justify-content: center;">
                     <input type="text" id="couponInput" placeholder="쿠폰 코드 입력" style="width: 70%; margin-bottom: 0;">
                     <button class="btn" style="width: 25%; padding: 8px; font-size: 14px;" onclick="useCoupon()">등록</button>
@@ -259,9 +230,11 @@
             </div>
 
             <div class="card">
-                <h3 style="margin-top:0;">🎒 무기고 (36칸)</h3>
+                <h3 style="margin-top:0; display:flex; justify-content:space-between; align-items:center;">
+                    <span>🎒 무기고 (36칸)</span>
+                </h3>
                 <div class="inventory-grid" id="inventoryGrid"></div>
-                <button class="btn btn-action" onclick="openActionModal()">⚙️ 선택 무기 관리 / 일괄 처리</button>
+                <button class="btn btn-action" onclick="openActionModal()">⚙️ 선택한 무기 관리 / 일괄 처리</button>
             </div>
         </div>
     </div>
@@ -274,8 +247,9 @@
         let equippedIndex = null;
         let currentGuildId = null;
 
-        let currentTradeId = null;
-        let selectedTradeInventoryIndex = null;
+        let activeTradeId = null;
+        let tradeSelectedIndices = [];
+        let myOfferedIndices = [];
 
         socket.on('connect', () => { myId = socket.id; });
 
@@ -290,14 +264,14 @@
         function requestRegister() {
             const nickname = document.getElementById('authNickInput').value.trim();
             const password = document.getElementById('authPwInput').value.trim();
-            if (!nickname || !password) { alert('닉네임과 비밀번호를 입력해주세요!'); return; }
+            if (!nickname || !password) { alert('닉네임과 비밀번호를 모두 입력해주세요!'); return; }
             socket.emit('register', { nickname, password });
         }
 
         function requestLogin() {
             const nickname = document.getElementById('authNickInput').value.trim();
             const password = document.getElementById('authPwInput').value.trim();
-            if (!nickname || !password) { alert('닉네임과 비밀번호를 입력해주세요!'); return; }
+            if (!nickname || !password) { alert('닉네임과 비밀번호를 모두 입력해주세요!'); return; }
             socket.emit('login', { nickname, password });
         }
 
@@ -325,9 +299,9 @@
         }
 
         function promptCreateGuild() {
-            const guildName = prompt('생성할 길드 이름:', '기사단');
+            const guildName = prompt('생성할 길드 이름을 입력해주세요:', '명예로운 기사단');
             if (!guildName) return;
-            const maxMembers = prompt('최대 인원 (2~20명):', '5');
+            const maxMembers = prompt('길드 최대 인원을 설정하세요 (2 ~ 20명):', '5');
             socket.emit('createGuild', { guildName, maxMembers: parseInt(maxMembers) || 5 });
         }
 
@@ -337,99 +311,87 @@
         }
         function closeGuildModal() { document.getElementById('guildListModal').style.display = 'none'; }
         function joinSelectedGuild(guildId) { socket.emit('joinGuild', guildId); closeGuildModal(); }
+        function leaveGuild() { if (confirm('정말 길드를 탈퇴하시겠습니까?')) socket.emit('leaveGuild'); }
         
-        function openGuildInfoModal() {
-            socket.emit('getGuildInfo');
-            document.getElementById('guildInfoModal').style.display = 'flex';
-        }
-        function closeGuildInfoModal() { document.getElementById('guildInfoModal').style.display = 'none'; }
-        
-        function leaveGuild() { if (confirm('탈퇴하시겠습니까?')) socket.emit('leaveGuild'); }
-        function toggleSub(targetSocketId) { socket.emit('toggleSubLeader', targetSocketId); }
-        
-        socket.on('guildResult', (res) => { alert(res.message); openGuildInfoModal(); });
+        socket.on('guildResult', (res) => { alert(res.message); socket.emit('getGuildList'); });
 
         socket.on('guildListResult', (list) => {
             const container = document.getElementById('guildListContainer');
             container.innerHTML = '';
             if (list.length === 0) {
-                container.innerHTML = '<p style="color:#aaa; font-size:13px;">길드가 없습니다.</p>';
+                container.innerHTML = '<p style="color:#aaa; font-size:13px;">현재 생성된 길드가 없습니다.</p>';
                 return;
             }
             list.forEach(g => {
                 const row = document.createElement('div');
                 row.className = 'guild-item-row';
-                row.innerHTML = `<div style="font-size:13px;"><strong>${g.name}</strong> (${g.currentCount}/${g.maxMembers})</div><button class="btn" style="padding:4px 10px; font-size:12px; width:auto;" onclick="joinSelectedGuild('${g.id}')">가입</button>`;
+                row.innerHTML = `
+                    <div style="text-align:left; font-size:13px;">
+                        <strong>${g.name}</strong> <span style="color:#3498db; font-size:11px;">(${g.currentCount}/${g.maxMembers}인)</span>
+                    </div>
+                    <button class="btn" style="padding:4px 10px; font-size:12px; width:auto;" onclick="joinSelectedGuild('${g.id}')">가입</button>
+                `;
                 container.appendChild(row);
             });
         });
 
-        socket.on('guildInfoResult', (data) => {
-            document.getElementById('guildInfoTitle').innerText = `🏰 길드: ${data.guildName}`;
-            const container = document.getElementById('guildMemberListContainer');
-            container.innerHTML = '';
-            data.members.forEach(m => {
-                const row = document.createElement('div');
-                row.className = 'guild-item-row';
-                let actionBtnHtml = (data.isMaster && m.role !== '길드마스터') ? `<button class="btn" style="padding:3px 8px; font-size:11px; width:auto; background:#8e44ad;" onclick="toggleSub('${m.id}')">${m.role === '길드부마스터' ? '해제' : '임명'}</button>` : '';
-                row.innerHTML = `<div style="font-size:12px;"><strong>${m.name}</strong> [${m.role}]</div><div>${actionBtnHtml}</div>`;
-                container.appendChild(row);
-            });
-        });
-
-        function openOnlineUsersModal() {
+        function openTradeMarket() {
             socket.emit('getOnlineUsers');
-            document.getElementById('onlineUsersModal').style.display = 'flex';
+            document.getElementById('tradeUserModal').style.display = 'flex';
         }
-        function closeOnlineUsersModal() { document.getElementById('onlineUsersModal').style.display = 'none'; }
+        function closeTradeUserModal() { document.getElementById('tradeUserModal').style.display = 'none'; }
 
         socket.on('onlineUsersResult', (users) => {
             const container = document.getElementById('onlineUsersContainer');
             container.innerHTML = '';
             if (users.length === 0) {
-                container.innerHTML = '<p style="color:#aaa; font-size:12px; text-align:center;">접속 중인 유저가 없습니다.</p>';
+                container.innerHTML = '<p style="color:#aaa; font-size:13px;">현재 접속 중인 다른 유저가 없습니다.</p>';
                 return;
             }
             users.forEach(u => {
                 const row = document.createElement('div');
                 row.className = 'user-row';
-                row.innerHTML = `<span style="font-size:13px; font-weight:bold;">${u.name}</span><button class="btn" style="padding:4px 10px; font-size:12px; width:auto; background:#27ae60;" onclick="sendTradeRequest('${u.id}')">신청</button>`;
+                row.innerHTML = `
+                    <span style="font-size:13px;">👤 ${u.name}</span>
+                    <button class="btn" style="padding:4px 10px; font-size:12px; width:auto; background:#2980b9;" onclick="sendTradeRequest('${u.id}')">거래 신청</button>
+                `;
                 container.appendChild(row);
             });
         });
 
         function sendTradeRequest(targetId) {
-            closeOnlineUsersModal();
             socket.emit('requestTrade', targetId);
-            alert('거래 요청을 보냈습니다.');
+            alert('거래 요청을 전송했습니다. 상대방의 수락을 기다리는 중...');
+            closeTradeUserModal();
         }
 
-        let incomingTradeFromId = null;
-        socket.on('tradeRequested', ({ fromId, fromName }) => {
-            incomingTradeFromId = fromId;
-            document.getElementById('tradeRequestText').innerText = `'${fromName}' 님의 거래 요청!`;
+        let pendingTradeFromId = null;
+        socket.on('tradeRequested', (data) => {
+            pendingTradeFromId = data.fromId;
+            document.getElementById('tradeRequestText').innerText = `[${data.fromName}] 님이 1:1 거래를 요청했습니다!`;
             document.getElementById('tradeRequestModal').style.display = 'flex';
         });
 
-        function acceptIncomingTrade() {
-            document.getElementById('tradeRequestModal').style.display = 'none';
-            if (incomingTradeFromId) socket.emit('acceptTrade', incomingTradeFromId);
+        function acceptTradeRequest() {
+            if (pendingTradeFromId) {
+                socket.emit('acceptTrade', pendingTradeFromId);
+                document.getElementById('tradeRequestModal').style.display = 'none';
+            }
         }
-        function rejectIncomingTrade() {
+        function closeTradeRequestModal() {
             document.getElementById('tradeRequestModal').style.display = 'none';
-            incomingTradeFromId = null;
+            pendingTradeFromId = null;
         }
 
-        socket.on('tradeStart', ({ tradeId, partnerName }) => {
-            currentTradeId = tradeId;
-            document.getElementById('partnerNameLabel').innerText = partnerName;
-            const btn = document.getElementById('tradeReadyBtn');
-            btn.innerText = '거래 수락 (준비)';
-            btn.style.background = '#27ae60';
+        socket.on('tradeMsg', (res) => { alert(res.message); });
+
+        socket.on('tradeStart', (data) => {
+            activeTradeId = data.tradeId;
+            document.getElementById('tradePartnerName').innerText = data.partnerName;
+            myOfferedIndices = [];
+            tradeSelectedIndices = [];
+            showScreen('tradeScreen');
             renderTradeInventory();
-            document.getElementById('myTradeOfferSlot').innerHTML = '없음';
-            document.getElementById('partnerTradeOfferSlot').innerHTML = '없음';
-            document.getElementById('tradeRoomModal').style.display = 'flex';
         });
 
         function renderTradeInventory() {
@@ -440,104 +402,79 @@
                 slot.className = 'slot';
                 const item = latestInventory[i];
                 if (item) {
-                    if (selectedTradeInventoryIndex === i) slot.classList.add('selected');
-                    slot.innerHTML = '<div>' + (item.icon || '⚔️') + '</div><div>+' + (item.enhance||0) + '</div>';
-                    slot.onclick = () => { selectedTradeInventoryIndex = i; renderTradeInventory(); };
-                } else { slot.innerText = '빈칸'; }
+                    if (myOfferedIndices.includes(i)) {
+                        slot.style.opacity = '0.3';
+                        slot.innerText = '올림';
+                    } else {
+                        if (tradeSelectedIndices.includes(i)) slot.classList.add('selected');
+                        slot.innerHTML = '<div>' + item.icon + '</div><div>+' + (item.enhance||0) + '</div>';
+                        slot.onclick = () => {
+                            const pos = tradeSelectedIndices.indexOf(i);
+                            if (pos > -1) { tradeSelectedIndices.splice(pos, 1); slot.classList.remove('selected'); }
+                            else { tradeSelectedIndices.push(i); slot.classList.add('selected'); }
+                        };
+                    }
+                } else {
+                    slot.innerText = '빈칸';
+                }
                 grid.appendChild(slot);
             }
         }
 
-        function putItemToTrade() {
-            if (selectedTradeInventoryIndex === null) { alert('아이템을 선택해주세요.'); return; }
-            socket.emit('updateTradeOffer', { tradeId: currentTradeId, offeredIndices: [selectedTradeInventoryIndex] });
+        function addSelectedToTrade() {
+            if (tradeSelectedIndices.length === 0) { alert('거래 칸에 올릴 무기를 선택해주세요!'); return; }
+            myOfferedIndices = [...myOfferedIndices, ...tradeSelectedIndices];
+            tradeSelectedIndices = [];
+            socket.emit('updateTradeOffer', { tradeId: activeTradeId, offeredIndices: myOfferedIndices });
+            renderTradeInventory();
         }
 
-        socket.on('tradeStateUpdate', (trade) => {
-            const isP1 = (myId === trade.p1Id);
-            const myItems = isP1 ? trade.items1 : trade.items2;
-            const partnerItems = isP1 ? trade.items2 : trade.items1;
-            document.getElementById('myTradeOfferSlot').innerHTML = myItems.length > 0 ? `${myItems[0].icon} ${myItems[0].name}` : '없음';
-            document.getElementById('partnerTradeOfferSlot').innerHTML = partnerItems.length > 0 ? `${partnerItems[0].icon} ${partnerItems[0].name}` : '없음';
+        socket.on('tradeStateUpdate', (data) => {
+            const mySlots = document.getElementById('myTradeSlots');
+            mySlots.innerHTML = '';
+            data.items1.forEach(item => {
+                const chip = document.createElement('div');
+                chip.className = 'trade-item-chip';
+                chip.innerHTML = `<span>${item.icon}</span><span>+${item.enhance||0}</span>`;
+                mySlots.appendChild(chip);
+            });
+            document.getElementById('myTradeStatusText').innerText = data.ready1 ? '준비 완료 ✅' : '대기 중...';
+            document.getElementById('myTradeStatusText').style.color = data.ready1 ? '#2ecc71' : '#e74c3c';
+
+            const partnerSlots = document.getElementById('partnerTradeSlots');
+            partnerSlots.innerHTML = '';
+            data.items2.forEach(item => {
+                const chip = document.createElement('div');
+                chip.className = 'trade-item-chip';
+                chip.innerHTML = `<span>${item.icon}</span><span>+${item.enhance||0}</span>`;
+                partnerSlots.appendChild(chip);
+            });
+            document.getElementById('partnerTradeStatusText').innerText = data.ready2 ? '준비 완료 ✅' : '대기 중...';
+            document.getElementById('partnerTradeStatusText').style.color = data.ready2 ? '#2ecc71' : '#e74c3c';
         });
 
-        let isTradeReadyState = false;
+        let isTradeReady = false;
         function toggleTradeReady() {
-            isTradeReadyState = !isTradeReadyState;
-            const btn = document.getElementById('tradeReadyBtn');
-            if (isTradeReadyState) {
-                btn.innerText = '준비완료';
-                btn.style.background = '#e67e22';
-            } else {
-                btn.innerText = '거래 수락 (준비)';
-                btn.style.background = '#27ae60';
-            }
-            socket.emit('setTradeReady', { tradeId: currentTradeId, ready: isTradeReadyState });
+            isTradeReady = !isTradeReady;
+            socket.emit('setTradeReady', { tradeId: activeTradeId, ready: isTradeReady });
         }
 
         function cancelTradeSession() {
-            if (currentTradeId) socket.emit('cancelTrade', currentTradeId);
-            closeTradeRoomModal();
+            if (activeTradeId) socket.emit('cancelTrade', activeTradeId);
         }
 
-        function closeTradeRoomModal() {
-            document.getElementById('tradeRoomModal').style.display = 'none';
-            currentTradeId = null;
-            selectedTradeInventoryIndex = null;
-            isTradeReadyState = false;
-        }
-
-        socket.on('tradeComplete', (res) => { alert(res.message); closeTradeRoomModal(); });
-        socket.on('tradeCancelled', (res) => { alert(res.message); closeTradeRoomModal(); });
-        socket.on('tradeMsg', (res) => { alert(res.message); });
-
-        function openMarketModal() {
-            socket.emit('getMarketList');
-            document.getElementById('marketModal').style.display = 'flex';
-        }
-        function closeMarketModal() { document.getElementById('marketModal').style.display = 'none'; }
-
-        function openMarketRegisterModal() {
-            if (selectedIndices.length !== 1) { alert('아이템을 1개만 선택해주세요!'); return; }
-            document.getElementById('marketSlotInput').value = selectedIndices[0];
-            document.getElementById('marketPriceInput').value = '';
-            document.getElementById('marketRegisterModal').style.display = 'flex';
-        }
-        function closeMarketRegisterModal() { document.getElementById('marketRegisterModal').style.display = 'none'; }
-
-        function submitMarketItem() {
-            const inventoryIndex = parseInt(document.getElementById('marketSlotInput').value);
-            const priceGold = parseInt(document.getElementById('marketPriceInput').value);
-            if (isNaN(inventoryIndex) || isNaN(priceGold)) { alert('정보를 입력해주세요.'); return; }
-            socket.emit('listMarketItem', { inventoryIndex, priceGold, desiredItemKey: 'none' });
-            closeMarketRegisterModal();
-        }
-
-        socket.on('marketResult', (res) => { alert(res.message); socket.emit('getMarketList'); });
-
-        socket.on('marketListResult', (listings) => {
-            const container = document.getElementById('marketListContainer');
-            if (!container) return;
-            container.innerHTML = '';
-            const keys = Object.keys(listings);
-            if (keys.length === 0) {
-                container.innerHTML = '<p style="color:#aaa; font-size:12px; text-align:center;">매물이 없습니다.</p>';
-                return;
-            }
-            keys.forEach(id => {
-                const itemData = listings[id];
-                const row = document.createElement('div');
-                row.className = 'market-row';
-                const isMyListing = itemData.sellerId === myId;
-                row.innerHTML = `<div style="font-size:12px;"><strong>${itemData.item.icon} ${itemData.item.name}</strong> (+${itemData.item.enhance || 0})<br><span style="color:#f1c40f;">${itemData.priceGold.toLocaleString()} G</span></div><div>${isMyListing ? `<button class="btn" style="padding:4px 8px; font-size:11px; background:#c0392b; width:auto;" onclick="cancelMarket('${itemData.id}')">회수</button>` : `<button class="btn" style="padding:4px 8px; font-size:11px; background:#27ae60; width:auto;" onclick="buyMarket('${itemData.id}', ${itemData.priceGold})">구매</button>`}</div>`;
-                container.appendChild(row);
-            });
+        socket.on('tradeCancelled', (res) => {
+            alert(res.message);
+            activeTradeId = null;
+            goToLobby();
         });
 
-        function cancelMarket(listingId) { socket.emit('cancelMarketItem', listingId); }
-        function buyMarket(listingId, price) {
-            if (confirm(`구매하시겠습니까?`)) socket.emit('buyMarketItem', { listingId, payWithGold: true });
-        }
+        socket.on('tradeComplete', (res) => {
+            alert(res.message);
+            activeTradeId = null;
+            isTradeReady = false;
+            goToLobby();
+        });
 
         socket.on('skillResult', (res) => { 
             if (res.success) { triggerHitEffect(); alert(res.message); }
@@ -545,7 +482,7 @@
         });
 
         function openActionModal() {
-            if (selectedIndices.length === 0) { alert("아이템을 선택해주세요!"); return; }
+            if (selectedIndices.length === 0) { alert("관리할 무기를 슬롯에서 선택해주세요!"); return; }
             const modal = document.getElementById('itemActionModal');
             const title = document.getElementById('popupTitle');
             const contentArea = document.getElementById('popupContentArea');
@@ -555,34 +492,27 @@
             if (selectedIndices.length === 1) {
                 const idx = selectedIndices[0];
                 const item = latestInventory[idx];
-                if (!item) { alert("비어있습니다."); selectedIndices = []; modal.style.display = 'none'; return; }
+                if (!item) { alert("비어있는 슬롯입니다."); selectedIndices = []; modal.style.display = 'none'; return; }
 
-                title.innerText = `🔍 ${item.name} (+${item.enhance || 0})`;
+                title.innerText = `🔍 무기 관리: ${item.name} (+${item.enhance || 0})`;
                 const isEquipped = (equippedIndex === idx);
+                const isArtifact = (item.type === 'artifact');
                 const enhanceCost = ((item.enhance || 0) + 1) * 400;
 
                 contentArea.innerHTML = `
-                    <button class="popup-btn" style="background:#2980b9;" onclick="doSingleAction('equip', ${idx})">${isEquipped ? '장착 해제' : '장착'}</button>
-                    <button class="popup-btn" style="background:#f39c12;" onclick="doSingleAction('enhance', ${idx})">✨ 강화 (${enhanceCost}G)</button>
-                    <button class="popup-btn" style="background:#e67e22;" onclick="doSingleAction('sell', ${idx})">💰 판매 (${item.sellPrice}G)</button>
-                    <button class="popup-btn" style="background:#c0392b;" onclick="doSingleAction('delete', ${idx})">🗑️ 삭제</button>
-                    <button class="popup-btn" style="background:#27ae60;" onclick="openMarketRegisterFromModal(${idx})">🛒 거래소 등록</button>
+                    <button class="popup-btn" style="background:#2980b9;" onclick="doSingleAction('equip', ${idx})">${isEquipped ? '장착 해제' : '무기 장착'}</button>
+                    ${isArtifact ? '<p style="color:#e74c3c; font-size:12px; margin:5px 0;">❌ 유물은 강화할 수 없습니다.</p>' : `<button class="popup-btn" style="background:#f39c12;" onclick="doSingleAction('enhance', ${idx})">✨ 강화 (${enhanceCost}G)</button>`}
+                    <button class="popup-btn" style="background:#e67e22;" onclick="doSingleAction('sell', ${idx})">💰 단건 판매 (${item.sellPrice}G)</button>
+                    <button class="popup-btn" style="background:#c0392b;" onclick="doSingleAction('delete', ${idx})">🗑️ 단건 삭제</button>
                 `;
             } else {
-                title.innerText = `📦 다중 선택 (${selectedIndices.length}개)`;
+                title.innerText = `📦 다중 선택 관리 (${selectedIndices.length}개)`;
                 contentArea.innerHTML = `
-                    <button class="popup-btn" style="background:#e67e22;" onclick="doBatchAction('sell')">💰 일괄 판매</button>
-                    <button class="popup-btn" style="background:#c0392b;" onclick="doBatchAction('delete')">🗑️ 일괄 삭제</button>
+                    <button class="popup-btn" style="background:#e67e22;" onclick="doBatchAction('sell')">💰 선택 무기 일괄 판매</button>
+                    <button class="popup-btn" style="background:#c0392b;" onclick="doBatchAction('delete')">🗑️ 선택 무기 일괄 삭제</button>
                 `;
             }
             modal.style.display = 'flex';
-        }
-
-        function openMarketRegisterFromModal(idx) {
-            closeItemModal();
-            selectedIndices = [idx];
-            openMarketModal();
-            openMarketRegisterModal();
         }
 
         function closeItemModal() { document.getElementById('itemActionModal').style.display = 'none'; }
@@ -624,7 +554,7 @@
                 (state.rankings.players || []).slice(0, 5).forEach((p) => {
                     const li = document.createElement('li');
                     const isMe = p.name === state.players[myId]?.name ? ' (나)' : '';
-                    li.innerText = `${p.name}${isMe} - ${p.totalDamage.toLocaleString()}`;
+                    li.innerText = `${p.name}${isMe} - ${p.totalDamage.toLocaleString()} DMG`;
                     pRankList.appendChild(li);
                 });
 
@@ -632,11 +562,11 @@
                 gRankList.innerHTML = '';
                 const guilds = state.rankings.guilds || [];
                 if (guilds.length === 0) {
-                    gRankList.innerHTML = '<li style="list-style:none; color:#aaa;">없음</li>';
+                    gRankList.innerHTML = '<li style="list-style:none; color:#aaa;">랭킹 없음</li>';
                 } else {
                     guilds.slice(0, 5).forEach((g) => {
                         const li = document.createElement('li');
-                        li.innerText = `${g.name} - ${g.totalDamage.toLocaleString()}`;
+                        li.innerText = `${g.name} (${g.memberCount}/${g.maxMembers}) - ${g.totalDamage.toLocaleString()} DMG`;
                         gRankList.appendChild(li);
                     });
                 }
@@ -645,21 +575,11 @@
             const me = state.players[myId];
             if (me) {
                 document.getElementById('lobbyName').innerText = me.name;
-                document.getElementById('lobbyLevel').innerText = me.level;
                 document.getElementById('lobbyGold').innerText = me.gold.toLocaleString();
                 document.getElementById('lobbyInvenCount').innerText = me.inventory.length;
                 
-                document.getElementById('battleLevel').innerText = me.level;
                 document.getElementById('myHp').innerText = me.hp;
-                document.getElementById('myMaxHp').innerText = me.maxHp;
                 document.getElementById('myGold').innerText = me.gold.toLocaleString();
-
-                const expPct = Math.min(100, (me.exp / me.maxExp) * 100).toFixed(1);
-                const expTextStr = `${me.exp.toLocaleString()} / ${me.maxExp.toLocaleString()} (${expPct}%)`;
-                document.getElementById('lobbyExpFill').style.width = expPct + '%';
-                document.getElementById('lobbyExpText').innerText = expTextStr;
-                document.getElementById('battleExpFill').style.width = expPct + '%';
-                document.getElementById('battleExpText').innerText = expTextStr;
                 
                 latestInventory = me.inventory || [];
                 equippedIndex = me.equippedIndex;
@@ -670,13 +590,20 @@
 
                 if (currentGuildId && state.guilds[currentGuildId]) {
                     const gInfo = state.guilds[currentGuildId];
-                    lobbyGuildStatus.innerText = `[${gInfo.name}] (${gInfo.members.length}/${gInfo.maxMembers})`;
+                    lobbyGuildStatus.innerText = `[${gInfo.name}] (${gInfo.members.length}/${gInfo.maxMembers}인)`;
                     lobbyGuildStatus.style.color = '#2ecc71';
-                    lobbyGuildControl.innerHTML = `<button class="btn btn-sub" style="background:#3498db;" onclick="openGuildInfoModal()">🏰 길드 정보</button><button class="btn btn-sub" style="background:#e74c3c; margin-left:6px;" onclick="leaveGuild()">탈퇴</button>`;
+                    lobbyGuildControl.innerHTML = `<button class="btn btn-sub" style="background:#e74c3c;" onclick="leaveGuild()">길드 탈퇴</button>`;
                 } else {
                     lobbyGuildStatus.innerText = '미소속';
                     lobbyGuildStatus.style.color = '#e74c3c';
-                    lobbyGuildControl.innerHTML = `<button class="btn btn-sub" onclick="promptCreateGuild()">🏰 길드 만들기</button><button class="btn btn-sub" style="background:#27ae60; margin-left:6px;" onclick="openGuildListModal()">🔍 길드 가입</button>`;
+                    lobbyGuildControl.innerHTML = `
+                        <button class="btn btn-sub" onclick="promptCreateGuild()">🏰 길드 만들기</button>
+                        <button class="btn btn-sub" style="background:#27ae60; margin-left:6px;" onclick="openGuildListModal()">🔍 길드 참여</button>
+                    `;
+                }
+
+                if (activeTradeId) {
+                    renderTradeInventory();
                 }
 
                 const grid = document.getElementById('inventoryGrid');
@@ -708,3 +635,4 @@
     </script>
 </body>
 </html>
+
