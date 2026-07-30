@@ -187,7 +187,14 @@ function calculateDamage(p) {
         rarityMul = getRarityMultiplier(eq.rarity);
         baseAtk = (eq.atk * (1 + (eq.enhance || 0) * 0.15)) * rarityMul;
     }
-    return Math.round(baseAtk + (p.bonusAtk || 0));
+
+    // 10레벨 이상부터 1레벨 오를 때마다 데미지 +200 증가 적용
+    let levelBonusAtk = 0;
+    if (p.level >= 10) {
+        levelBonusAtk = (p.level - 10) * 200;
+    }
+
+    return Math.round(baseAtk + (p.bonusAtk || 0) + levelBonusAtk);
 }
 
 function addExp(p, amount) {
@@ -290,7 +297,6 @@ io.on('connection', (socket) => {
         io.emit('updateState', gameState);
     });
 
-    // 💬 채팅 메시지 수신 및 배포 이벤트
     socket.on('chatMessage', ({ channel, message }) => {
         const p = gameState.players[socket.id];
         if (!p || !message || message.trim() === '') return;
@@ -328,8 +334,8 @@ io.on('connection', (socket) => {
 
         saveAccountState(p);
         updateRankings();
-        if (p.isInUpperDungeon) checkUpperBossKill(p);
-        else checkBossKill(p);
+        if (p.isInUpperDungeon) checkUpperBossKill();
+        else checkBossKill();
 
         io.emit('updateState', gameState);
     });
@@ -369,7 +375,8 @@ io.on('connection', (socket) => {
             skillResultData.message = `🛡️ [절대 방벽] ${durationSec}초 무적 개시!`;
             skillResultData.val = durationSec;
         } else {
-            let skillDmg = Math.round((baseAtk * rarityMul * 2.5) + (p.bonusAtk || 0));
+            let levelBonusAtk = p.level >= 10 ? (p.level - 10) * 200 : 0;
+            let skillDmg = Math.round(((baseAtk * rarityMul * 2.5) + (p.bonusAtk || 0) + levelBonusAtk));
             if (p.isInUpperDungeon) {
                 gameState.upperBoss.currentHp -= skillDmg;
                 p.sessionDamage = (p.sessionDamage || 0) + skillDmg;
@@ -383,61 +390,83 @@ io.on('connection', (socket) => {
             skillResultData.message = `⚔️ 필살기 적중! ${skillDmg.toLocaleString()} 대미지 작렬!`;
             skillResultData.val = skillDmg;
             updateRankings();
-            if (p.isInUpperDungeon) checkUpperBossKill(p);
-            else checkBossKill(p);
+            if (p.isInUpperDungeon) checkUpperBossKill();
+            else checkBossKill();
         }
         saveAccountState(p);
         socket.emit('skillResultPop', skillResultData);
         io.emit('updateState', gameState);
     });
 
-    function checkBossKill(p) {
+    function checkBossKill() {
         if (gameState.boss.currentHp <= 0) {
             let currentBoss = BOSS_LIST.find(b => b.name === gameState.boss.name) || BOSS_LIST[0];
             let requiredDamage = currentBoss.maxHp * 0.10;
 
-            if ((p.sessionDamage || 0) >= requiredDamage) {
-                let rewardExp = currentBoss.expReward;
-                addExp(p, rewardExp);
+            // 접속 중인 모든 플레이어를 대상으로 기여도(10% 이상) 검사 후 보상 지급
+            Object.values(gameState.players).forEach(player => {
+                if ((player.sessionDamage || 0) >= requiredDamage) {
+                    let rewardExp = currentBoss.expReward;
+                    addExp(player, rewardExp);
 
-                const artifactKey = getRandomArtifactKey(false);
-                const droppedItem = { ...WEAPON_DB[artifactKey], id: Date.now() + Math.random(), enhance: 0 };
-                
-                if (p.inventory.length < 36) {
-                    p.inventory.push(droppedItem);
-                    socket.emit('itemObtained', { weapon: droppedItem, full: false });
+                    const artifactKey = getRandomArtifactKey(false);
+                    const droppedItem = { ...WEAPON_DB[artifactKey], id: Date.now() + Math.random(), enhance: 0 };
+                    
+                    // 소켓 찾아서 알림 및 아이템 지급
+                    const targetSocket = io.sockets.sockets.get(player.id);
+                    if (targetSocket) {
+                        if (player.inventory.length < 36) {
+                            player.inventory.push(droppedItem);
+                            targetSocket.emit('itemObtained', { weapon: droppedItem, full: false });
+                        } else {
+                            targetSocket.emit('itemObtained', { weapon: droppedItem, full: true });
+                        }
+                        targetSocket.emit('tradeAlert', { success: true, message: `🎉 보스 처치 기여 성공! 유물(${droppedItem.name})과 경험치를 획득했습니다!` });
+                    }
                 } else {
-                    socket.emit('itemObtained', { weapon: droppedItem, full: true });
+                    const targetSocket = io.sockets.sockets.get(player.id);
+                    if (targetSocket) {
+                        targetSocket.emit('tradeAlert', { success: false, message: `보스 체력의 10% 이상을 기여하지 못해 보상을 받지 못했습니다!` });
+                    }
                 }
-            } else {
-                socket.emit('tradeAlert', { success: false, message: `보스 체력의 10% 이상을 기여하지 못해 보상을 받지 못했습니다!` });
-            }
+                player.sessionDamage = 0;
+                saveAccountState(player);
+            });
 
             gameState.boss = { ...BOSS_LIST[Math.floor(Math.random() * BOSS_LIST.length)] };
-            p.sessionDamage = 0;
-            saveAccountState(p);
         }
     }
 
-    function checkUpperBossKill(p) {
+    function checkUpperBossKill() {
         if (gameState.upperBoss.currentHp <= 0) {
             let currentUpperBoss = UPPER_BOSS_LIST.find(b => b.name === gameState.upperBoss.name) || UPPER_BOSS_LIST[0];
             let requiredDamage = currentUpperBoss.maxHp * 0.10;
 
-            if ((p.sessionDamage || 0) >= requiredDamage) {
-                addExp(p, 500000);
-                const artifactKey = getRandomArtifactKey(true);
-                const droppedItem = { ...WEAPON_DB[artifactKey], id: Date.now() + Math.random(), enhance: 0 };
-                
-                if (p.inventory.length < 36) {
-                    p.inventory.push(droppedItem);
-                    socket.emit('itemObtained', { weapon: droppedItem, full: false });
+            Object.values(gameState.players).forEach(player => {
+                if ((player.sessionDamage || 0) >= requiredDamage) {
+                    addExp(player, 500000);
+                    const artifactKey = getRandomArtifactKey(true);
+                    const droppedItem = { ...WEAPON_DB[artifactKey], id: Date.now() + Math.random(), enhance: 0 };
+                    
+                    const targetSocket = io.sockets.sockets.get(player.id);
+                    if (targetSocket) {
+                        if (player.inventory.length < 36) {
+                            player.inventory.push(droppedItem);
+                            targetSocket.emit('itemObtained', { weapon: droppedItem, full: false });
+                        } else {
+                            targetSocket.emit('itemObtained', { weapon: droppedItem, full: true });
+                        }
+                        targetSocket.emit('tradeAlert', { success: true, message: `🎉 상위 보스 처치 기여 성공! 유물(${droppedItem.name})과 경험치를 획득했습니다!` });
+                    }
                 } else {
-                    socket.emit('itemObtained', { weapon: droppedItem, full: true });
+                    const targetSocket = io.sockets.sockets.get(player.id);
+                    if (targetSocket) {
+                        targetSocket.emit('tradeAlert', { success: false, message: `상위 보스 체력의 10% 이상을 기여하지 못해 보상을 받지 못했습니다!` });
+                    }
                 }
-            } else {
-                socket.emit('tradeAlert', { success: false, message: `상위 보스 체력의 10% 이상을 기여하지 못해 보상을 받지 못했습니다!` });
-            }
+                player.sessionDamage = 0;
+                saveAccountState(player);
+            });
 
             const r = Math.random() * 100;
             let nextBossIdx = 0;
@@ -447,8 +476,6 @@ io.on('connection', (socket) => {
             else nextBossIdx = 3;
 
             gameState.upperBoss = { ...UPPER_BOSS_LIST[nextBossIdx] };
-            p.sessionDamage = 0;
-            saveAccountState(p);
         }
     }
 
