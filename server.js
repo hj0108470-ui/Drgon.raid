@@ -10,6 +10,7 @@ const io = new Server(server, { cors: { origin: "*", methods: ["GET", "POST"] } 
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 
+// 💡 보스 처치 시 지급되는 경험치 대폭 상향 반영
 const BOSS_LIST = [
     { name: '🐷 꿀신', maxHp: 157500, currentHp: 157500, expReward: 2000 },
     { name: '🗿 골리앗', maxHp: 367500, currentHp: 367500, expReward: 4500 },
@@ -18,51 +19,44 @@ const BOSS_LIST = [
 ];
 
 const UPPER_BOSS_LIST = [
-    { name: '🦁 우흐라', maxHp: 12000000, currentHp: 12000000, expReward: 50000, dps: 20, interval: 10 },
-    { name: '🐯 기호전', maxHp: 17000000, currentHp: 17000000, expReward: 80000, dps: 12, interval: 5 },
-    { name: '👾 사이키', maxHp: 25000000, currentHp: 25000000, expReward: 130000, dps: 3, interval: 1 },
-    { name: '👁️ 개념의 눈알', maxHp: 50000000, currentHp: 50000000, expReward: 250000, dps: 5, interval: 1 }
+    { name: '🦁 우흐라', maxHp: 12000000, currentHp: 12000000, expReward: 80000, dps: 20, interval: 10 },
+    { name: '🐯 기호전', maxHp: 17000000, currentHp: 17000000, expReward: 130000, dps: 12, interval: 5 },
+    { name: '👾 사이키', maxHp: 25000000, currentHp: 25000000, expReward: 200000, dps: 3, interval: 1 },
+    { name: '👁️ 개념의 눈알', maxHp: 50000000, currentHp: 50000000, expReward: 400000, dps: 5, interval: 1 }
 ];
 
 const WEAPON_DB = {
-    // 커먼 (50%)
     knife_common: { name: '녹슨 도살도', type: 'knife', rarity: 'Common', atk: 100, sellPrice: 50, icon: '🔪' },
     shield_common: { name: '나무 냄비뚜껑', type: 'shield', rarity: 'Common', atk: 60, shieldDuration: 10, sellPrice: 50, icon: '🛡️' },
     bow_common: { name: '굽은 나무활', type: 'bow', rarity: 'Common', atk: 80, sellPrice: 50, icon: '🏹' },
     staff_common: { name: '새싹의 허브 지팡이', type: 'staff', rarity: 'Common', atk: 40, heal: 100, sellPrice: 50, icon: '🌿' },
 
-    // 레어 (32%)
     knife_rare: { name: '혈각의 서사도', type: 'knife', rarity: 'Rare', atk: 250, sellPrice: 250, icon: '🗡️' },
     shield_rare: { name: '수호자의 가디언 실드', type: 'shield', rarity: 'Rare', atk: 180, shieldDuration: 12, sellPrice: 250, icon: '🛡️✨' },
     bow_rare: { name: '사냥꾼의 숏보우', type: 'bow', rarity: 'Rare', atk: 220, sellPrice: 250, icon: '🏹✨' },
     staff_rare: { name: '축복의 성수 지팡이', type: 'staff', rarity: 'Rare', atk: 120, heal: 150, sellPrice: 250, icon: '💧✨' },
 
-    // 에픽 (15%)
     knife_epic: { name: '흑염의 사도검', type: 'knife', rarity: 'Epic', atk: 600, sellPrice: 2500, icon: '🗡️🔥' },
     shield_epic: { name: '불멸의 가고일 방패', type: 'shield', rarity: 'Epic', atk: 450, shieldDuration: 14, sellPrice: 2500, icon: '🛡️🗿' },
     bow_epic: { name: '폭풍의 엘븐 보우', type: 'bow', rarity: 'Epic', atk: 550, sellPrice: 2500, icon: '🎯🔥' },
     staff_epic: { name: '요정의 생명 지팡이', type: 'staff', rarity: 'Epic', atk: 350, heal: 200, sellPrice: 2500, icon: '🔮🌿' },
 
-    // 레전더리 (2.9%)
     knife_legendary: { name: '피빛의 소울리퍼', type: 'knife', rarity: 'Legendary', atk: 1400, sellPrice: 10000, icon: '⚔️🩸' },
     shield_legendary: { name: '성기사의 천상 실드', type: 'shield', rarity: 'Legendary', atk: 1000, shieldDuration: 16, sellPrice: 10000, icon: '🛡️👑' },
     bow_legendary: { name: '천둥의 스톰브링어', type: 'bow', rarity: 'Legendary', atk: 1250, sellPrice: 10000, icon: '🏹⚡' },
     staff_legendary: { name: '세라핌의 치유 지팡이', type: 'staff', rarity: 'Legendary', atk: 800, heal: 250, sellPrice: 10000, icon: '🌟💖' },
 
-    // 신화 (0.08%)
     knife_mythic: { name: '심연의 핏빛 멸살검', type: 'knife', rarity: 'Mythic', atk: 3500, sellPrice: 100000, icon: '🗡️💀' },
     shield_mythic: { name: '신성한 절대자의 결계', type: 'shield', rarity: 'Mythic', atk: 2500, shieldDuration: 20, sellPrice: 100000, icon: '🛡️❇️' },
     bow_mythic: { name: '태양의 신궁 아폴론', type: 'bow', rarity: 'Mythic', atk: 3000, sellPrice: 100000, icon: '🏹🌌' },
     staff_mythic: { name: '세계수의 영원한 생명', type: 'staff', rarity: 'Mythic', atk: 2000, heal: 300, sellPrice: 100000, icon: '🌌✨' },
 
-    // 시크릿 (0.02%) - 신규 추가 5종
     secret_weapon_1: { name: '🌌 차원을 찢는 공허의 단검', type: 'knife', rarity: 'Secret', atk: 8888, sellPrice: 1000000, icon: '🔪🌀' },
     secret_weapon_2: { name: '🛡️ 만상을 거부하는 방패', type: 'shield', rarity: 'Secret', atk: 6666, shieldDuration: 30, sellPrice: 1000000, icon: '🛡️💠' },
     secret_weapon_3: { name: '🏹 우주를 관통하는 천공궁', type: 'bow', rarity: 'Secret', atk: 7777, sellPrice: 1000000, icon: '🏹🌠' },
     secret_weapon_4: { name: '🌿 신들이 버린 태초의 생명봉', type: 'staff', rarity: 'Secret', atk: 5555, heal: 1000, sellPrice: 1000000, icon: '🌿✨' },
     secret_weapon_5: { name: '👑 지배자의 무한한 홀', type: 'staff', rarity: 'Secret', atk: 9999, heal: 1200, sellPrice: 1500000, icon: '👑💫' },
 
-    // 확장된 유물 시스템 (판매 가능 골드 반영)
     artifact_honey_fork: { name: '부러진 꿀신 갈퀴', type: 'artifact', rarity: 'Common', atk: 0, sellPrice: 1200, icon: '🪵' },
     artifact_goliath_stone: { name: '골리앗의 돌멩이 조각', type: 'artifact', rarity: 'Common', atk: 0, sellPrice: 1200, icon: '🪨' },
     artifact_iraso_scale: { name: '이라소의 비늘 파편', type: 'artifact', rarity: 'Common', atk: 0, sellPrice: 1200, icon: '🐟' },
@@ -134,6 +128,7 @@ function updateRankings() {
     gameState.rankings.guilds = gList;
 }
 
+// 💡 1레벨 경험치 360, 레벨업마다 1.5배 공식, 최대 100레벨 적용
 function getRequiredExp(level) {
     if (level >= 100) return 999999999;
     return Math.round(360 * Math.pow(1.5, level - 1));
@@ -145,7 +140,7 @@ function addExp(p, amount) {
     while (p.level < 100 && p.exp >= getRequiredExp(p.level)) {
         p.exp -= getRequiredExp(p.level);
         p.level++;
-        p.maxHp += 10;
+        p.maxHp += 10; // 💡 레벨업 시 체력 +10 증가
         p.hp = p.maxHp;
     }
 }
@@ -200,7 +195,6 @@ function calculateDamage(p) {
     return Math.round(baseAtk + (p.bonusAtk || 0));
 }
 
-// 상위 레이드 보스 등장 확률 판정 (우흐라 45%, 기호전 25%, 사이키 15%, 개념의 눈알 15%)
 function spawnNextUpperBoss() {
     const rand = Math.random() * 100;
     let index = 0;
@@ -211,7 +205,6 @@ function spawnNextUpperBoss() {
     gameState.boss = { ...UPPER_BOSS_LIST[index], isUpper: true };
 }
 
-// 상위 보스 자동 딜 데미지 처리 타이머 (10초마다 또는 1초마다 실시간 체력 깎기)
 setInterval(() => {
     let updated = false;
     let now = Date.now();
@@ -225,10 +218,8 @@ setInterval(() => {
                 p.hp = Math.max(0, p.hp - 5);
                 updated = true;
             }
-            // 상위 보스 방에 있는 유저라면 상위 보스 패시브 데미지 적용
             if (gameState.boss.isUpper && p.hp > 0) {
                 const b = gameState.boss;
-                // interval 주기마다 플레이어 체력 차감
                 if (!p.lastUpperHit || now - p.lastUpperHit >= b.interval * 1000) {
                     p.hp = Math.max(0, p.hp - b.dps);
                     p.lastUpperHit = now;
@@ -296,18 +287,14 @@ io.on('connection', (socket) => {
         io.emit('updateState', gameState);
     });
 
-    // 🔒 중요 무기(LOCK) 설정 토글 핸들러
     socket.on('toggleLockItem', (index) => {
         const p = gameState.players[socket.id];
         if (!p || index < 0 || index >= p.inventory.length) return;
         const item = p.inventory[index];
         item.isLocked = !item.isLocked;
 
-        // 중요 무기 설정 시 인벤토리 정렬 (중요 무기 우선 배치)
         p.inventory.sort((a, b) => (b.isLocked ? 1 : 0) - (a.isLocked ? 1 : 0));
-        // 장착 인덱스 재조정
         if (p.equippedIndex !== null) {
-            // 현재 장착된 아이템의 새 위치 찾기
             p.equippedIndex = p.inventory.findIndex(it => it.id === item.id);
         }
 
@@ -316,7 +303,6 @@ io.on('connection', (socket) => {
         io.emit('updateState', gameState);
     });
 
-    // 거래소 핸들러
     socket.on('getMarketList', () => {
         socket.emit('marketListResult', gameState.marketListings);
     });
@@ -367,7 +353,7 @@ io.on('connection', (socket) => {
         io.emit('marketListResult', gameState.marketListings);
     });
 
-    socket.on('buyMarketItem', ({ listingId, payWithGold, payWithInventoryIndex }) => {
+    socket.on('buyMarketItem', ({ listingId, payWithGold }) => {
         const buyer = gameState.players[socket.id];
         const listing = gameState.marketListings[listingId];
         if (!buyer || !listing) return;
@@ -397,7 +383,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 1:1 실시간 거래 핸들러
     socket.on('getOnlineUsers', () => {
         const users = Object.values(gameState.players).filter(p => p.id !== socket.id).map(p => ({ id: p.id, name: p.name }));
         socket.emit('onlineUsersResult', users);
@@ -491,7 +476,6 @@ io.on('connection', (socket) => {
         delete activeTrades[tradeId];
     });
 
-    // 판매 기능 (유물 포함, 단 락 걸린 무기는 판매 불가)
     socket.on('sellItems', (indices) => {
         const p = gameState.players[socket.id];
         if (!p || !Array.isArray(indices)) return;
@@ -502,7 +486,7 @@ io.on('connection', (socket) => {
         uniqueIndices.forEach(idx => {
             if (idx >= 0 && idx < p.inventory.length) {
                 const item = p.inventory[idx];
-                if (item.isLocked) return; // 락 걸린 무기 판매 방지
+                if (item.isLocked) return;
                 totalEarnedGold += (item.sellPrice || 0);
                 p.inventory.splice(idx, 1);
                 if (p.equippedIndex === idx) p.equippedIndex = null;
@@ -522,7 +506,7 @@ io.on('connection', (socket) => {
 
         [...new Set(indices)].sort((a, b) => b - a).forEach(idx => {
             if (idx >= 0 && idx < p.inventory.length) {
-                if (p.inventory[idx].isLocked) return; // 락 걸린 무기 삭제 방지
+                if (p.inventory[idx].isLocked) return;
                 p.inventory.splice(idx, 1);
                 if (p.equippedIndex === idx) p.equippedIndex = null;
                 else if (p.equippedIndex !== null && p.equippedIndex > idx) p.equippedIndex--;
@@ -553,6 +537,9 @@ io.on('connection', (socket) => {
         gameState.boss.currentHp -= dmg;
         p.totalDamage = (p.totalDamage || 0) + dmg;
         p.gold += 15;
+
+        // 💡 보스 기본 타격 시 소량의 경험치 지급 (원하시면 조정 가능)
+        addExp(p, 5);
 
         checkBossKill(p);
         updateRankings();
@@ -600,7 +587,6 @@ io.on('connection', (socket) => {
         io.emit('updateState', gameState);
     });
 
-    // 상위 던전 입장 핸들러 (50레벨 이상)
     socket.on('enterUpperDungeon', () => {
         const p = gameState.players[socket.id];
         if (!p) return;
@@ -613,7 +599,6 @@ io.on('connection', (socket) => {
         io.emit('updateState', gameState);
     });
 
-    // 일반 던전으로 돌아가기
     socket.on('returnNormalDungeon', () => {
         gameState.boss = { ...BOSS_LIST[0], isUpper: false };
         io.emit('updateState', gameState);
@@ -762,4 +747,3 @@ io.on('connection', (socket) => {
 });
 
 server.listen(3000, () => console.log('서버 실행 중 포트: 3000'));
-
