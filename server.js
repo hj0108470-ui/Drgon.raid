@@ -10,7 +10,6 @@ const io = new Server(server, { cors: { origin: "*", methods: ["GET", "POST"] } 
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 
-// 1. 보스 4종 및 처치 시 지급할 경험치(expReward) 설정
 const BOSS_LIST = [
     { name: '🐷 꿀신', maxHp: 157500, currentHp: 157500, expReward: 2000 },
     { name: '🗿 골리앗', maxHp: 367500, currentHp: 367500, expReward: 4500 },
@@ -155,19 +154,17 @@ function calculateDamage(p) {
     return Math.round(baseAtk + (p.bonusAtk || 0));
 }
 
-// 최대 레벨 75제, 레벨업 시 체력 +10 및 레벨당 필요 경험치 증가 로직
 function addExp(p, amount) {
     if (p.level >= 75) {
         p.exp = 0;
         return;
     }
     p.exp += amount;
-    // 레벨이 올라갈수록 필요 경험치가 가파르게 증가 (예: 레벨 * 1500 + 500)
     let reqExp = p.level * 1500 + 500;
     while (p.level < 75 && p.exp >= reqExp) {
         p.exp -= reqExp;
         p.level++;
-        p.maxHp += 10; // 레벨 업당 체력 10 증가
+        p.maxHp += 10;
         p.hp = p.maxHp;
         reqExp = p.level * 1500 + 500;
     }
@@ -258,7 +255,7 @@ io.on('connection', (socket) => {
         gameState.boss.currentHp -= dmg;
         p.totalDamage = (p.totalDamage || 0) + dmg;
         p.gold += 15;
-        addExp(p, 30); // 보스 기본 타격 시 기본 경험치 지급
+        addExp(p, 30);
         saveAccountState(p);
 
         updateRankings();
@@ -312,7 +309,6 @@ io.on('connection', (socket) => {
 
     function checkBossKill(p) {
         if (gameState.boss.currentHp <= 0) {
-            // 보스별 고정 경험치 지급 (꿀신: 2000, 골리앗: 4500, 이라소: 7500, 드래곤: 15000)
             addExp(p, gameState.boss.expReward);
 
             const artifactKey = getRandomArtifactKey();
@@ -325,15 +321,13 @@ io.on('connection', (socket) => {
                 socket.emit('itemObtained', { weapon: droppedItem, full: true });
             }
 
-            // 다음 보스로 무작위 순환
             gameState.boss = { ...BOSS_LIST[Math.floor(Math.random() * BOSS_LIST.length)] };
             saveAccountState(p);
         }
     }
 
-    // 거래소, 유물강화, 길드, 쿠폰 등 기타 통신 로직 유지
     socket.on('getMarketList', () => { socket.emit('marketListResult', gameState.marketListings); });
-    socket.on('listMarketItem', ({ inventoryIndex, priceGold, desiredItemType, desiredItemRarity }) => {
+    socket.on('listMarketItem', ({ inventoryIndex, priceGold }) => {
         const p = gameState.players[socket.id];
         if (!p || inventoryIndex < 0 || inventoryIndex >= p.inventory.length) return;
         const itemToSell = p.inventory[inventoryIndex];
@@ -344,7 +338,7 @@ io.on('connection', (socket) => {
         const listingId = 'market_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
         gameState.marketListings[listingId] = {
             id: listingId, sellerId: socket.id, sellerName: p.name, item: itemToSell,
-            priceGold: parseInt(priceGold) || 0, desiredItemType: desiredItemType || 'none', desiredItemRarity: 'any'
+            priceGold: parseInt(priceGold) || 0, desiredItemType: 'none', desiredItemRarity: 'any'
         };
         saveAccountState(p);
         io.emit('updateState', gameState);
