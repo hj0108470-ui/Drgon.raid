@@ -2,158 +2,123 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>컴팩트 방치형 RPG</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>실시간 멀티 방치형 보스 레이드 & 거래소</title>
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
     <style>
         body { 
             font-family: sans-serif; 
             margin: 0; 
-            padding: 0; 
+            padding: 10px; 
+            overflow-x: hidden;
             background: #0b0c10;
             color: #fff;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            overflow: hidden;
-        }
-        /* 절대 화면을 늘리지 않고 핸드폰 세로형 규격(max-width: 480px)으로 엄격 고정 */
-        .container { 
-            width: 100%; 
-            max-width: 480px; 
-            height: 100%;
-            max-height: 850px;
-            background: #12141d;
-            box-shadow: 0 0 20px rgba(0,0,0,0.8);
-            display: flex;
-            flex-direction: column;
             position: relative;
-            overflow-y: auto;
-            box-sizing: border-box;
-            padding: 10px;
         }
+        .container { max-width: 600px; margin: 0 auto; position: relative; z-index: 1; text-align: center; }
         .card { 
             background: rgba(22, 24, 32, 0.95); 
             border-radius: 12px; 
-            padding: 12px; 
-            margin-bottom: 10px; 
+            padding: 15px; 
+            margin-bottom: 12px; 
             border: 1px solid #3a3f52; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
             text-align: left;
         }
         .boss-card { border: 2px solid #e74c3c; text-align: center; }
         
         @keyframes floatBoss {
             0% { transform: translateY(0px); }
-            50% { transform: translateY(-6px); }
+            50% { transform: translateY(-8px); }
             100% { transform: translateY(0px); }
         }
-        .boss-icon { font-size: 60px; margin: 5px 0; display: inline-block; animation: floatBoss 2.5s ease-in-out infinite; }
-        .hp-bar-bg { background: #111; height: 20px; border-radius: 10px; overflow: hidden; margin: 8px 0; border: 1px solid #444; }
+        @keyframes hitEffect {
+            0% { transform: translate(0, 0) scale(1); }
+            20% { transform: translate(-6px, 3px) scale(0.95); filter: brightness(1.5); }
+            40% { transform: translate(6px, -3px) scale(1.05); }
+            100% { transform: translate(0, 0) scale(1); filter: brightness(1); }
+        }
+        .boss-icon { font-size: 75px; margin: 5px 0; display: inline-block; animation: floatBoss 2.5s ease-in-out infinite; }
+        .hit-anim { animation: hitEffect 0.3s ease !important; }
+
+        .hp-bar-bg { background: #111; height: 24px; border-radius: 12px; overflow: hidden; margin: 10px 0; border: 1px solid #444; }
         .hp-bar-fill { background: linear-gradient(90deg, #c0392b, #e74c3c); height: 100%; width: 100%; transition: width 0.2s; }
         
-        /* EXP 바 스타일 추가 */
-        .exp-bar-bg { background: #111; height: 14px; border-radius: 7px; overflow: hidden; margin: 6px 0; border: 1px solid #333; }
-        .exp-bar-fill { background: linear-gradient(90deg, #27ae60, #2ecc71); height: 100%; width: 0%; transition: width 0.2s; }
-
-        .action-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; margin-top: 8px; }
-        .btn { background: #d35400; border: none; padding: 12px; color: #fff; font-size: 15px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; }
+        .action-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-top: 10px; }
+        .btn { background: #d35400; border: none; padding: 14px; color: #fff; font-size: 16px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; box-shadow: 0 3px 6px rgba(0,0,0,0.3); }
         .btn:active { transform: scale(0.97); }
         .btn-skill { background: #8e44ad; }
         .btn-gacha { background: #f1c40f; color: #000; }
-        .btn-sub { background: #2980b9; font-size: 12px; padding: 6px 10px; width: auto; }
-        .btn-action { background: #27ae60; margin-top: 6px; font-size: 13px; padding: 8px; }
+        .btn-sub { background: #2980b9; font-size: 13px; padding: 6px 12px; width: auto; }
+        .btn-action { background: #27ae60; margin-top: 8px; font-size: 14px; padding: 10px; }
 
-        .inventory-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-top: 8px; }
-        .slot { background: #15171e; border: 1px solid #2f354a; height: 46px; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 9px; cursor: pointer; position: relative; }
+        .inventory-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; margin-top: 10px; }
+        .slot { background: #15171e; border: 1px solid #2f354a; height: 50px; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; cursor: pointer; position: relative; }
         .slot.equipped { border-color: #f1c40f; background: #3d3512; }
-        .slot.selected { border-color: #3498db; background: #1b365d; }
+        .slot.selected { border-color: #3498db; background: #1b365d; box-shadow: 0 0 5px #3498db; }
         
-        /* 등급별 테두리 색상 */
-        .slot.rarity-Legendary { border-color: #f1c40f; }
-        .slot.rarity-Mythic { border-color: #9b59b6; }
-        .slot.rarity-Secret { border-color: #00ffff; box-shadow: 0 0 6px #00ffff; }
-
-        .ranking-container { display: flex; gap: 8px; font-size: 11px; }
-        .ranking-box { flex: 1; background: #15171e; padding: 6px; border-radius: 6px; max-height: 100px; overflow-y: auto; }
-        .ranking-list { text-align: left; margin: 0; padding-left: 12px; }
+        .ranking-container { display: flex; gap: 10px; font-size: 12px; }
+        .ranking-box { flex: 1; background: #15171e; padding: 8px; border-radius: 6px; max-height: 120px; overflow-y: auto; }
+        .ranking-list { text-align: left; margin: 0; padding-left: 15px; }
         
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 100; }
-        .modal-content { background: #1e222d; padding: 15px; border-radius: 10px; width: 300px; border: 1px solid #555; text-align: center; }
-        input, select { padding: 8px; border-radius: 4px; border: 1px solid #444; background: #111; color: #fff; width: 85%; margin-bottom: 8px; }
+        .modal-content { background: #1e222d; padding: 20px; border-radius: 10px; width: 340px; border: 1px solid #555; text-align: center; }
+        input, select { padding: 8px; border-radius: 4px; border: 1px solid #444; background: #111; color: #fff; width: 85%; margin-bottom: 10px; }
         
-        .screen { display: none; flex-direction: column; height: 100%; }
-        .screen.active { display: flex; }
+        .guild-item-row, .user-row { background: #2a2e3d; padding: 10px; border-radius: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
         .popup-btn { background: #34495e; color: white; border: none; padding: 10px; margin: 4px 0; width: 100%; border-radius: 5px; cursor: pointer; font-weight: bold; }
+
+        .screen { display: none; }
+        .screen.active { display: block; }
+
+        .trade-container { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
+        .trade-box { background: #15171e; border: 1px solid #444; border-radius: 8px; padding: 10px; min-height: 110px; text-align: center; }
+        .trade-slot-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 8px; }
+        .trade-item-chip { background: #222; border: 1px solid #555; border-radius: 4px; font-size: 10px; padding: 4px; display:flex; flex-direction:column; align-items:center; }
     </style>
 </head>
 <body>
     <!-- 로그인 모달 -->
     <div id="authModal" class="modal" style="display: flex;">
         <div class="modal-content">
-            <h3 style="color:#f1c40f; margin-top:0;">🔐 계정 로그인</h3>
-            <input type="text" id="authNickInput" placeholder="닉네임 입력" maxlength="12">
+            <h3 style="color:#f1c40f; margin-top:0;">🔐 계정 로그인 / 회원가입</h3>
+            <p style="font-size: 11px; color: #aaa;">닉네임과 비밀번호를 입력하여 시작하세요!</p>
+            <input type="text" id="authNickInput" placeholder="닉네임 입력 (최대 12글자)" maxlength="12">
             <input type="password" id="authPwInput" placeholder="비밀번호 입력">
             <div style="display:flex; gap:5px;">
-                <button class="btn" style="background:#27ae60;" onclick="requestLogin()">로그인</button>
-                <button class="btn" style="background:#2980b9;" onclick="requestRegister()">회원가입</button>
+                <button class="btn" style="padding: 10px; background:#27ae60;" onclick="requestLogin()">로그인</button>
+                <button class="btn" style="padding: 10px; background:#2980b9;" onclick="requestRegister()">회원가입</button>
             </div>
         </div>
     </div>
 
-    <!-- 길드 상세/정보 모달 -->
-    <div id="guildModal" class="modal">
-        <div class="modal-content" style="width: 320px;">
-            <h3 style="color:#3498db; margin-top:0;" id="guildModalTitle">🏰 길드 정보</h3>
-            <div id="guildModalBody" style="max-height: 200px; overflow-y: auto; text-align:left; font-size:12px; margin-bottom:10px;"></div>
+    <!-- 길드 참여 모달 -->
+    <div id="guildListModal" class="modal">
+        <div class="modal-content" style="width: 330px;">
+            <h3 style="color:#3498db; margin-top:0;">🏰 길드 참여하기</h3>
+            <div id="guildListContainer" style="max-height: 180px; overflow-y: auto; margin-bottom: 10px;"></div>
             <button class="btn" style="background:#555; padding: 8px;" onclick="closeGuildModal()">닫기</button>
         </div>
     </div>
 
-    <!-- 길드 참여 목록 모달 -->
-    <div id="guildListModal" class="modal">
-        <div class="modal-content" style="width: 320px;">
-            <h3 style="color:#3498db; margin-top:0;">🏰 길드 목록</h3>
-            <div id="guildListContainer" style="max-height: 180px; overflow-y: auto; margin-bottom: 10px;"></div>
-            <button class="btn" style="background:#555; padding: 8px;" onclick="closeGuildListModal()">닫기</button>
+    <!-- 유저 목록 모달 -->
+    <div id="tradeUserModal" class="modal">
+        <div class="modal-content" style="width: 340px;">
+            <h3 style="color:#f1c40f; margin-top:0;">⚖️ 실시간 거래소</h3>
+            <div id="onlineUsersContainer" style="max-height: 180px; overflow-y: auto; margin-bottom: 10px;"></div>
+            <button class="btn" style="background:#555; padding: 8px;" onclick="closeTradeUserModal()">닫기</button>
         </div>
     </div>
 
-    <!-- 실시간 거래소 메인 모달 -->
-    <div id="marketModal" class="modal">
-        <div class="modal-content" style="width: 330px;">
-            <h3 style="color:#e67e22; margin-top:0;">⚖️ 실시간 거래소</h3>
-            <div style="display:flex; gap:5px; margin-bottom:10px;">
-                <button class="btn" style="background:#27ae60; padding:8px; font-size:12px;" onclick="openMarketListTab()">매물 확인하기</button>
-                <button class="btn" style="background:#2980b9; padding:8px; font-size:12px;" onclick="openMarketUploadTab()">매물 올리기</button>
-                <button class="btn" style="background:#8e44ad; padding:8px; font-size:12px;" onclick="openRealtimeTradeUsers()">1:1 거래</button>
+    <!-- 거래 요청 수락 모달 -->
+    <div id="tradeRequestModal" class="modal">
+        <div class="modal-content">
+            <h3 style="color:#e74c3c; margin-top:0;">🚨 거래 요청 도착!</h3>
+            <p id="tradeRequestText" style="font-size: 13px;"></p>
+            <div style="display:flex; gap:8px;">
+                <button class="btn" style="background:#27ae60; padding:10px;" onclick="acceptTradeRequest()">수락 ✅</button>
+                <button class="btn" style="background:#c0392b; padding:10px;" onclick="closeTradeRequestModal()">거절 ❌</button>
             </div>
-            <div id="marketTabContent" style="max-height: 200px; overflow-y: auto; text-align:left; font-size:12px; margin-bottom:10px;"></div>
-            <button class="btn" style="background:#555; padding: 8px;" onclick="closeMarketModal()">닫기</button>
-        </div>
-    </div>
-
-    <!-- 1:1 실시간 거래 화면 모달 -->
-    <div id="realtimeTradeModal" class="modal">
-        <div class="modal-content" style="width: 330px;">
-            <h3 style="color:#f1c40f; margin-top:0;">🤝 1:1 실시간 거래</h3>
-            <div style="display:flex; gap:10px; margin-bottom:10px;">
-                <div style="flex:1; background:#15171e; padding:6px; border-radius:4px;">
-                    <div style="font-size:11px; color:#3498db;">나의 거래창</div>
-                    <div id="myTradeSlots" style="display:grid; grid-template-columns:repeat(3,1fr); gap:2px; min-height:40px; margin-top:4px;"></div>
-                    <div id="myTradeStatus" style="font-size:10px; color:#e74c3c;">대기 중</div>
-                </div>
-                <div style="flex:1; background:#15171e; padding:6px; border-radius:4px;">
-                    <div style="font-size:11px; color:#e67e22;">상대 거래창</div>
-                    <div id="partnerTradeSlots" style="display:grid; grid-template-columns:repeat(3,1fr); gap:2px; min-height:40px; margin-top:4px;"></div>
-                    <div id="partnerTradeStatus" style="font-size:10px; color:#e74c3c;">대기 중</div>
-                </div>
-            </div>
-            <div style="display:flex; gap:5px;">
-                <button class="btn" style="background:#27ae60; padding:8px; font-size:12px;" onclick="toggleTradeReady()">✅ 수락</button>
-                <button class="btn" style="background:#c0392b; padding:8px; font-size:12px;" onclick="cancelTrade()">❌ 거절/취소</button>
-            </div>
-            <button class="btn" style="background:#555; padding: 6px; margin-top:8px; font-size:11px;" onclick="closeRealtimeTradeModal()">닫기</button>
         </div>
     </div>
 
@@ -162,85 +127,114 @@
         <div class="modal-content">
             <h3 id="popupTitle" style="color:#f1c40f; margin-top:0;">아이템 관리</h3>
             <div id="popupContentArea"></div>
-            <button class="popup-btn" style="background:#7f8c8d;" onclick="closeItemModal()">닫기</button>
+            <button class="popup-btn" style="background:#7f8c8d; margin-top: 10px;" onclick="closeItemModal()">닫기</button>
         </div>
     </div>
 
     <div class="container">
         <!-- 로비 화면 -->
-        <div id="lobbyScreen" class="screen active">
+        <div id="lobbyScreen" class="screen">
             <div class="card" style="text-align: center;">
-                <h2 style="color:#f1c40f; margin: 5px 0;">🌟 LOBBY & 무기고</h2>
-                <div style="background: #15171e; padding: 10px; border-radius: 8px; margin: 10px 0; text-align: left; font-size: 13px;">
-                    <p style="margin: 4px 0;">👤 닉네임: <strong id="lobbyName" style="color:#f1c40f;">-</strong></p>
-                    <p style="margin: 4px 0;">💰 골드: <span id="lobbyGold" style="color:#f1c40f;">0</span> G</p>
-                    <p style="margin: 4px 0;">🎒 인벤토리: <span id="lobbyInvenCount">0</span> / 36 칸</p>
-                    <p style="margin: 4px 0;">🏰 소속 길드: <span id="lobbyGuildStatus" style="color:#e74c3c;">미소속</span></p>
+                <h1 style="color:#f1c40f; margin: 5px 0;">🌟 LOBBY</h1>
+                <div style="background: #15171e; padding: 12px; border-radius: 8px; margin: 15px 0; text-align: left;">
+                    <p style="margin: 5px 0;">👤 닉네임: <strong id="lobbyName" style="color:#f1c40f;">-</strong></p>
+                    <p style="margin: 5px 0;">💰 보유 골드: <span id="lobbyGold" style="color:#f1c40f;">0</span> G</p>
+                    <p style="margin: 5px 0;">🎒 인벤토리: <span id="lobbyInvenCount">0</span> / 36 칸</p>
+                    <p style="margin: 5px 0;">🏰 소속 길드: <span id="lobbyGuildStatus" style="color:#e74c3c;">미소속</span></p>
                 </div>
-                <div style="display:flex; gap:5px; margin-bottom:8px;">
-                    <button class="btn btn-sub" onclick="openGuildModal()" style="flex:1;">길드 정보</button>
-                    <button class="btn btn-sub" style="background:#e67e22; flex:1;" onclick="openMarketModal()">실시간 거래소</button>
+                <div id="lobbyGuildControl" style="margin-bottom: 10px;"></div>
+                <button class="btn" style="background:#e67e22; margin-bottom: 10px; padding: 12px;" onclick="openTradeMarket()">⚖️ 실시간 거래소 입장</button>
+                <button class="btn" style="background:#27ae60; padding: 15px; font-size: 18px;" onclick="goToBattle()">⚔️ 보스 레이드 입장하기</button>
+            </div>
+        </div>
+
+        <!-- 거래 화면 -->
+        <div id="tradeScreen" class="screen">
+            <div class="card" style="border: 2px solid #e67e22; text-align: center;">
+                <h2 style="color:#e67e22; margin-top:0;">🤝 1:1 실시간 거래 중</h2>
+                <p style="font-size: 12px; color:#aaa;">상대방: <strong id="tradePartnerName" style="color:#fff;">-</strong></p>
+                
+                <div class="trade-container">
+                    <div class="trade-box">
+                        <div style="font-size:12px; color:#3498db; font-weight:bold;">나의 거래 칸</div>
+                        <div id="myTradeSlots" class="trade-slot-grid"></div>
+                        <div id="myTradeStatusText" style="margin-top:6px; font-size:11px; color:#e74c3c;">대기 중...</div>
+                    </div>
+                    <div class="trade-box">
+                        <div style="font-size:12px; color:#e67e22; font-weight:bold;">상대방 거래 칸</div>
+                        <div id="partnerTradeSlots" class="trade-slot-grid"></div>
+                        <div id="partnerTradeStatusText" style="margin-top:6px; font-size:11px; color:#e74c3c;">대기 중...</div>
+                    </div>
                 </div>
-                <button class="btn" style="background:#27ae60; padding: 12px; font-size: 16px;" onclick="goToBattle()">⚔️ 보스 레이드 입장하기</button>
+
+                <div style="display:flex; gap:8px; margin-top:10px;">
+                    <button class="btn" style="background:#27ae60; padding:10px;" onclick="toggleTradeReady()">✅ 거래 동의 (준비)</button>
+                    <button class="btn" style="background:#c0392b; padding:10px;" onclick="cancelTradeSession()">❌ 거래 취소</button>
+                </div>
             </div>
 
-            <!-- 로비 내 무기고 -->
-            <div class="card" style="flex:1; display:flex; flex-direction:column;">
-                <h3 style="margin-top:0; font-size:14px; display:flex; justify-content:space-between;">
-                    <span>🎒 무기고</span>
-                    <span style="font-size:11px; color:#aaa;">(클릭 시 관리)</span>
-                </h3>
-                <div class="inventory-grid" id="lobbyInventoryGrid"></div>
-                <button class="btn btn-action" onclick="openActionModal()">⚙️ 선택 무기 관리 / 일괄 처리</button>
+            <div class="card">
+                <h3 style="margin-top:0; font-size:14px; color:#f1c40f;">🎒 무기고에서 거래 칸에 올릴 무기 선택</h3>
+                <div class="inventory-grid" id="tradeInventoryGrid"></div>
+                <button class="btn btn-action" onclick="addSelectedToTrade()">➕ 선택한 무기를 거래 칸에 올리기</button>
             </div>
         </div>
 
         <!-- 전투 화면 -->
         <div id="battleScreen" class="screen">
-            <div style="text-align: left; margin-bottom: 6px; display:flex; justify-content:space-between;">
-                <button class="btn btn-sub" style="background:#555;" onclick="goToLobby()">🏠 로비(무기고)</button>
-                <button class="btn btn-sub" style="background:#e67e22;" onclick="openMarketModal()">⚖️ 거래소</button>
+            <div style="text-align: left; margin-bottom: 8px;">
+                <button class="btn btn-sub" style="background:#555;" onclick="goToLobby()">🏠 로비로 돌아가기</button>
             </div>
 
             <div class="card boss-card" id="bossCardArea">
                 <div id="bossIcon" class="boss-icon">⚔️</div>
-                <h3 id="bossName" style="margin: 4px 0;">🔄 로딩 중...</h3>
+                <h2 id="bossName" style="margin: 5px 0;">🔄 서버 연결 중...</h2>
                 <div class="hp-bar-bg"><div id="bossHpFill" class="hp-bar-fill"></div></div>
-                <p id="bossHpText" style="margin: 0; font-weight: bold; font-size: 12px;">0 / 0</p>
+                <p id="bossHpText" style="margin: 0; font-weight: bold; font-size: 14px;">0 / 0</p>
                 <div class="action-grid">
-                    <button class="btn" style="padding:10px;" onclick="attack()">⚔️ 공격</button>
-                    <button id="skillBtn" class="btn btn-skill" style="padding:10px;" onclick="useSkill()">⚡ 스킬</button>
+                    <button class="btn" onclick="attack()">⚔️ 일반 공격</button>
+                    <button id="skillBtn" class="btn btn-skill" onclick="useSkill()">⚡ 스킬</button>
                 </div>
             </div>
 
-            <div class="card" style="padding: 10px;">
-                <p style="margin: 4px 0; font-size: 12px;">❤️ 체력: <span id="myHp">100</span>/100 | 레벨: Lv.<span id="myLevel">1</span></p>
-                <div style="font-size: 11px; margin-top:4px;">EXP</div>
-                <div class="exp-bar-bg"><div id="expBarFill" class="exp-bar-fill"></div></div>
+            <div class="card">
+                <h3 style="margin-top:0; color:#3498db;">🛡️ 전투 상태</h3>
+                <p style="margin: 6px 0;">❤️ 체력: <span id="myHp">100</span>/100 | 💰 골드: <span id="myGold">500</span> G</p>
             </div>
 
-            <div class="card" style="padding: 10px;">
-                <h4 style="margin: 0 0 6px 0; color: #f1c40f; font-size: 13px;">🏆 랭킹보드</h4>
+            <div class="card" style="border: 2px solid #f1c40f;">
+                <h3 style="margin: 0 0 8px 0; color: #f1c40f; font-size: 15px;">🏆 실시간 랭킹보드</h3>
                 <div class="ranking-container">
-                    <div class="ranking-box"><div style="color:#3498db; font-weight:bold;">개인 Dmg</div><ol id="playerRankingList" class="ranking-list"></ol></div>
-                    <div class="ranking-box"><div style="color:#e67e22; font-weight:bold;">길드 Dmg</div><ol id="guildRankingList" class="ranking-list"></ol></div>
+                    <div class="ranking-box">
+                        <div style="font-weight:bold; color:#3498db; margin-bottom:4px;">👤 개인 데미지 랭킹</div>
+                        <ol id="playerRankingList" class="ranking-list"></ol>
+                    </div>
+                    <div class="ranking-box">
+                        <div style="font-weight:bold; color:#e67e22; margin-bottom:4px;">🏰 길드 데미지 랭킹</div>
+                        <ol id="guildRankingList" class="ranking-list"></ol>
+                    </div>
                 </div>
             </div>
 
-            <div class="card" style="padding: 10px;">
-                <h4 style="margin:0 0 6px 0; font-size:13px;">🎰 뽑기 & 쿠폰</h4>
-                <button class="btn btn-gacha" style="padding:10px; font-size:13px;" onclick="gacha()">🎲 무기 뽑기 (1,000G)</button>
-                <div style="display: flex; gap: 5px; margin-top: 6px;">
-                    <input type="text" id="couponInput" placeholder="쿠폰 입력" style="margin-bottom:0; font-size:12px; padding:6px;">
-                    <button class="btn" style="width: 30%; padding: 6px; font-size: 12px;" onclick="useCoupon()">등록</button>
+            <div class="card">
+                <h3 style="margin-top:0;">🎰 무기 뽑기</h3>
+                <button class="btn btn-gacha" onclick="gacha()">🎲 행운의 룰렛 뽑기 (1,000G)</button>
+            </div>
+
+            <div class="card">
+                <h3 style="margin-top:0;">🎁 리딤 쿠폰 코드</h3>
+                <div style="display: flex; gap: 5px; justify-content: center;">
+                    <input type="text" id="couponInput" placeholder="쿠폰 코드 입력" style="width: 70%; margin-bottom: 0;">
+                    <button class="btn" style="width: 25%; padding: 8px; font-size: 14px;" onclick="useCoupon()">등록</button>
                 </div>
             </div>
 
-            <!-- 상위 던전 구역 (맨 아래 배치, 50레벨 이상) -->
-            <div class="card" style="border: 2px solid #9b59b6; text-align: center; padding: 10px;">
-                <h4 style="margin:0 0 6px 0; color:#9b59b6; font-size:13px;">🦁 상위 던전 (Lv.50 이상)</h4>
-                <div id="dungeonAreaContent" style="font-size: 12px; color:#aaa; margin-bottom:6px;">입장 조건: 레벨 50 달성</div>
-                <button class="btn" style="background:#9b59b6; padding:8px; font-size:12px;" onclick="enterDungeon()">상위 던전 입장하기</button>
+            <div class="card">
+                <h3 style="margin-top:0; display:flex; justify-content:space-between; align-items:center;">
+                    <span>🎒 무기고 (36칸)</span>
+                </h3>
+                <div class="inventory-grid" id="inventoryGrid"></div>
+                <button class="btn btn-action" onclick="openActionModal()">⚙️ 선택한 무기 관리 / 일괄 처리</button>
             </div>
         </div>
     </div>
@@ -251,6 +245,11 @@
         let selectedIndices = []; 
         let latestInventory = [];
         let equippedIndex = null;
+        let currentGuildId = null;
+
+        let activeTradeId = null;
+        let tradeSelectedIndices = [];
+        let myOfferedIndices = [];
 
         socket.on('connect', () => { myId = socket.id; });
 
@@ -265,14 +264,14 @@
         function requestRegister() {
             const nickname = document.getElementById('authNickInput').value.trim();
             const password = document.getElementById('authPwInput').value.trim();
-            if (!nickname || !password) { alert('정보를 입력해주세요.'); return; }
+            if (!nickname || !password) { alert('닉네임과 비밀번호를 모두 입력해주세요!'); return; }
             socket.emit('register', { nickname, password });
         }
 
         function requestLogin() {
             const nickname = document.getElementById('authNickInput').value.trim();
             const password = document.getElementById('authPwInput').value.trim();
-            if (!nickname || !password) { alert('정보를 입력해주세요.'); return; }
+            if (!nickname || !password) { alert('닉네임과 비밀번호를 모두 입력해주세요!'); return; }
             socket.emit('login', { nickname, password });
         }
 
@@ -284,7 +283,14 @@
             }
         });
 
-        function attack() { socket.emit('attack'); }
+        function triggerHitEffect() {
+            const bossIcon = document.getElementById('bossIcon');
+            bossIcon.classList.remove('hit-anim');
+            void bossIcon.offsetWidth; 
+            bossIcon.classList.add('hit-anim');
+        }
+
+        function attack() { triggerHitEffect(); socket.emit('attack'); }
         function useSkill() { socket.emit('useSkill'); }
         function gacha() { socket.emit('drawGacha'); }
         function useCoupon() {
@@ -292,150 +298,191 @@
             if (code) socket.emit('useCoupon', code);
         }
 
-        socket.on('skillResult', (res) => { alert(res.message); });
-        socket.on('gachaResult', (res) => {
-            if (!res.success) alert(res.message);
-            else alert(`[ 무기 ${res.weapon.name}이 뽑혔습니다. ]`);
-        });
-
-        function openGuildModal() {
-            socket.emit('getGuildDetail');
-            document.getElementById('guildModal').style.display = 'flex';
+        function promptCreateGuild() {
+            const guildName = prompt('생성할 길드 이름을 입력해주세요:', '명예로운 기사단');
+            if (!guildName) return;
+            const maxMembers = prompt('길드 최대 인원을 설정하세요 (2 ~ 20명):', '5');
+            socket.emit('createGuild', { guildName, maxMembers: parseInt(maxMembers) || 5 });
         }
-        function closeGuildModal() { document.getElementById('guildModal').style.display = 'none'; }
-
-        socket.on('guildDetailResult', (data) => {
-            const body = document.getElementById('guildModalBody');
-            body.innerHTML = `<strong>길드명: ${data.guild.name}</strong><br><br>`;
-            data.members.forEach(m => {
-                let badge = m.isLeader ? '👑마스터' : (m.isSubLeader ? '⭐부마스터' : '길드원');
-                body.innerHTML += `<div>👤 ${m.name} (Lv.${m.level}) [${badge}] `;
-                if (data.isLeader && !m.isLeader && !m.isSubLeader) {
-                    body.innerHTML += `<button class="btn btn-sub" style="padding:2px 6px; font-size:10px;" onclick="appointSub('${m.id}')">부마스터 승급</button>`;
-                }
-                body.innerHTML += `</div>`;
-            });
-            body.innerHTML += `<br><button class="btn btn-sub" style="background:#e74c3c; width:100%;" onclick="leaveGuild()">길드 탈퇴</button>`;
-            body.innerHTML += `<button class="btn btn-sub" style="background:#27ae60; width:100%; margin-top:4px;" onclick="openGuildListModal()">다른 길드 가입/목록</button>`;
-        });
-
-        function appointSub(targetId) { socket.emit('appointSubLeader', targetId); closeGuildModal(); }
-        function leaveGuild() { socket.emit('leaveGuild'); closeGuildModal(); }
 
         function openGuildListModal() {
-            closeGuildModal();
             socket.emit('getGuildList');
             document.getElementById('guildListModal').style.display = 'flex';
         }
-        function closeGuildListModal() { document.getElementById('guildListModal').style.display = 'none'; }
+        function closeGuildModal() { document.getElementById('guildListModal').style.display = 'none'; }
+        function joinSelectedGuild(guildId) { socket.emit('joinGuild', guildId); closeGuildModal(); }
+        function leaveGuild() { if (confirm('정말 길드를 탈퇴하시겠습니까?')) socket.emit('leaveGuild'); }
+        
+        socket.on('guildResult', (res) => { alert(res.message); socket.emit('getGuildList'); });
 
         socket.on('guildListResult', (list) => {
-            const c = document.getElementById('guildListContainer');
-            c.innerHTML = '<button class="btn btn-sub" style="width:100%; margin-bottom:6px;" onclick="createGuildPrompt()">🏰 길드 만들기</button>';
-            list.forEach(g => {
-                c.innerHTML += `<div style="background:#222; padding:6px; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
-                    <span>${g.name} (${g.currentCount}/${g.maxMembers})</span>
-                    <button class="btn btn-sub" onclick="joinGuild('${g.id}')">가입</button>
-                </div>`;
-            });
-        });
-
-        function createGuildPrompt() {
-            const name = prompt('길드 이름 입력:');
-            if (name) socket.emit('createGuild', { guildName: name, maxMembers: 5 });
-            closeGuildListModal();
-        }
-        function joinGuild(id) { socket.emit('joinGuild', id); closeGuildListModal(); }
-        socket.on('guildResult', (res) => { alert(res.message); });
-
-        // 거래소 모달 제어
-        function openMarketModal() {
-            document.getElementById('marketModal').style.display = 'flex';
-            openMarketListTab();
-        }
-        function closeMarketModal() { document.getElementById('marketModal').style.display = 'none'; }
-
-        function openMarketListTab() {
-            socket.emit('getMarketList');
-        }
-
-        socket.on('marketListResult', (listings) => {
-            const content = document.getElementById('marketTabContent');
-            content.innerHTML = '<h4>등록된 매물 목록</h4>';
-            const keys = Object.keys(listings);
-            if (keys.length === 0) {
-                content.innerHTML += '<p style="color:#aaa;">등록된 매물이 없습니다.</p>';
+            const container = document.getElementById('guildListContainer');
+            container.innerHTML = '';
+            if (list.length === 0) {
+                container.innerHTML = '<p style="color:#aaa; font-size:13px;">현재 생성된 길드가 없습니다.</p>';
                 return;
             }
-            keys.forEach(k => {
-                const item = listings[k];
-                content.innerHTML += `<div style="background:#222; padding:6px; margin-bottom:4px; border-radius:4px;">
-                    <div>판매자: ${item.sellerName} | 가격: ${item.priceGold}G</div>
-                    <div>아이템: ${item.item.icon} ${item.item.name} (+${item.item.enhance||0})</div>
-                    <button class="btn btn-sub" style="background:#27ae60; padding:2px 6px; margin-top:2px;" onclick="buyMarket('${item.id}', ${item.priceGold})">구매하기</button>
-                </div>`;
+            list.forEach(g => {
+                const row = document.createElement('div');
+                row.className = 'guild-item-row';
+                row.innerHTML = `
+                    <div style="text-align:left; font-size:13px;">
+                        <strong>${g.name}</strong> <span style="color:#3498db; font-size:11px;">(${g.currentCount}/${g.maxMembers}인)</span>
+                    </div>
+                    <button class="btn" style="padding:4px 10px; font-size:12px; width:auto;" onclick="joinSelectedGuild('${g.id}')">가입</button>
+                `;
+                container.appendChild(row);
             });
         });
 
-        function openMarketUploadTab() {
-            const content = document.getElementById('marketTabContent');
-            content.innerHTML = `<h4>매물 등록 (인벤토리에서 선택)</h4>
-                <input type="number" id="marketPriceInput" placeholder="판매 골드 가격">
-                <button class="btn btn-sub" style="background:#27ae60; width:100%;" onclick="submitMarketUpload()">등록 신청</button>`;
-        }
-
-        function submitMarketUpload() {
-            if (selectedIndices.length !== 1) { alert('등록할 무기를 정확히 1개 선택해주세요!'); return; }
-            const price = document.getElementById('marketPriceInput').value;
-            socket.emit('listMarketItem', { inventoryIndex: selectedIndices[0], priceGold: price, desiredItemType: 'none', desiredItemRarity: 'any' });
-            selectedIndices = [];
-            closeMarketModal();
-        }
-
-        function buyMarket(listingId, price) {
-            socket.emit('buyMarketItem', { listingId, payWithGold: true });
-        }
-        socket.on('marketResult', (res) => { alert(res.message); openMarketListTab(); });
-
-        function openRealtimeTradeUsers() {
-            closeMarketModal();
+        function openTradeMarket() {
             socket.emit('getOnlineUsers');
+            document.getElementById('tradeUserModal').style.display = 'flex';
         }
+        function closeTradeUserModal() { document.getElementById('tradeUserModal').style.display = 'none'; }
 
         socket.on('onlineUsersResult', (users) => {
-            if (users.length === 0) { alert('접속 중인 다른 유저가 없습니다.'); return; }
-            const targetName = prompt('거래할 유저 닉네임 입력:\n' + users.map(u => u.name).join(', '));
-            const target = users.find(u => u.name === targetName);
-            if (target) socket.emit('requestTrade', target.id);
-        });
-
-        socket.on('tradeRequested', (data) => {
-            if (confirm(`[${data.fromName}] 님이 1:1 실시간 거래를 요청했습니다. 수락하시겠습니까?`)) {
-                socket.emit('acceptTrade', data.fromId);
+            const container = document.getElementById('onlineUsersContainer');
+            container.innerHTML = '';
+            if (users.length === 0) {
+                container.innerHTML = '<p style="color:#aaa; font-size:13px;">현재 접속 중인 다른 유저가 없습니다.</p>';
+                return;
             }
+            users.forEach(u => {
+                const row = document.createElement('div');
+                row.className = 'user-row';
+                row.innerHTML = `
+                    <span style="font-size:13px;">👤 ${u.name}</span>
+                    <button class="btn" style="padding:4px 10px; font-size:12px; width:auto; background:#2980b9;" onclick="sendTradeRequest('${u.id}')">거래 신청</button>
+                `;
+                container.appendChild(row);
+            });
         });
 
-        let activeTradeId = null;
+        function sendTradeRequest(targetId) {
+            socket.emit('requestTrade', targetId);
+            alert('거래 요청을 전송했습니다. 상대방의 수락을 기다리는 중...');
+            closeTradeUserModal();
+        }
+
+        let pendingTradeFromId = null;
+        socket.on('tradeRequested', (data) => {
+            pendingTradeFromId = data.fromId;
+            document.getElementById('tradeRequestText').innerText = `[${data.fromName}] 님이 1:1 거래를 요청했습니다!`;
+            document.getElementById('tradeRequestModal').style.display = 'flex';
+        });
+
+        function acceptTradeRequest() {
+            if (pendingTradeFromId) {
+                socket.emit('acceptTrade', pendingTradeFromId);
+                document.getElementById('tradeRequestModal').style.display = 'none';
+            }
+        }
+        function closeTradeRequestModal() {
+            document.getElementById('tradeRequestModal').style.display = 'none';
+            pendingTradeFromId = null;
+        }
+
+        socket.on('tradeMsg', (res) => { alert(res.message); });
+
         socket.on('tradeStart', (data) => {
             activeTradeId = data.tradeId;
-            document.getElementById('realtimeTradeModal').style.display = 'flex';
+            document.getElementById('tradePartnerName').innerText = data.partnerName;
+            myOfferedIndices = [];
+            tradeSelectedIndices = [];
+            showScreen('tradeScreen');
+            renderTradeInventory();
         });
 
-        function toggleTradeReady() {
-            socket.emit('setTradeReady', { tradeId: activeTradeId, ready: true });
+        function renderTradeInventory() {
+            const grid = document.getElementById('tradeInventoryGrid');
+            grid.innerHTML = '';
+            for (let i = 0; i < 36; i++) {
+                const slot = document.createElement('div');
+                slot.className = 'slot';
+                const item = latestInventory[i];
+                if (item) {
+                    if (myOfferedIndices.includes(i)) {
+                        slot.style.opacity = '0.3';
+                        slot.innerText = '올림';
+                    } else {
+                        if (tradeSelectedIndices.includes(i)) slot.classList.add('selected');
+                        slot.innerHTML = '<div>' + item.icon + '</div><div>+' + (item.enhance||0) + '</div>';
+                        slot.onclick = () => {
+                            const pos = tradeSelectedIndices.indexOf(i);
+                            if (pos > -1) { tradeSelectedIndices.splice(pos, 1); slot.classList.remove('selected'); }
+                            else { tradeSelectedIndices.push(i); slot.classList.add('selected'); }
+                        };
+                    }
+                } else {
+                    slot.innerText = '빈칸';
+                }
+                grid.appendChild(slot);
+            }
         }
-        function cancelTrade() {
-            if (activeTradeId) socket.emit('cancelTrade', activeTradeId);
-            document.getElementById('realtimeTradeModal').style.display = 'none';
-        }
-        function closeRealtimeTradeModal() { document.getElementById('realtimeTradeModal').style.display = 'none'; }
-        socket.on('tradeCancelled', (res) => { alert(res.message); closeRealtimeTradeModal(); });
-        socket.on('tradeComplete', (res) => { alert(res.message); closeRealtimeTradeModal(); });
 
-        function enterDungeon() { socket.emit('enterDungeon'); }
+        function addSelectedToTrade() {
+            if (tradeSelectedIndices.length === 0) { alert('거래 칸에 올릴 무기를 선택해주세요!'); return; }
+            myOfferedIndices = [...myOfferedIndices, ...tradeSelectedIndices];
+            tradeSelectedIndices = [];
+            socket.emit('updateTradeOffer', { tradeId: activeTradeId, offeredIndices: myOfferedIndices });
+            renderTradeInventory();
+        }
+
+        socket.on('tradeStateUpdate', (data) => {
+            const mySlots = document.getElementById('myTradeSlots');
+            mySlots.innerHTML = '';
+            data.items1.forEach(item => {
+                const chip = document.createElement('div');
+                chip.className = 'trade-item-chip';
+                chip.innerHTML = `<span>${item.icon}</span><span>+${item.enhance||0}</span>`;
+                mySlots.appendChild(chip);
+            });
+            document.getElementById('myTradeStatusText').innerText = data.ready1 ? '준비 완료 ✅' : '대기 중...';
+            document.getElementById('myTradeStatusText').style.color = data.ready1 ? '#2ecc71' : '#e74c3c';
+
+            const partnerSlots = document.getElementById('partnerTradeSlots');
+            partnerSlots.innerHTML = '';
+            data.items2.forEach(item => {
+                const chip = document.createElement('div');
+                chip.className = 'trade-item-chip';
+                chip.innerHTML = `<span>${item.icon}</span><span>+${item.enhance||0}</span>`;
+                partnerSlots.appendChild(chip);
+            });
+            document.getElementById('partnerTradeStatusText').innerText = data.ready2 ? '준비 완료 ✅' : '대기 중...';
+            document.getElementById('partnerTradeStatusText').style.color = data.ready2 ? '#2ecc71' : '#e74c3c';
+        });
+
+        let isTradeReady = false;
+        function toggleTradeReady() {
+            isTradeReady = !isTradeReady;
+            socket.emit('setTradeReady', { tradeId: activeTradeId, ready: isTradeReady });
+        }
+
+        function cancelTradeSession() {
+            if (activeTradeId) socket.emit('cancelTrade', activeTradeId);
+        }
+
+        socket.on('tradeCancelled', (res) => {
+            alert(res.message);
+            activeTradeId = null;
+            goToLobby();
+        });
+
+        socket.on('tradeComplete', (res) => {
+            alert(res.message);
+            activeTradeId = null;
+            isTradeReady = false;
+            goToLobby();
+        });
+
+        socket.on('skillResult', (res) => { 
+            if (res.success) { triggerHitEffect(); alert(res.message); }
+            else { alert(res.message); }
+        });
 
         function openActionModal() {
-            if (selectedIndices.length === 0) { alert("무기를 선택해주세요!"); return; }
+            if (selectedIndices.length === 0) { alert("관리할 무기를 슬롯에서 선택해주세요!"); return; }
             const modal = document.getElementById('itemActionModal');
             const title = document.getElementById('popupTitle');
             const contentArea = document.getElementById('popupContentArea');
@@ -445,38 +492,41 @@
             if (selectedIndices.length === 1) {
                 const idx = selectedIndices[0];
                 const item = latestInventory[idx];
-                title.innerText = `🔍 무기 관리: ${item.name}`;
+                if (!item) { alert("비어있는 슬롯입니다."); selectedIndices = []; modal.style.display = 'none'; return; }
+
+                title.innerText = `🔍 무기 관리: ${item.name} (+${item.enhance || 0})`;
                 const isEquipped = (equippedIndex === idx);
+                const enhanceCost = ((item.enhance || 0) + 1) * 400;
+
                 contentArea.innerHTML = `
-                    <button class="popup-btn" style="background:#2980b9;" onclick="doAction('equip', ${idx})">${isEquipped ? '장착 해제' : '장착'}</button>
-                    <button class="popup-btn" style="background:#f39c12;" onclick="doAction('enhance', ${idx})">✨ 강화</button>
-                    <button class="popup-btn" style="background:#9b59b6;" onclick="doAction('important', ${idx})">${item.isImportant ? '⭐ 중요 해제' : '⭐ 중요 설정(상단고정/보호)'}</button>
-                    <button class="popup-btn" style="background:#e67e22;" onclick="doAction('sell', ${idx})">💰 판매 (${item.sellPrice}G)</button>
-                    <button class="popup-btn" style="background:#c0392b;" onclick="doAction('delete', ${idx})">🗑️ 삭제</button>
+                    <button class="popup-btn" style="background:#2980b9;" onclick="doSingleAction('equip', ${idx})">${isEquipped ? '장착 해제' : '무기 장착'}</button>
+                    <button class="popup-btn" style="background:#f39c12;" onclick="doSingleAction('enhance', ${idx})">✨ 강화 (${enhanceCost}G)</button>
+                    <button class="popup-btn" style="background:#e67e22;" onclick="doSingleAction('sell', ${idx})">💰 단건 판매 (${item.sellPrice}G)</button>
+                    <button class="popup-btn" style="background:#c0392b;" onclick="doSingleAction('delete', ${idx})">🗑️ 단건 삭제</button>
                 `;
             } else {
+                title.innerText = `📦 다중 선택 관리 (${selectedIndices.length}개)`;
                 contentArea.innerHTML = `
-                    <button class="popup-btn" style="background:#e67e22;" onclick="doBatch('sell')">💰 일괄 판매</button>
-                    <button class="popup-btn" style="background:#c0392b;" onclick="doBatch('delete')">🗑️ 일괄 삭제</button>
+                    <button class="popup-btn" style="background:#e67e22;" onclick="doBatchAction('sell')">💰 선택 무기 일괄 판매</button>
+                    <button class="popup-btn" style="background:#c0392b;" onclick="doBatchAction('delete')">🗑️ 선택 무기 일괄 삭제</button>
                 `;
             }
             modal.style.display = 'flex';
         }
 
         function closeItemModal() { document.getElementById('itemActionModal').style.display = 'none'; }
-        function doAction(type, idx) {
+        function doSingleAction(actionType, idx) {
             closeItemModal();
-            if (type === 'equip') socket.emit('equipItem', idx);
-            if (type === 'enhance') socket.emit('enhanceItem', idx);
-            if (type === 'important') socket.emit('toggleImportant', idx);
-            if (type === 'sell') socket.emit('sellItems', [idx]);
-            if (type === 'delete') socket.emit('deleteItems', [idx]);
+            if (actionType === 'equip') socket.emit('equipItem', idx);
+            if (actionType === 'enhance') socket.emit('enhanceItem', idx);
+            if (actionType === 'sell') socket.emit('sellItems', [idx]);
+            if (actionType === 'delete') socket.emit('deleteItems', [idx]);
             selectedIndices = [];
         }
-        function doBatch(type) {
+        function doBatchAction(actionType) {
             closeItemModal();
-            if (type === 'sell') socket.emit('sellItems', selectedIndices);
-            if (type === 'delete') socket.emit('deleteItems', selectedIndices);
+            if (actionType === 'sell') socket.emit('sellItems', selectedIndices);
+            if (actionType === 'delete') socket.emit('deleteItems', selectedIndices);
             selectedIndices = [];
         }
 
@@ -485,30 +535,40 @@
         socket.on('enhanceResult', (res) => { alert(res.message); });
 
         socket.on('updateState', (state) => {
-            if (!state) return;
+            if (!state || !state.boss) return;
 
-            // 보스 정보 렌더링
-            let targetBoss = state.dungeonBoss || state.boss;
-            if (targetBoss) {
-                const parts = targetBoss.name.split(' ');
-                document.getElementById('bossIcon').innerText = parts[0] || '⚔️';
-                document.getElementById('bossName').innerText = parts.slice(1).join(' ') || targetBoss.name;
-                const pct = (targetBoss.currentHp / targetBoss.maxHp) * 100;
-                document.getElementById('bossHpFill').style.width = Math.max(0, pct) + '%';
-                document.getElementById('bossHpText').innerText = `${targetBoss.currentHp.toLocaleString()} / ${targetBoss.maxHp.toLocaleString()}`;
+            const bossParts = state.boss.name.split(' ');
+            if (bossParts.length >= 2) {
+                document.getElementById('bossIcon').innerText = bossParts[0];
+                document.getElementById('bossName').innerText = bossParts.slice(1).join(' ');
             }
 
+            const bossHpPct = (state.boss.currentHp / state.boss.maxHp) * 100;
+            document.getElementById('bossHpFill').style.width = Math.max(0, bossHpPct) + '%';
+            document.getElementById('bossHpText').innerText = Math.max(0, state.boss.currentHp).toLocaleString() + ' / ' + state.boss.maxHp.toLocaleString();
+            
             if (state.rankings) {
-                const pList = document.getElementById('playerRankingList');
-                pList.innerHTML = '';
-                (state.rankings.players || []).slice(0, 3).forEach(p => {
-                    pList.innerHTML += `<li>${p.name} (${p.totalDamage})</li>`;
+                const pRankList = document.getElementById('playerRankingList');
+                pRankList.innerHTML = '';
+                (state.rankings.players || []).slice(0, 5).forEach((p) => {
+                    const li = document.createElement('li');
+                    const isMe = p.name === state.players[myId]?.name ? ' (나)' : '';
+                    li.innerText = `${p.name}${isMe} - ${p.totalDamage.toLocaleString()} DMG`;
+                    pRankList.appendChild(li);
                 });
-                const gList = document.getElementById('guildRankingList');
-                gList.innerHTML = '';
-                (state.rankings.guilds || []).slice(0, 3).forEach(g => {
-                    gList.innerHTML += `<li>${g.name} (${g.totalDamage})</li>`;
-                });
+
+                const gRankList = document.getElementById('guildRankingList');
+                gRankList.innerHTML = '';
+                const guilds = state.rankings.guilds || [];
+                if (guilds.length === 0) {
+                    gRankList.innerHTML = '<li style="list-style:none; color:#aaa;">랭킹 없음</li>';
+                } else {
+                    guilds.slice(0, 5).forEach((g) => {
+                        const li = document.createElement('li');
+                        li.innerText = `${g.name} (${g.memberCount}/${g.maxMembers}) - ${g.totalDamage.toLocaleString()} DMG`;
+                        gRankList.appendChild(li);
+                    });
+                }
             }
 
             const me = state.players[myId];
@@ -516,26 +576,36 @@
                 document.getElementById('lobbyName').innerText = me.name;
                 document.getElementById('lobbyGold').innerText = me.gold.toLocaleString();
                 document.getElementById('lobbyInvenCount').innerText = me.inventory.length;
-                document.getElementById('myHp').innerText = me.hp;
-                document.getElementById('myLevel').innerText = me.level;
                 
-                let reqExp = me.level * 1500;
-                let expPct = Math.min(100, (me.exp / reqExp) * 100);
-                document.getElementById('expBarFill').style.width = expPct + '%';
-
+                document.getElementById('myHp').innerText = me.hp;
+                document.getElementById('myGold').innerText = me.gold.toLocaleString();
+                
                 latestInventory = me.inventory || [];
                 equippedIndex = me.equippedIndex;
 
-                const guildStat = document.getElementById('lobbyGuildStatus');
-                if (me.guildId && state.guilds[me.guildId]) {
-                    guildStat.innerText = state.guilds[me.guildId].name;
-                    guildStat.style.color = '#2ecc71';
+                currentGuildId = me.guildId;
+                const lobbyGuildStatus = document.getElementById('lobbyGuildStatus');
+                const lobbyGuildControl = document.getElementById('lobbyGuildControl');
+
+                if (currentGuildId && state.guilds[currentGuildId]) {
+                    const gInfo = state.guilds[currentGuildId];
+                    lobbyGuildStatus.innerText = `[${gInfo.name}] (${gInfo.members.length}/${gInfo.maxMembers}인)`;
+                    lobbyGuildStatus.style.color = '#2ecc71';
+                    lobbyGuildControl.innerHTML = `<button class="btn btn-sub" style="background:#e74c3c;" onclick="leaveGuild()">길드 탈퇴</button>`;
                 } else {
-                    guildStat.innerText = '미소속';
-                    guildStat.style.color = '#e74c3c';
+                    lobbyGuildStatus.innerText = '미소속';
+                    lobbyGuildStatus.style.color = '#e74c3c';
+                    lobbyGuildControl.innerHTML = `
+                        <button class="btn btn-sub" onclick="promptCreateGuild()">🏰 길드 만들기</button>
+                        <button class="btn btn-sub" style="background:#27ae60; margin-left:6px;" onclick="openGuildListModal()">🔍 길드 참여</button>
+                    `;
                 }
 
-                const grid = document.getElementById('lobbyInventoryGrid');
+                if (activeTradeId) {
+                    renderTradeInventory();
+                }
+
+                const grid = document.getElementById('inventoryGrid');
                 grid.innerHTML = '';
                 for (let i = 0; i < 36; i++) {
                     const slot = document.createElement('div');
@@ -544,24 +614,23 @@
                     if (item) {
                         if (me.equippedIndex === i) slot.classList.add('equipped');
                         if (selectedIndices.includes(i)) slot.classList.add('selected');
-                        if (item.rarity) slot.classList.add(`rarity-${item.rarity}`);
-                        if (item.isImportant) slot.style.borderStyle = 'dashed';
-                        
-                        slot.innerHTML = `<div>${item.icon || '⚔️'}</div><div>+${item.enhance||0}</div>`;
+                        slot.innerHTML = '<div>' + (item.icon || '⚔️') + '</div><div>+' + (item.enhance||0) + '</div>';
                         slot.onclick = () => {
-                            const pos = selectedIndices.indexOf(i);
-                            if (pos > -1) { selectedIndices.splice(pos, 1); slot.classList.remove('selected'); }
+                            const idxPos = selectedIndices.indexOf(i);
+                            if (idxPos > -1) { selectedIndices.splice(idxPos, 1); slot.classList.remove('selected'); }
                             else { selectedIndices.push(i); slot.classList.add('selected'); }
                         };
-                    } else {
-                        slot.innerText = '빈칸';
-                    }
+                    } else { slot.innerText = '빈칸'; }
                     grid.appendChild(slot);
                 }
             }
         });
 
         socket.on('couponResult', (res) => alert(res.message));
+        socket.on('gachaResult', (res) => {
+            if (!res.success) alert(res.message);
+            else alert('🎉 획득: ' + res.weapon.icon + ' [' + res.weapon.rarity + '] ' + res.weapon.name);
+        });
     </script>
 </body>
 </html>
