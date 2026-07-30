@@ -510,7 +510,7 @@ io.on('connection', (socket) => {
         io.emit('updateState', gameState);
     });
 
-    // 상세 거래소 매물 시스템 (골드 또는 무기/유물 지정 가능)
+    // 실시간 거래소 매물 시스템 (골드 또는 무기/유물 지정 가능)
     socket.on('getMarketList', () => { socket.emit('marketListResult', gameState.marketListings); });
     
     socket.on('listMarketItem', ({ inventoryIndex, priceType, priceGold, priceItemIndex }) => {
@@ -527,7 +527,7 @@ io.on('connection', (socket) => {
             reqGold = parseInt(priceGold) || 0;
         } else if (priceType === 'item') {
             if (priceItemIndex < 0 || priceItemIndex >= p.inventory.length || priceItemIndex === inventoryIndex) {
-                socket.emit('alertMessage', '올바른 교환원하실 무기/유물 슬롯을 지정해주세요.');
+                socket.emit('alertMessage', '올바른 교환할 무기/유물 슬롯을 지정해주세요.');
                 return;
             }
             reqItem = p.inventory[priceItemIndex];
@@ -537,13 +537,10 @@ io.on('connection', (socket) => {
             }
         }
 
-        // 아이템 등록 진행 (판매자 인벤토리에서 차감)
         p.inventory.splice(inventoryIndex, 1);
         if (p.equippedIndex === inventoryIndex) p.equippedIndex = null;
         
-        // 만약 교환용 아이템을 내 인벤토리에서 지정했다면 그 아이템도 같이 등록용으로 묶어서 차감하거나 거래 시 처리
         if (priceType === 'item' && reqItem) {
-            // 인덱스가 밀릴 수 있으므로 정확히 아이템 객체 기준으로 제거
             const actualIdx = p.inventory.findIndex(it => it.id === reqItem.id);
             if (actualIdx > -1) {
                 p.inventory.splice(actualIdx, 1);
@@ -557,9 +554,9 @@ io.on('connection', (socket) => {
             sellerId: socket.id,
             sellerName: p.name,
             item: itemToSell,
-            priceType: priceType, // 'gold' 또는 'item'
+            priceType: priceType,
             priceGold: reqGold,
-            priceItem: reqItem // 교환 요구 아이템 상세 정보
+            priceItem: reqItem
         };
 
         saveAccountState(p);
@@ -587,15 +584,13 @@ io.on('connection', (socket) => {
                 saveAccountState(seller);
             }
         } else if (listing.priceType === 'item') {
-            // 구매자가 해당 요구 아이템을 가지고 있는지 확인
             const reqIdx = buyer.inventory.findIndex(it => 
                 it.name === listing.priceItem.name && it.rarity === listing.priceItem.rarity && !it.isLocked
             );
             if (reqIdx === -1) {
-                socket.emit('alertMessage', '거래에 필요한 지정된 무기/유물 아이템이 인벤토리에 없습니다! (잠긴 아이템은 사용 불가)');
+                socket.emit('alertMessage', '거래에 필요한 지정된 무기/유물 아이템이 인벤토리에 없습니다!');
                 return;
             }
-            // 구매자의 요구 아이템을 판매자에게 지급하고, 매물 아이템을 구매자에게 지급
             const paymentItem = buyer.inventory.splice(reqIdx, 1)[0];
             buyer.inventory.push(listing.item);
 
@@ -603,7 +598,6 @@ io.on('connection', (socket) => {
                 if (seller.inventory.length < 36) {
                     seller.inventory.push(paymentItem);
                 } else {
-                    // 판매자 인벤토리가 꽉 찼을 경우 보조 처리 혹은 골드로 환산 등
                     seller.gold += (paymentItem.sellPrice || 100);
                 }
                 saveAccountState(seller);
