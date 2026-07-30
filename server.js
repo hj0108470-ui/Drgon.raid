@@ -10,7 +10,6 @@ const io = new Server(server, { cors: { origin: "*", methods: ["GET", "POST"] } 
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 
-// 1. 보스 4종 및 처치 시 지급할 경험치(expReward) 설정
 const BOSS_LIST = [
     { name: '🐷 꿀신', maxHp: 157500, currentHp: 157500, expReward: 2000 },
     { name: '🗿 골리앗', maxHp: 367500, currentHp: 367500, expReward: 4500 },
@@ -76,6 +75,7 @@ let gameState = {
     registeredAccounts: {},
     guilds: {},
     marketListings: {},
+    trades: {},
     rankings: { players: [], guilds: [] }
 };
 
@@ -276,7 +276,7 @@ io.on('connection', (socket) => {
 
         let currentCooldown = (weaponType === 'shield') ? ((eq.shieldDuration || 10) + 5) * 1000 : 5000;
         if (now - (p.lastSkillTime || 0) < currentCooldown) {
-            socket.emit('skillResult', { success: false, message: '⏳ 스킬 쿨타임 중입니다!' });
+            socket.emit('skillResultPop', { success: false, message: '⏳ 스킬 쿨타임 중입니다!' });
             return;
         }
         p.lastSkillTime = now;
@@ -332,6 +332,127 @@ io.on('connection', (socket) => {
             saveAccountState(p);
         }
     }
+
+    // ⚖️ 1대1 실시간 거래 시스템
+    socket.on('requestTrade', (targetName) => {
+        const sender = gameState.players[socket.id];
+        if (!sender) return;
+        let targetSocketId = null;
+        for (let [sId, pObj] of Object.entries(gameState.players)) {
+            if (pObj.name === targetName) {
+                targetSocketId = sId;
+                break;
+            }
+        }
+        if (!targetSocketId || targetSocketId === socket.id) {
+            socket.emit('tradeAlert', { success: false, message: '상대를 찾을 수 없거나 자기 자신과는 거래할 수 없습니다.' });
+            return;
+        }
+        io.to(targetSocketId).emit('tradeRequestReceived', { senderId: socket.id, senderName: sender.name });
+        socket.emit('tradeAlert', { success: true, message: `${targetName}님께 1대1 거래를 요청했습니다.` });
+    });
+
+    socket.on('acceptTrade', (senderId) => {
+        const acceptor = gameState.players[socket.id];
+        const sender = gameState.players[senderId];
+        if (!acceptor || !sender) return;
+
+        const tradeId = 'trade_' + Date.now();
+        gameState.trades[tradeId] = {
+            id: tradeId,
+            p1: senderId,
+            p2: socket.id,
+            p1Offer: { items: [], gold: 0, locked: false },
+            p2Offer: { items: [], gold: 0, locked: false }
+        };
+
+        io.to(senderId).emit('tradeStarted', { tradeId, partnerName: acceptor.name });
+        io.to(socket.id).emit('tradeStarted', { tradeId, partnerName: sender.name });
+    });
+
+    socket.on('updateTradeOffer', ({ tradeId, offerItems, offerGold }) => {
+        const trade = gameState.trades[tradeId];
+        const p = gameState.players[socket.id];
+        if (!trade || !p) return;
+
+        if (trade.p1 === socket.id) {
+            if (trade.p1Offer.locked) return;
+            trade.p1Offer.items = offerItems;
+            trade.p1Offer.gold = parseInt(offerGold) || 0;
+        } else if (trade.p2 === socket.id) {
+            if (trade.p2Offer.locked) return;
+            trade.p2Offer.items = offerItems;
+            trade.p2Offer.gold = parseInt(offerGold) || 0;
+        }
+
+        io.to(trade.p1).emit('tradeStateUpdate', trade);
+        io.to(trade.p2).emit('tradeStateUpdate', trade);
+    });
+
+    socket.on('lockTradeOffer', (tradeId) => {
+        const trade = gameState.trades[tradeId];
+        if (!trade) return;
+
+        if (trade.p1 === socket.id) trade.p1Offer.locked = true;
+        else if (trade.p2 === socket.id) trade.p2Offer.locked = true;
+
+        io.to(trade.p1).emit('tradeStateUpdate', trade);
+        io.to(trade.p2).emit('tradeStateUpdate', trade);
+
+        if (trade.p1Offer.locked && trade.p2Offer.locked) {
+            // 거래 최종 확정 및 교환 처리
+            const p1 = gameState.players[trade.p1];
+            const p2 = gameState.players[trade.p2];
+
+            if (p1 && p2) {
+                // 검증: 아이템 소유 여부 및 골드 보유량 체크
+                let p1Items = trade.p1Offer.items.map(idx => p1.inventory[idx]);
+                let p2Items = trade.p2Offer.items.map(idx => p2.inventory[idx]);
+
+                if (p1.gold < trade.p1Offer.gold || p2.gold < trade.p2Offer.gold || p1Items.includes(undefined) || p2Items.includes(undefined)) {
+                    io.to(trade.p1).emit('tradeComplete', { success: false, message: '보유 자산이나 아이템이 부족하여 거래가 취소되었습니다.' });
+                    io.to(trade.p2).emit('tradeComplete', { success: false, message: '보유 자산이나 아이템이 부족하여 거래가 취소되었습니다.' });
+                    delete gameState.trades[tradeId];
+                    return;
+                }
+
+                // 골드 교환
+                p1.gold -= trade.p1Offer.gold;
+                p1.gold += trade.p2Offer.gold;
+                p2.gold -= trade.p2Offer.gold;
+                p2.gold += trade.p1Offer.gold;
+
+                // 아이템 교환 (인덱스 내림차순 정렬하여 splice 오류 방지)
+                let p1Indices = [...trade.p1Offer.items].sort((a, b) => b - a);
+                let p2Indices = [...trade.p2Offer.items].sort((a, b) => b - a);
+
+                let extractedP1Items = p1Indices.map(idx => p1.inventory.splice(idx, 1)[0]);
+                let extractedP2Items = p2Indices.map(idx => p2.inventory.splice(idx, 1)[0]);
+
+                p1.inventory.push(...extractedP2Items);
+                p2.inventory.push(...extractedP1Items);
+
+                p1.equippedIndex = null;
+                p2.equippedIndex = null;
+
+                saveAccountState(p1);
+                saveAccountState(p2);
+
+                io.to(trade.p1).emit('tradeComplete', { success: true, message: '🤝 1대1 거래가 성공적으로 완료되었습니다!' });
+                io.to(trade.p2).emit('tradeComplete', { success: true, message: '🤝 1대1 거래가 성공적으로 완료되었습니다!' });
+            }
+            delete gameState.trades[tradeId];
+            io.emit('updateState', gameState);
+        }
+    });
+
+    socket.on('cancelTrade', (tradeId) => {
+        const trade = gameState.trades[tradeId];
+        if (!trade) return;
+        io.to(trade.p1).emit('tradeComplete', { success: false, message: '상대방이 거래를 취소했습니다.' });
+        io.to(trade.p2).emit('tradeComplete', { success: false, message: '상대방이 거래를 취소했습니다.' });
+        delete gameState.trades[tradeId];
+    });
 
     socket.on('getMarketList', () => { socket.emit('marketListResult', gameState.marketListings); });
     socket.on('listMarketItem', ({ inventoryIndex, priceGold }) => {
@@ -536,6 +657,14 @@ io.on('connection', (socket) => {
                 guild.members = guild.members.filter(id => id !== socket.id);
                 if (guild.members.length === 0) delete gameState.guilds[p.guildId];
                 else if (guild.leaderId === socket.id) guild.leaderId = guild.members[0];
+            }
+        }
+        // 진행 중인 1대1 거래 취소 처리
+        for (let [tId, tObj] of Object.entries(gameState.trades)) {
+            if (tObj.p1 === socket.id || tObj.p2 === socket.id) {
+                const otherId = (tObj.p1 === socket.id) ? tObj.p2 : tObj.p1;
+                io.to(otherId).emit('tradeComplete', { success: false, message: '상대방의 연결이 끊어져 거래가 취소되었습니다.' });
+                delete gameState.trades[tId];
             }
         }
         delete gameState.players[socket.id];
