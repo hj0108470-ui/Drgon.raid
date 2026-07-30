@@ -202,14 +202,14 @@ function addExp(p, amount) {
         return;
     }
     p.exp += amount;
-    let reqExp = Math.round(360 * Math.pow(1.5, p.level - 1));
+    let reqExp = Math.round(360 * Math.pow(1.2, p.level - 1));
     while (p.level < 100 && p.exp >= reqExp) {
         p.exp -= reqExp;
         p.level++;
         p.maxHp += 10;
         p.hp = p.maxHp;
         p.gold += 5000;
-        reqExp = Math.round(360 * Math.pow(1.5, p.level - 1));
+        reqExp = Math.round(360 * Math.pow(1.2, p.level - 1));
     }
     if (p.level >= 100) {
         p.level = 100;
