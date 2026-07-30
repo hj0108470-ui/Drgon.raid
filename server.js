@@ -196,6 +196,7 @@ function calculateDamage(p) {
     return Math.round(baseAtk + (p.bonusAtk || 0) + levelBonusAtk);
 }
 
+// 📌 경험치 요구량 증가 배율 1.2배로 수정 반영
 function addExp(p, amount) {
     if (p.level >= 100) {
         p.exp = 0;
@@ -564,7 +565,7 @@ io.on('connection', (socket) => {
         let currentEmptySlots = 36 - p.inventory.length;
 
         if (currentEmptySlots + 1 < itemsCount || p.inventory.length + itemsCount - 1 > 36) {
-            socket.emit('tradeAlert', { success: false, message: '[ 무기고가 꽉 찼습니다! ]' });
+            socket.emit('tradeAlert', { success: false, message: '[ 무기고 꽉 찼습니다 ! ]' });
             return;
         }
 
@@ -630,17 +631,8 @@ io.on('connection', (socket) => {
             trade.p2Offer.gold = parseInt(offerGold) || 0;
         }
 
-        const p1 = gameState.players[trade.p1];
-        const p2 = gameState.players[trade.p2];
-
-        let tradeUpdatePayload = {
-            ...trade,
-            p1ItemsName: p1 ? trade.p1Offer.items.map(idx => (p1.inventory[idx] ? p1.inventory[idx].name : '알 수 없음')) : [],
-            p2ItemsName: p2 ? trade.p2Offer.items.map(idx => (p2.inventory[idx] ? p2.inventory[idx].name : '알 수 없음')) : []
-        };
-
-        io.to(trade.p1).emit('tradeStateUpdate', tradeUpdatePayload);
-        io.to(trade.p2).emit('tradeStateUpdate', tradeUpdatePayload);
+        io.to(trade.p1).emit('tradeStateUpdate', trade);
+        io.to(trade.p2).emit('tradeStateUpdate', trade);
     });
 
     socket.on('lockTradeOffer', (tradeId) => {
@@ -650,19 +642,13 @@ io.on('connection', (socket) => {
         if (trade.p1 === socket.id) trade.p1Offer.locked = true;
         else if (trade.p2 === socket.id) trade.p2Offer.locked = true;
 
-        const p1 = gameState.players[trade.p1];
-        const p2 = gameState.players[trade.p2];
-
-        let tradeUpdatePayload = {
-            ...trade,
-            p1ItemsName: p1 ? trade.p1Offer.items.map(idx => (p1.inventory[idx] ? p1.inventory[idx].name : '알 수 없음')) : [],
-            p2ItemsName: p2 ? trade.p2Offer.items.map(idx => (p2.inventory[idx] ? p2.inventory[idx].name : '알 수 없음')) : []
-        };
-
-        io.to(trade.p1).emit('tradeStateUpdate', tradeUpdatePayload);
-        io.to(trade.p2).emit('tradeStateUpdate', tradeUpdatePayload);
+        io.to(trade.p1).emit('tradeStateUpdate', trade);
+        io.to(trade.p2).emit('tradeStateUpdate', trade);
 
         if (trade.p1Offer.locked && trade.p2Offer.locked) {
+            const p1 = gameState.players[trade.p1];
+            const p2 = gameState.players[trade.p2];
+
             if (p1 && p2) {
                 let p1Items = trade.p1Offer.items.map(idx => p1.inventory[idx]);
                 let p2Items = trade.p2Offer.items.map(idx => p2.inventory[idx]);
@@ -824,33 +810,7 @@ io.on('connection', (socket) => {
                 isLeader: (g.leaderId === mId), isSubLeader: (g.subLeaderId === mId)
             };
         });
-        socket.emit('guildDetailResult', { guildName: g.name, isLeader: (g.leaderId === socket.id), isSubLeader: (g.subLeaderId === socket.id), members: memberDetails });
-    });
-
-    socket.on('setSubLeader', (targetSocketId) => {
-        const p = gameState.players[socket.id];
-        if (!p || !p.guildId || !gameState.guilds[p.guildId]) return;
-        const guild = gameState.guilds[p.guildId];
-
-        if (guild.leaderId !== socket.id) {
-            socket.emit('tradeAlert', { success: false, message: '길드마스터만 부마스터를 임명할 수 있습니다.' });
-            return;
-        }
-
-        if (!guild.members.includes(targetSocketId)) {
-            socket.emit('tradeAlert', { success: false, message: '해당 유저는 우리 길드원이 아닙니다.' });
-            return;
-        }
-
-        if (guild.subLeaderId === targetSocketId) {
-            guild.subLeaderId = null;
-            socket.emit('tradeAlert', { success: true, message: '부마스터 직위가 해제되었습니다.' });
-        } else {
-            guild.subLeaderId = targetSocketId;
-            socket.emit('tradeAlert', { success: true, message: '성공적으로 부마스터로 임명했습니다.' });
-        }
-
-        io.emit('updateState', gameState);
+        socket.emit('guildDetailResult', { guildName: g.name, isLeader: (g.leaderId === socket.id), members: memberDetails });
     });
 
     socket.on('joinGuild', (guildId) => {
@@ -870,13 +830,8 @@ io.on('connection', (socket) => {
         const guild = gameState.guilds[p.guildId];
         if (guild) {
             guild.members = guild.members.filter(id => id !== socket.id);
-            if (guild.leaderId === socket.id) {
-                if (guild.members.length > 0) guild.leaderId = guild.members[0];
-            }
-            if (guild.subLeaderId === socket.id) {
-                guild.subLeaderId = null;
-            }
             if (guild.members.length === 0) delete gameState.guilds[p.guildId];
+            else if (guild.leaderId === socket.id) guild.leaderId = guild.members[0];
         }
         p.guildId = null;
         saveAccountState(p);
@@ -886,17 +841,13 @@ io.on('connection', (socket) => {
 
     socket.on('useCoupon', (code) => {
         const p = gameState.players[socket.id];
-        if (!p || !COUPONS[code]) {
-            socket.emit('couponResult', { success: false, message: '유효하지 않은 쿠폰 코드입니다.' });
-            return;
-        }
+        if (!p || !COUPONS[code]) return;
         const c = COUPONS[code];
         if (c.type === 'gold') p.gold += c.reward;
         else if (c.type === 'weapon' && p.inventory.length < 36) {
             p.inventory.push({ ...WEAPON_DB[c.reward], id: Date.now(), enhance: 0 });
         }
         saveAccountState(p);
-        socket.emit('couponResult', { success: true, message: '쿠폰이 성공적으로 등록되었습니다!' });
         io.emit('updateState', gameState);
     });
 
@@ -962,13 +913,8 @@ io.on('connection', (socket) => {
             if (p.guildId && gameState.guilds[p.guildId]) {
                 const guild = gameState.guilds[p.guildId];
                 guild.members = guild.members.filter(id => id !== socket.id);
-                if (guild.leaderId === socket.id) {
-                    if (guild.members.length > 0) guild.leaderId = guild.members[0];
-                }
-                if (guild.subLeaderId === socket.id) {
-                    guild.subLeaderId = null;
-                }
                 if (guild.members.length === 0) delete gameState.guilds[p.guildId];
+                else if (guild.leaderId === socket.id) guild.leaderId = guild.members[0];
             }
         }
         for (let [tId, tObj] of Object.entries(gameState.trades)) {
