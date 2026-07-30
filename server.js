@@ -188,7 +188,6 @@ function calculateDamage(p) {
         baseAtk = (eq.atk * (1 + (eq.enhance || 0) * 0.15)) * rarityMul;
     }
 
-    // 10레벨 이상부터 1레벨 오를 때마다 데미지 +200 증가 적용
     let levelBonusAtk = 0;
     if (p.level >= 10) {
         levelBonusAtk = (p.level - 10) * 200;
@@ -403,7 +402,6 @@ io.on('connection', (socket) => {
             let currentBoss = BOSS_LIST.find(b => b.name === gameState.boss.name) || BOSS_LIST[0];
             let requiredDamage = currentBoss.maxHp * 0.10;
 
-            // 접속 중인 모든 플레이어를 대상으로 기여도(10% 이상) 검사 후 보상 지급
             Object.values(gameState.players).forEach(player => {
                 if ((player.sessionDamage || 0) >= requiredDamage) {
                     let rewardExp = currentBoss.expReward;
@@ -412,7 +410,6 @@ io.on('connection', (socket) => {
                     const artifactKey = getRandomArtifactKey(false);
                     const droppedItem = { ...WEAPON_DB[artifactKey], id: Date.now() + Math.random(), enhance: 0 };
                     
-                    // 소켓 찾아서 알림 및 아이템 지급
                     const targetSocket = io.sockets.sockets.get(player.id);
                     if (targetSocket) {
                         if (player.inventory.length < 36) {
