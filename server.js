@@ -196,7 +196,6 @@ function calculateDamage(p) {
     return Math.round(baseAtk + (p.bonusAtk || 0) + levelBonusAtk);
 }
 
-// 필요 경험치 계산 배율 1.2배로 수정 반영 (360 -> 432 공식 호환)
 function addExp(p, amount) {
     if (p.level >= 100) {
         p.exp = 0;
@@ -634,7 +633,6 @@ io.on('connection', (socket) => {
         const p1 = gameState.players[trade.p1];
         const p2 = gameState.players[trade.p2];
 
-        // 상대방에게 등록된 아이템들의 실제 데이터 이름(WEAPON_DB 또는 저장된 이름)을 제대로 조회하도록 수정
         let tradeUpdatePayload = {
             ...trade,
             p1ItemsName: p1 ? trade.p1Offer.items.map(idx => (p1.inventory[idx] ? p1.inventory[idx].name : '알 수 없음')) : [],
@@ -826,7 +824,37 @@ io.on('connection', (socket) => {
                 isLeader: (g.leaderId === mId), isSubLeader: (g.subLeaderId === mId)
             };
         });
-        socket.emit('guildDetailResult', { guildName: g.name, isLeader: (g.leaderId === socket.id), members: memberDetails });
+        socket.emit('guildDetailResult', { guildName: g.name, isLeader: (g.leaderId === socket.id), isSubLeader: (g.subLeaderId === socket.id), members: memberDetails });
+    });
+
+    // 길드 마스터가 부마스터를 임명 또는 해제하는 기능
+    socket.on('setSubLeader', (targetSocketId) => {
+        const p = gameState.players[socket.id];
+        if (!p || !p.guildId || !gameState.guilds[p.guildId]) return;
+        const guild = gameState.guilds[p.guildId];
+
+        // 요청자가 길드 마스터인지 확인
+        if (guild.leaderId !== socket.id) {
+            socket.emit('tradeAlert', { success: false, message: '길드마스터만 부마스터를 임명할 수 있습니다.' });
+            return;
+        }
+
+        // 대상이 해당 길드의 멤버인지 확인
+        if (!guild.members.includes(targetSocketId)) {
+            socket.emit('tradeAlert', { success: false, message: '해당 유저는 우리 길드원이 아닙니다.' });
+            return;
+        }
+
+        // 이미 부마스터인 사람을 다시 지정하면 해제, 아니면 새로 임명
+        if (guild.subLeaderId === targetSocketId) {
+            guild.subLeaderId = null;
+            socket.emit('tradeAlert', { success: true, message: '부마스터 직위가 해제되었습니다.' });
+        } else {
+            guild.subLeaderId = targetSocketId;
+            socket.emit('tradeAlert', { success: true, message: '성공적으로 부마스터로 임명했습니다.' });
+        }
+
+        io.emit('updateState', gameState);
     });
 
     socket.on('joinGuild', (guildId) => {
@@ -846,8 +874,13 @@ io.on('connection', (socket) => {
         const guild = gameState.guilds[p.guildId];
         if (guild) {
             guild.members = guild.members.filter(id => id !== socket.id);
+            if (guild.leaderId === socket.id) {
+                if (guild.members.length > 0) guild.leaderId = guild.members[0];
+            }
+            if (guild.subLeaderId === socket.id) {
+                guild.subLeaderId = null;
+            }
             if (guild.members.length === 0) delete gameState.guilds[p.guildId];
-            else if (guild.leaderId === socket.id) guild.leaderId = guild.members[0];
         }
         p.guildId = null;
         saveAccountState(p);
@@ -929,8 +962,13 @@ io.on('connection', (socket) => {
             if (p.guildId && gameState.guilds[p.guildId]) {
                 const guild = gameState.guilds[p.guildId];
                 guild.members = guild.members.filter(id => id !== socket.id);
+                if (guild.leaderId === socket.id) {
+                    if (guild.members.length > 0) guild.leaderId = guild.members[0];
+                }
+                if (guild.subLeaderId === socket.id) {
+                    guild.subLeaderId = null;
+                }
                 if (guild.members.length === 0) delete gameState.guilds[p.guildId];
-                else if (guild.leaderId === socket.id) guild.leaderId = guild.members[0];
             }
         }
         for (let [tId, tObj] of Object.entries(gameState.trades)) {
