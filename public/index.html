@@ -559,7 +559,6 @@
             const isP1 = (trade.p1 === myId);
             const myOffer = isP1 ? trade.p1Offer : trade.p2Offer;
             const partnerOffer = isP1 ? trade.p2Offer : trade.p1Offer;
-            const partnerNamesList = isP1 ? trade.p2ItemsName : trade.p1ItemsName;
 
             let mySummaryHtml = `골드: ${myOffer.gold.toLocaleString()}G<br>`;
             myOffer.items.forEach(idx => {
@@ -571,10 +570,14 @@
             document.getElementById('myTradeOfferSummary').innerHTML = mySummaryHtml;
 
             let partnerSummaryHtml = `골드: ${partnerOffer.gold.toLocaleString()}G<br>`;
-            if (partnerNamesList && partnerNamesList.length > 0) {
-                partnerSummaryHtml += partnerNamesList.map(name => `• <strong>${name}</strong>`).join('<br>');
-            } else if (partnerOffer.items.length === 0) {
-                partnerSummaryHtml += '물건 없음';
+            if (partnerOffer.items && partnerOffer.items.length > 0) {
+                partnerSummaryHtml = `골드: ${partnerOffer.gold.toLocaleString()}G<br>` + partnerOffer.items.map(iIndex => {
+                    return `• 물건 이름: <strong>${trade.partnerItemsName ? trade.partnerItemsName[iIndex] : '등록된 물건'}</strong>`;
+                }).join('<br>');
+            } else if (partnerOffer.gold > 0) {
+                partnerSummaryHtml = `골드: ${partnerOffer.gold.toLocaleString()}G<br>물건 없음`;
+            } else {
+                partnerSummaryHtml = '없음';
             }
             if (partnerOffer.locked) partnerSummaryHtml += '<span style="color:#2ecc71; font-weight:bold;"> [상대방 잠금완료]</span>';
             
@@ -607,10 +610,6 @@
             if (code) socket.emit('useCoupon', code);
         }
 
-        socket.on('couponResult', (res) => {
-            alert(res.message);
-        });
-
         function promptCreateGuild() {
             const guildName = prompt('생성할 길드 이름을 입력해주세요:', '명예로운 기사단');
             if (!guildName) return;
@@ -631,6 +630,8 @@
         }
         function closeGuildDetailModal() { document.getElementById('guildDetailModal').style.display = 'none'; }
         function leaveGuild() { if (confirm('정말 길드를 탈퇴하시겠습니까?')) socket.emit('leaveGuild'); }
+
+        socket.on('guildResult', (res) => { alert(res.message); socket.emit('getGuildList'); });
 
         socket.on('guildListResult', (list) => {
             const container = document.getElementById('guildListContainer');
@@ -769,14 +770,14 @@
                 if (item.type === 'box') {
                     title.innerText = `📦 상자 관리: ${item.name}`;
                     contentArea.innerHTML = `
-                        <p style="font-size:11px; color:#aaa;">상자 내부 아이템 수: ${item.items.length}개<br>가치 총합: ${item.sellPrice.toLocaleString()}G</p>
+                        <p style="font-size:11px; color:#aaa;">상자 내부 아이템 수: ${item.items.length}개</p>
                         <button class="popup-btn" style="background:#27ae60;" onclick="doUnpackBox(${idx})">📦 상자 풀기 (해제)</button>
-                        <button class="popup-btn" style="background:#e67e22;" onclick="doSingleAction('sell', ${idx})">💰 상자 판매 (${item.sellPrice.toLocaleString()}G)</button>
+                        <button class="popup-btn" style="background:#e67e22;" onclick="doSingleAction('sell', ${idx})">💰 상자 판매 (${item.sellPrice}G)</button>
                     `;
                 } else if (item.type === 'artifact') {
                     title.innerText = `🏺 유물: ${item.name}`;
                     contentArea.innerHTML = `
-                        <button class="popup-btn" style="background:#e67e22;" onclick="doSingleAction('sellArtifact', ${idx})">💰 유물 판매 (${item.sellPrice.toLocaleString()}G)</button>
+                        <button class="popup-btn" style="background:#e67e22;" onclick="doSingleAction('sellArtifact', ${idx})">💰 유물 판매 (${item.sellPrice}G)</button>
                     `;
                 } else {
                     title.innerText = `🔍 무기 관리: ${item.name} (+${item.enhance || 0})`;
@@ -784,19 +785,20 @@
                     contentArea.innerHTML = `
                         <button class="popup-btn" style="background:#2980b9;" onclick="doSingleAction('equip', ${idx})">${isEquipped ? '장착 해제' : '무기 장착'}</button>
                         <button class="popup-btn" style="background:#8e44ad;" onclick="openArtifactEnhanceModalForWeapon(${idx})">🏺 유물로 강화하기</button>
-                        <button class="popup-btn" style="background:#f39c12;" onclick="doSingleAction('toggleLock', ${idx})">${isLocked ? '🔓 중요 무기 해제' : '🔒 중요 무기 설정'}</button>
-                        <button class="popup-btn" style="background:#e67e22;" onclick="doSingleAction('sell', ${idx})">💰 단건 판매 (${item.sellPrice.toLocaleString()}G)</button>
+                        <button class="popup-btn" style="background:#f39c12;" onclick="doSingleAction('toggleLock', ${idx})">${isLocked ? '🔓 중요 무기 해제 (삭제/판매 가능)' : '🔒 중요 무기 설정 (상단고정/보호)'}</button>
+                        <button class="popup-btn" style="background:#e67e22;" onclick="doSingleAction('sell', ${idx})">💰 단건 판매 (${item.sellPrice}G)</button>
                         <button class="popup-btn" style="background:#c0392b;" onclick="doSingleAction('delete', ${idx})">🗑️ 단건 삭제</button>
                     `;
                 }
             } else {
                 title.innerText = `📦 다중 선택 관리 (${selectedIndices.length}개)`;
+                
                 let boxCreateSection = '';
                 if (selectedIndices.length <= 25) {
                     boxCreateSection = `
                         <div style="margin: 8px 0; background:#111; padding:8px; border-radius:6px; text-align:left;">
                             <p style="margin:0 0 4px 0; font-size:11px; color:#f1c40f;">📦 상자 이름 정하기:</p>
-                            <input type="text" id="customBoxNameInput" placeholder="상자 이름 입력" style="width:100%; font-size:11px; margin-bottom:6px;">
+                            <input type="text" id="customBoxNameInput" placeholder="상자 이름 입력 (예: 주력무기보관함)" style="width:100%; font-size:11px; margin-bottom:6px;">
                             <button class="popup-btn" style="background:#27ae60;" onclick="doPackItemsIntoBox()">📦 모으기 (상자 생성)</button>
                         </div>
                     `;
@@ -806,8 +808,8 @@
 
                 contentArea.innerHTML = `
                     ${boxCreateSection}
-                    <button class="popup-btn" style="background:#e67e22;" onclick="doBatchAction('sell')">💰 선택 일괄 판매 (락 제외)</button>
-                    <button class="popup-btn" style="background:#c0392b;" onclick="doBatchAction('delete')">🗑️ 선택 일괄 삭제 (락 제외)</button>
+                    <button class="popup-btn" style="background:#e67e22;" onclick="doBatchAction('sell')">💰 선택 일괄 판매 (락 아이템 제외)</button>
+                    <button class="popup-btn" style="background:#c0392b;" onclick="doBatchAction('delete')">🗑️ 선택 일괄 삭제 (락 아이템 제외)</button>
                 `;
             }
             modal.style.display = 'flex';
@@ -969,19 +971,16 @@
                         slot.innerHTML = `<div>${lockBadge}${item.icon || '⚔️'}</div><div>+${item.enhance||0}</div>`;
                         slot.onclick = () => {
                             const idxPos = selectedIndices.indexOf(i);
-                            if (idxPos > -1) { 
-                                selectedIndices.splice(idxPos, 1); 
-                                slot.classList.remove('selected'); 
-                            } else { 
-                                selectedIndices.push(i); 
-                                slot.classList.add('selected'); 
-                            }
+                            if (idxPos > -1) { selectedIndices.splice(idxPos, 1); slot.classList.remove('selected'); }
+                            else { selectedIndices.push(i); slot.classList.add('selected'); }
                         };
                     } else { slot.innerText = '빈칸'; }
                     grid.appendChild(slot);
                 }
             }
         });
+
+        socket.on('couponResult', (res) => alert(res.message));
     </script>
 </body>
 </html>
