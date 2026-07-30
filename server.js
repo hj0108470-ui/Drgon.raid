@@ -672,3 +672,4 @@ io.on('connection', (socket) => {
 });
 
 server.listen(3000, () => console.log('서버 실행 중 포트: 3000'));
+
