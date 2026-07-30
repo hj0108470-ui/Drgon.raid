@@ -120,12 +120,20 @@
         </div>
     </div>
 
-    <!-- 매물 등록 팝업 -->
+    <!-- 매물 등록 팝업 (골드/유물/무기 가치 선택 추가) -->
     <div id="marketRegisterModal" class="modal">
         <div class="modal-content" style="width: 340px;">
             <h3 style="color:#27ae60; margin-top:0;">🏷️ 거래소에 무기 올리기</h3>
-            <p style="font-size:11px; color:#aaa;">아래 무기고에서 등록할 무기를 먼저 선택한 뒤 가격을 입력하세요.</p>
-            <input type="number" id="marketPriceInput" placeholder="판매 가격 (골드)">
+            <p style="font-size:11px; color:#aaa;">무기고에서 등록할 무기를 선택한 뒤 아래에서 화폐/가치 유형과 가격을 입력하세요.</p>
+            <div style="margin-bottom:8px; text-align:left;">
+                <label style="font-size:11px; color:#aaa;">거래 화폐 / 가치 유형</label>
+                <select id="marketCurrencyType" style="width:100%; margin-top:3px;">
+                    <option value="gold">골드 (G)</option>
+                    <option value="artifact">유물 가치</option>
+                    <option value="weapon">무기 가치</option>
+                </select>
+            </div>
+            <input type="number" id="marketPriceInput" placeholder="판매 가격 또는 수치 입력">
             <button class="popup-btn" style="background:#27ae60;" onclick="confirmListMarket()">등록하기</button>
             <button class="popup-btn" style="background:#555;" onclick="closeSubModals()">돌아가기</button>
         </div>
@@ -152,11 +160,18 @@
         </div>
     </div>
 
-    <!-- 길드 참여 모달 -->
+    <!-- 길드 참여 및 생성/인원 설정 모달 -->
     <div id="guildListModal" class="modal">
         <div class="modal-content" style="width: 320px;">
-            <h3 style="color:#3498db; margin-top:0;">🏰 길드 리스트</h3>
-            <div id="guildListContainer" style="max-height: 180px; overflow-y: auto; margin-bottom: 8px;"></div>
+            <h3 style="color:#3498db; margin-top:0;">🏰 길드 시스템</h3>
+            <div style="background:#15171e; padding:8px; border-radius:6px; margin-bottom:8px; text-align:left;">
+                <p style="font-size:11px; color:#aaa; margin:0 0 4px 0;">새 길드 창설 (최대 인원 설정)</p>
+                <input type="text" id="guildNameInput" placeholder="길드 이름" style="width:100%; margin-bottom:4px;" maxlength="10">
+                <input type="number" id="guildMaxMemberInput" placeholder="최대 인원 (기본 30명, 최대 100명)" value="30" min="5" max="100" style="width:100%; margin-bottom:4px;">
+                <button class="popup-btn" style="background:#27ae60; padding:6px;" onclick="confirmCreateGuild()">길드 만들기</button>
+            </div>
+            <div style="font-size:11px; color:#3498db; font-weight:bold; text-align:left; margin-bottom:4px;">참여 가능한 길드 리스트</div>
+            <div id="guildListContainer" style="max-height: 150px; overflow-y: auto; margin-bottom: 8px;"></div>
             <button class="popup-btn" style="background:#555;" onclick="closeGuildModal()">닫기</button>
         </div>
     </div>
@@ -226,7 +241,7 @@
                 <button class="btn btn-sub" style="background:#9b59b6;" onclick="enterUpperDungeon()">🔥 상위 레이드 던전 (Lv.50+)</button>
             </div>
 
-            <!-- 💡 레벨 & 경험치바 내 정보칸 배치 -->
+            <!-- 레벨 & 경험치바 내 정보칸 배치 -->
             <div class="card" style="border: 2px solid #3498db;">
                 <h4 style="margin:0 0 6px 0; color:#3498db; font-size:13px;">🛡️ 내 정보 & 경험치</h4>
                 <p style="margin: 4px 0; font-size: 12px;">⭐ Lv.<span id="myLevel">1</span> | ❤️ 체력: <span id="myHp">100</span>/<span id="myMaxHp">100</span> | 💰 <span id="myGold">500</span> G</p>
@@ -373,10 +388,11 @@
                 const l = listings[k];
                 const row = document.createElement('div');
                 row.className = 'market-row';
+                let currencyLabel = l.currencyType === 'artifact' ? '유물 가치' : (l.currencyType === 'weapon' ? '무기 가치' : '골드(G)');
                 row.innerHTML = `
                     <div>
                         <strong>${l.item.icon} ${l.item.name}</strong> (+${l.item.enhance||0})<br>
-                        <span style="font-size:10px; color:#aaa;">판매자: ${l.sellerName} | 가격: ${l.priceGold.toLocaleString()}G</span>
+                        <span style="font-size:10px; color:#aaa;">판매자: ${l.sellerName} | 요금: ${l.price.toLocaleString()} (${currencyLabel})</span>
                     </div>
                     <button class="btn" style="padding:4px 8px; font-size:11px; width:auto; background:#27ae60;" onclick="buyMarketItem('${l.id}')">구매</button>
                 `;
@@ -385,7 +401,7 @@
         });
 
         function buyMarketItem(listingId) {
-            socket.emit('buyMarketItem', { listingId, payWithGold: true });
+            socket.emit('buyMarketItem', { listingId });
         }
 
         function openMarketRegisterTab() {
@@ -396,8 +412,9 @@
         function confirmListMarket() {
             if (selectedIndices.length !== 1) { alert('등록할 무기를 무기고에서 정확히 1개 선택해주세요!'); return; }
             const price = document.getElementById('marketPriceInput').value;
-            if (!price) { alert('판매 가격을 입력해주세요!'); return; }
-            socket.emit('listMarketItem', { inventoryIndex: selectedIndices[0], priceGold: price });
+            const currencyType = document.getElementById('marketCurrencyType').value;
+            if (!price) { alert('판매 가격 또는 가치 수치를 입력해주세요!'); return; }
+            socket.emit('listMarketItem', { inventoryIndex: selectedIndices[0], price: price, currencyType: currencyType });
             selectedIndices = [];
             closeSubModals();
         }
@@ -524,23 +541,27 @@
         socket.on('tradeCancelled', (res) => { alert(res.message); activeTradeId = null; goToLobby(); });
         socket.on('tradeComplete', (res) => { alert(res.message); activeTradeId = null; isTradeReady = false; goToLobby(); });
 
-        // 길드 시스템
-        function promptCreateGuild() {
-            const name = prompt('길드 이름:', '불멸의 기사단');
-            if (name) socket.emit('createGuild', { guildName: name, maxMembers: 5 });
-        }
-        function openGuildListModal() {
+        // 길드 시스템 (인원 설정 포함)
+        function openGuildModal() {
             socket.emit('getGuildList');
             document.getElementById('guildListModal').style.display = 'flex';
         }
         function closeGuildModal() { document.getElementById('guildListModal').style.display = 'none'; }
+        
+        function confirmCreateGuild() {
+            const name = document.getElementById('guildNameInput').value.trim();
+            const maxMembers = parseInt(document.getElementById('guildMaxMemberInput').value) || 30;
+            if (!name) { alert('길드 이름을 입력해주세요!'); return; }
+            socket.emit('createGuild', { guildName: name, maxMembers: maxMembers });
+        }
+
         function leaveGuild() { if (confirm('탈퇴하시겠습니까?')) socket.emit('leaveGuild'); }
 
         socket.on('guildResult', (res) => { alert(res.message); socket.emit('getGuildList'); });
         socket.on('guildListResult', (list) => {
             const container = document.getElementById('guildListContainer');
             container.innerHTML = '';
-            if (list.length === 0) { container.innerHTML = '<p style="color:#aaa; font-size:12px;">길드가 없습니다.</p>'; return; }
+            if (list.length === 0) { container.innerHTML = '<p style="color:#aaa; font-size:12px;">생성된 길드가 없습니다.</p>'; return; }
             list.forEach(g => {
                 const row = document.createElement('div');
                 row.className = 'guild-item-row';
@@ -661,7 +682,6 @@
                 document.getElementById('myMaxHp').innerText = me.maxHp;
                 document.getElementById('myGold').innerText = me.gold.toLocaleString();
 
-                // 💡 레벨 1 기준 360부터 시작 및 1.5배 증가 경험치 계산 공식 적용
                 let reqExp = me.level >= 100 ? me.exp : Math.round(360 * Math.pow(1.5, me.level - 1));
                 let expPct = reqExp > 0 ? Math.min(100, (me.exp / reqExp) * 100) : 100;
                 document.getElementById('myExpFill').style.width = expPct + '%';
@@ -682,7 +702,7 @@
                 } else {
                     lobbyGuildStatus.innerText = '미소속';
                     lobbyGuildStatus.style.color = '#e74c3c';
-                    lobbyGuildControl.innerHTML = `<button class="btn btn-sub" onclick="promptCreateGuild()">길드 만들기</button> <button class="btn btn-sub" style="background:#27ae60;" onclick="openGuildListModal()">길드 가입</button>`;
+                    lobbyGuildControl.innerHTML = `<button class="btn btn-sub" style="background:#27ae60;" onclick="openGuildModal()">길드 만들기 / 가입</button>`;
                 }
 
                 if (activeTradeId) renderTradeInventory();
