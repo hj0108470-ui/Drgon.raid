@@ -255,15 +255,6 @@
                     <button class="btn" style="width: 50px; padding: 6px; font-size: 11px; background: #3498db;" onclick="sendChatMessage()">전송</button>
                 </div>
             </div>
-
-            <!-- 로비 맨 아래 무기고 & 뽑기 버튼 영역 추가 -->
-            <div class="card" style="border: 2px solid #f1c40f; text-align: center;">
-                <h3 style="margin: 0 0 8px 0; color: #f1c40f; font-size: 14px;">🛠️ 빠른 시스템 메뉴</h3>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                    <button class="btn" style="background: #27ae60; padding: 12px; font-size: 14px;" onclick="goToBattleWithTab('inventory')">🎒 무기고 가기</button>
-                    <button class="btn btn-gacha" style="padding: 12px; font-size: 14px;" onclick="goToBattleWithTab('gacha')">🎰 행운의 뽑기</button>
-                </div>
-            </div>
         </div>
 
         <!-- BATTLE / UPPER DUNGEON SCREEN -->
@@ -391,19 +382,6 @@
             document.getElementById('bossCardArea').className = 'card boss-card';
             document.getElementById('gachaTitle').innerText = '🎰 무기 뽑기';
             showScreen('battleScreen'); 
-        }
-
-        function goToBattleWithTab(targetTab) {
-            goToBattle();
-            setTimeout(() => {
-                if (targetTab === 'inventory') {
-                    const el = document.getElementById('inventorySectionCard');
-                    if (el) el.scrollIntoView({ behavior: 'smooth' });
-                } else if (targetTab === 'gacha') {
-                    const el = document.getElementById('gachaSectionCard');
-                    if (el) el.scrollIntoView({ behavior: 'smooth' });
-                }
-            }, 100);
         }
 
         function enterUpperDungeonCheck() {
