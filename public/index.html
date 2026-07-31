@@ -234,10 +234,11 @@
                 </div>
 
                 <button class="btn" style="background:#27ae60; margin-bottom: 8px; padding: 12px; font-size: 16px;" onclick="goToBattle()">⚔️ 일반 보스 레이드 입장</button>
-                <button class="btn" style="background:#9b59b6; padding: 12px; font-size: 16px;" onclick="enterUpperDungeonCheck()">🦁 상위 던전 입장 (Lv.50+ / 6,000,000G)</button>
+                <button class="btn" style="background:#9b59b6; padding: 12px; font-size: 16px;" onclick="enterUpperDungeonCheck()">🦁 상위 던전 입장 (Lv.50+ / 600,000G)</button>
             </div>
 
-            <div class="card" style="margin-top: 10px;">
+            <!-- 로비 채팅 UI -->
+            <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                     <span style="font-size: 13px; font-weight: bold; color: #3498db;">💬 실시간 소통 채팅</span>
                     <div style="display: flex; gap: 4px;">
@@ -249,7 +250,7 @@
                     <div style="color: #777; font-style: italic;">채팅방에 연결되었습니다. 대화를 시작해보세요!</div>
                 </div>
                 <div style="display: flex; gap: 4px;">
-                    <input type="text" id="chatInput" placeholder="메시지를 입력하세요..." style="margin-bottom: 0; font-size: 11px; padding: 6px;" onkeypress="if(event.key === 'Enter') sendChatMessage()">
+                    <input type="text" id="chatInput" placeholder="메시지 또는 /귓속말 닉네임 내용" style="margin-bottom: 0; font-size: 11px; padding: 6px;" onkeypress="if(event.key === 'Enter') sendChatMessage()">
                     <button class="btn" style="width: 50px; padding: 6px; font-size: 11px; background: #3498db;" onclick="sendChatMessage()">전송</button>
                 </div>
             </div>
@@ -269,6 +270,24 @@
                 <div class="action-grid">
                     <button class="btn" onclick="attack()">⚔️ 일반 공격</button>
                     <button id="skillBtn" class="btn btn-skill" onclick="useSkill()">⚡ 스킬</button>
+                </div>
+            </div>
+
+            <!-- 보스 페이지 & 상위 던전 페이지 내부에 포함된 채팅 UI -->
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <span style="font-size: 13px; font-weight: bold; color: #3498db;">💬 전투 실시간 채팅</span>
+                    <div style="display: flex; gap: 4px;">
+                        <button class="btn btn-sub" style="padding: 3px 6px; font-size: 10px; background: #27ae60;" id="battleChatTabAll" onclick="switchChatChannel('all')">전체</button>
+                        <button class="btn btn-sub" style="padding: 3px 6px; font-size: 10px; background: #555;" id="battleChatTabGuild" onclick="switchChatChannel('guild')">길드</button>
+                    </div>
+                </div>
+                <div id="battleChatBoxContainer" style="background: #111; border: 1px solid #333; border-radius: 6px; height: 100px; overflow-y: auto; padding: 6px; font-size: 11px; margin-bottom: 6px; text-align: left; display: flex; flex-direction: column; gap: 4px;">
+                    <div style="color: #777; font-style: italic;">채팅방에 연결되었습니다.</div>
+                </div>
+                <div style="display: flex; gap: 4px;">
+                    <input type="text" id="battleChatInput" placeholder="메시지 또는 /귓속말 닉네임 내용" style="margin-bottom: 0; font-size: 11px; padding: 6px;" onkeypress="if(event.key === 'Enter') sendBattleChatMessage()">
+                    <button class="btn" style="width: 50px; padding: 6px; font-size: 11px; background: #3498db;" onclick="sendBattleChatMessage()">전송</button>
                 </div>
             </div>
 
@@ -404,35 +423,78 @@
             currentChatChannel = channel;
             const btnAll = document.getElementById('chatTabAll');
             const btnGuild = document.getElementById('chatTabGuild');
+            const bBtnAll = document.getElementById('battleChatTabAll');
+            const bBtnGuild = document.getElementById('battleChatTabGuild');
+
             if (channel === 'all') {
-                btnAll.style.background = '#27ae60';
-                btnGuild.style.background = '#555';
+                if(btnAll) btnAll.style.background = '#27ae60';
+                if(btnGuild) btnGuild.style.background = '#555';
+                if(bBtnAll) bBtnAll.style.background = '#27ae60';
+                if(bBtnGuild) bBtnGuild.style.background = '#555';
             } else {
                 if (!currentGuildId) {
                     alert('소속된 길드가 없습니다! 길드 가입 후 이용해주세요.');
                     currentChatChannel = 'all';
                     return;
                 }
-                btnAll.style.background = '#555';
-                btnGuild.style.background = '#27ae60';
+                if(btnAll) btnAll.style.background = '#555';
+                if(btnGuild) btnGuild.style.background = '#27ae60';
+                if(bBtnAll) bBtnAll.style.background = '#555';
+                if(bBtnGuild) bBtnGuild.style.background = '#27ae60';
             }
         }
 
         function sendChatMessage() {
             const input = document.getElementById('chatInput');
-            const message = input.value;
-            if (!message || message.trim() === '') return;
-            socket.emit('chatMessage', { channel: currentChatChannel, message: message });
+            processAndSendMsg(input.value);
             input.value = '';
         }
 
-        socket.on('chatMessage', ({ senderName, message, channel }) => {
+        function sendBattleChatMessage() {
+            const input = document.getElementById('battleChatInput');
+            processAndSendMsg(input.value);
+            input.value = '';
+        }
+
+        function processAndSendMsg(rawMsg) {
+            if (!rawMsg || rawMsg.trim() === '') return;
+            const msg = rawMsg.trim();
+            if (msg.startsWith('/귓속말 ')) {
+                const parts = msg.replace('/귓속말 ', '').split(' ');
+                const targetName = parts[0];
+                const content = parts.slice(1).join(' ');
+                if (!targetName || !content) {
+                    alert('사용법: /귓속말 닉네임 내용');
+                    return;
+                }
+                socket.emit('chatMessage', { channel: 'whisper', targetName, message: content });
+            } else {
+                socket.emit('chatMessage', { channel: currentChatChannel, message: msg });
+            }
+        }
+
+        socket.on('chatMessage', ({ senderName, message, channel, targetName }) => {
             const chatBox = document.getElementById('chatBoxContainer');
+            const battleChatBox = document.getElementById('battleChatBoxContainer');
+            
             const div = document.createElement('div');
-            let channelTag = channel === 'guild' ? '<span style="color:#e74c3c;">[길드]</span> ' : '<span style="color:#2ecc71;">[전체]</span> ';
+            let channelTag = '<span style="color:#2ecc71;">[전체]</span> ';
+            if (channel === 'guild') channelTag = '<span style="color:#e74c3c;">[길드]</span> ';
+            else if (channel === 'whisper') channelTag = `<span style="color:#9b59b6;">[귓속말->${targetName || ''}]</span> `;
+            else if (channel === 'system') channelTag = '<span style="color:#f1c40f;">[시스템]</span> ';
+
             div.innerHTML = `${channelTag}<strong>${senderName}:</strong> ${escapeHtml(message)}`;
-            chatBox.appendChild(div);
-            chatBox.scrollTop = chatBox.scrollHeight;
+            
+            if (chatBox) {
+                const clone = div.cloneNode(true);
+                chatBox.appendChild(clone);
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+            if (battleChatBox) {
+                const clone2 = div.cloneNode(true);
+                battleChatBox.appendChild(clone2);
+                battleChatBox.scrollTop = battleChatBox.scrollHeight;
+            }
         });
 
         function escapeHtml(text) {
@@ -770,7 +832,6 @@
                 if (item.type === 'box') {
                     title.innerText = `📦 상자 관리: ${item.name}`;
                     contentArea.innerHTML = `
-                        <p style="font-size:11px; color:#aaa;">상자 내부 아이템 수: ${item.items.length}개</p>
                         <button class="popup-btn" style="background:#27ae60;" onclick="doUnpackBox(${idx})">📦 상자 풀기 (해제)</button>
                         <button class="popup-btn" style="background:#e67e22;" onclick="doSingleAction('sell', ${idx})">💰 상자 판매 (${item.sellPrice}G)</button>
                     `;
@@ -785,31 +846,27 @@
                     contentArea.innerHTML = `
                         <button class="popup-btn" style="background:#2980b9;" onclick="doSingleAction('equip', ${idx})">${isEquipped ? '장착 해제' : '무기 장착'}</button>
                         <button class="popup-btn" style="background:#8e44ad;" onclick="openArtifactEnhanceModalForWeapon(${idx})">🏺 유물로 강화하기</button>
-                        <button class="popup-btn" style="background:#f39c12;" onclick="doSingleAction('toggleLock', ${idx})">${isLocked ? '🔓 중요 무기 해제 (삭제/판매 가능)' : '🔒 중요 무기 설정 (상단고정/보호)'}</button>
+                        <button class="popup-btn" style="background:#f39c12;" onclick="doSingleAction('toggleLock', ${idx})">${isLocked ? '🔓 중요 무기 해제' : '🔒 중요 무기 설정'}</button>
                         <button class="popup-btn" style="background:#e67e22;" onclick="doSingleAction('sell', ${idx})">💰 단건 판매 (${item.sellPrice}G)</button>
                         <button class="popup-btn" style="background:#c0392b;" onclick="doSingleAction('delete', ${idx})">🗑️ 단건 삭제</button>
                     `;
                 }
             } else {
                 title.innerText = `📦 다중 선택 관리 (${selectedIndices.length}개)`;
-                
                 let boxCreateSection = '';
                 if (selectedIndices.length <= 25) {
                     boxCreateSection = `
                         <div style="margin: 8px 0; background:#111; padding:8px; border-radius:6px; text-align:left;">
                             <p style="margin:0 0 4px 0; font-size:11px; color:#f1c40f;">📦 상자 이름 정하기:</p>
-                            <input type="text" id="customBoxNameInput" placeholder="상자 이름 입력 (예: 주력무기보관함)" style="width:100%; font-size:11px; margin-bottom:6px;">
+                            <input type="text" id="customBoxNameInput" placeholder="상자 이름 입력" style="width:100%; font-size:11px; margin-bottom:6px;">
                             <button class="popup-btn" style="background:#27ae60;" onclick="doPackItemsIntoBox()">📦 모으기 (상자 생성)</button>
                         </div>
                     `;
-                } else {
-                    boxCreateSection = `<p style="color:#e74c3c; font-size:11px;">상자 모으기는 최대 25개까지만 선택할 수 있습니다!</p>`;
                 }
-
                 contentArea.innerHTML = `
                     ${boxCreateSection}
-                    <button class="popup-btn" style="background:#e67e22;" onclick="doBatchAction('sell')">💰 선택 일괄 판매 (락 아이템 제외)</button>
-                    <button class="popup-btn" style="background:#c0392b;" onclick="doBatchAction('delete')">🗑️ 선택 일괄 삭제 (락 아이템 제외)</button>
+                    <button class="popup-btn" style="background:#e67e22;" onclick="doBatchAction('sell')">💰 선택 일괄 판매</button>
+                    <button class="popup-btn" style="background:#c0392b;" onclick="doBatchAction('delete')">🗑️ 선택 일괄 삭제</button>
                 `;
             }
             modal.style.display = 'flex';
