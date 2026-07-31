@@ -18,10 +18,10 @@ const BOSS_LIST = [
 ];
 
 const UPPER_BOSS_LIST = [
-    { name: '🦁 우흐라', maxHp: 12000000, currentHp: 12000000, damage: 20, interval: 10000, type: 'upper' },
-    { name: '🐯 기호전', maxHp: 17000000, currentHp: 17000000, damage: 12, interval: 5000, type: 'upper' },
-    { name: '👾 사이키', maxHp: 25000000, currentHp: 25000000, damage: 3, interval: 1000, type: 'upper' },
-    { name: '👁 개념의 눈알', maxHp: 5000000, currentHp: 5000000, damage: 5, interval: 1000, type: 'upper' }
+    { name: '🦁 우흐라', maxHp: 12000000, currentHp: 12000000, expReward: 1000000, damage: 20, interval: 10000, type: 'upper' },
+    { name: '🐯 기호전', maxHp: 17000000, currentHp: 17000000, expReward: 2500000, damage: 12, interval: 5000, type: 'upper' },
+    { name: '👾 사이키', maxHp: 25000000, currentHp: 25000000, expReward: 5000000, damage: 3, interval: 1000, type: 'upper' },
+    { name: '👁 개념의 눈알', maxHp: 5000000, currentHp: 5000000, expReward: 9000000, damage: 5, interval: 1000, type: 'upper' }
 ];
 
 const WEAPON_DB = {
@@ -129,7 +129,7 @@ function updateRankings() {
 function getRandomArtifactKey(isUpper = false) {
     const tierRand = Math.random() * 100;
     let chosenTier = 'Common';
-    let mythicRate = isUpper ? 3.0 : 1.0;
+    let mythicRate = isUpper ? 3.0 + 1.0 : 1.0;     // 신화 +1% 패시브 반영
     let legendaryRate = isUpper ? 10.0 : 5.0;
     let epicRate = isUpper ? 25.0 : 15.0;
     let rareRate = isUpper ? 60.0 : 45.0;
@@ -147,9 +147,13 @@ function getRandomArtifactKey(isUpper = false) {
 function getRandomWeaponKey(isUpper = false) {
     const rand = Math.random() * 100;
     let rarity = 'Common';
-    if (isUpper && rand < 0.02) {
+
+    let secretRate = isUpper ? 0.02 + 0.5 : 0.02;    // 시크릿 +0.5% 패시브 반영
+    let mythicRate = isUpper ? 0.08 + 1.0 : 0.08;    // 신화 +1% 패시브 반영
+
+    if (isUpper && rand < secretRate) {
         rarity = 'Secret';
-    } else if (rand < 0.08) {
+    } else if (rand < mythicRate) {
         rarity = 'Mythic';
     } else if (rand < 2.9) {
         rarity = 'Legendary';
@@ -196,7 +200,6 @@ function calculateDamage(p) {
     return Math.round(baseAtk + (p.bonusAtk || 0) + levelBonusAtk);
 }
 
-// 📌 경험치 요구량 증가 배율 1.2배로 수정 반영
 function addExp(p, amount) {
     if (p.level >= 100) {
         p.exp = 0;
@@ -297,12 +300,27 @@ io.on('connection', (socket) => {
         io.emit('updateState', gameState);
     });
 
-    socket.on('chatMessage', ({ channel, message }) => {
+    socket.on('chatMessage', ({ channel, message, targetName }) => {
         const p = gameState.players[socket.id];
         if (!p || !message || message.trim() === '') return;
         const cleanMsg = message.trim().substring(0, 150);
 
-        if (channel === 'guild') {
+        if (channel === 'whisper') {
+            if (!targetName) return;
+            let targetSocketId = null;
+            for (let [sId, pObj] of Object.entries(gameState.players)) {
+                if (pObj.name === targetName) {
+                    targetSocketId = sId;
+                    break;
+                }
+            }
+            if (!targetSocketId) {
+                socket.emit('chatMessage', { senderName: '시스템', message: `[${targetName}]님을 찾을 수 없습니다.`, channel: 'system' });
+                return;
+            }
+            io.to(targetSocketId).emit('chatMessage', { senderName: p.name, message: cleanMsg, channel: 'whisper', targetName });
+            socket.emit('chatMessage', { senderName: p.name, message: cleanMsg, channel: 'whisper', targetName });
+        } else if (channel === 'guild') {
             if (!p.guildId) return;
             const guild = gameState.guilds[p.guildId];
             if (guild) {
@@ -442,7 +460,7 @@ io.on('connection', (socket) => {
 
             Object.values(gameState.players).forEach(player => {
                 if ((player.sessionDamage || 0) >= requiredDamage) {
-                    addExp(player, 500000);
+                    addExp(player, currentUpperBoss.expReward); // 지정된 상위 던전 보스 EXP 지급
                     const artifactKey = getRandomArtifactKey(true);
                     const droppedItem = { ...WEAPON_DB[artifactKey], id: Date.now() + Math.random(), enhance: 0 };
                     
@@ -484,11 +502,11 @@ io.on('connection', (socket) => {
             socket.emit('upperDungeonResult', { success: false, message: '50레벨 이상만 입장 가능합니다!' });
             return;
         }
-        if (p.gold < 6000000) {
-            socket.emit('upperDungeonResult', { success: false, message: '입장 골드(6,000,000G)가 부족합니다!' });
+        if (p.gold < 600000) { // 입장 골드 600,000로 수정 반영
+            socket.emit('upperDungeonResult', { success: false, message: '입장 골드(600,000G)가 부족합니다!' });
             return;
         }
-        p.gold -= 6000000;
+        p.gold -= 600000;
         p.isInUpperDungeon = true;
         p.sessionDamage = 0;
         saveAccountState(p);
