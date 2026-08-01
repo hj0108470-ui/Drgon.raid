@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
+const { createClient } = require('@supabase/supabase-js'); // Supabase 모듈 추가
 
 const app = express();
 const server = http.createServer(app);
@@ -9,6 +10,11 @@ const io = new Server(server, { cors: { origin: "*", methods: ["GET", "POST"] } 
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
+
+// 1. Supabase 연결 설정 (알려주신 주소와 퍼블리시블 키 적용)
+const SUPABASE_URL = 'https://tffkdwjzrxziqxaemwfn.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_L6DgIxSAH7RryFZnGsFU6A_b_9gWTSF';
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const BOSS_LIST = [
     { name: '🐷 꿀신', maxHp: 157500, currentHp: 157500, expReward: 10000, type: 'normal' },
@@ -81,24 +87,31 @@ let gameState = {
     boss: { ...BOSS_LIST[0] },
     upperBoss: { ...UPPER_BOSS_LIST[0] },
     players: {},
-    registeredAccounts: {},
     guilds: {},
     marketListings: {},
     trades: {},
     rankings: { players: [], guilds: [] }
 };
 
-function saveAccountState(p) {
-    if (p && gameState.registeredAccounts[p.name]) {
-        gameState.registeredAccounts[p.name].gold = p.gold;
-        gameState.registeredAccounts[p.name].hp = p.hp;
-        gameState.registeredAccounts[p.name].exp = p.exp;
-        gameState.registeredAccounts[p.name].level = p.level;
-        gameState.registeredAccounts[p.name].maxHp = p.maxHp;
-        gameState.registeredAccounts[p.name].inventory = p.inventory;
-        gameState.registeredAccounts[p.name].equippedIndex = p.equippedIndex;
-        gameState.registeredAccounts[p.name].totalDamage = p.totalDamage;
-        gameState.registeredAccounts[p.name].guildId = p.guildId;
+// 2. Supabase에 계정 정보를 비동기로 저장하는 함수
+async function saveAccountState(p) {
+    if (!p) return;
+    try {
+        await supabase.from('accounts').upsert({
+            nickname: p.name,
+            gold: p.gold,
+            hp: p.hp,
+            exp: p.exp,
+            level: p.level,
+            maxHp: p.maxHp,
+            inventory: p.inventory,
+            equippedIndex: p.equippedIndex,
+            totalDamage: p.totalDamage,
+            bonusAtk: p.bonusAtk,
+            guildId: p.guildId
+        }, { onConflict: 'nickname' });
+    } catch (err) {
+        console.error('DB 저장 오류:', err);
     }
 }
 
@@ -129,7 +142,7 @@ function updateRankings() {
 function getRandomArtifactKey(isUpper = false) {
     const tierRand = Math.random() * 100;
     let chosenTier = 'Common';
-    let mythicRate = isUpper ? 3.0 + 1.0 : 1.0;     // 신화 +1% 패시브 반영
+    let mythicRate = isUpper ? 4.0 : 1.0;
     let legendaryRate = isUpper ? 10.0 : 5.0;
     let epicRate = isUpper ? 25.0 : 15.0;
     let rareRate = isUpper ? 60.0 : 45.0;
@@ -148,8 +161,8 @@ function getRandomWeaponKey(isUpper = false) {
     const rand = Math.random() * 100;
     let rarity = 'Common';
 
-    let secretRate = isUpper ? 0.02 + 0.5 : 0.02;    // 시크릿 +0.5% 패시브 반영
-    let mythicRate = isUpper ? 0.08 + 1.0 : 0.08;    // 신화 +1% 패시브 반영
+    let secretRate = isUpper ? 0.52 : 0.02;
+    let mythicRate = isUpper ? 1.08 : 0.08;
 
     if (isUpper && rand < secretRate) {
         rarity = 'Secret';
@@ -252,25 +265,38 @@ setInterval(() => {
 }, 10000);
 
 io.on('connection', (socket) => {
-    socket.on('register', ({ nickname, password }) => {
+    // 3. 회원가입 시 Supabase에 데이터 저장
+    socket.on('register', async ({ nickname, password }) => {
         if (!nickname || !password) {
             socket.emit('authResult', { success: false, message: '닉네임과 비밀번호를 입력해주세요.' });
             return;
         }
-        if (gameState.registeredAccounts[nickname]) {
+
+        const { data: existing } = await supabase.from('accounts').select('nickname').eq('nickname', nickname).single();
+        if (existing) {
             socket.emit('authResult', { success: false, message: '이미 존재하는 닉네임입니다.' });
             return;
         }
-        gameState.registeredAccounts[nickname] = {
+
+        const newAccount = {
             nickname, password, hp: 100, maxHp: 100, gold: 500, exp: 0, level: 1,
             inventory: [], equippedIndex: null, totalDamage: 0, bonusAtk: 0, guildId: null
         };
+
+        const { error } = await supabase.from('accounts').insert([newAccount]);
+        if (error) {
+            socket.emit('authResult', { success: false, message: '회원가입 중 오류가 발생했습니다.' });
+            return;
+        }
+
         socket.emit('authResult', { success: true, message: '회원가입 성공! 로그인해주세요.' });
     });
 
-    socket.on('login', ({ nickname, password }) => {
-        const account = gameState.registeredAccounts[nickname];
-        if (!account || account.password !== password) {
+    // 4. 로그인 시 Supabase에서 데이터 불러오기
+    socket.on('login', async ({ nickname, password }) => {
+        const { data: account, error } = await supabase.from('accounts').select('*').eq('nickname', nickname).single();
+
+        if (error || !account || account.password !== password) {
             socket.emit('authResult', { success: false, message: '계정 정보가 일치하지 않습니다.' });
             return;
         }
@@ -460,7 +486,7 @@ io.on('connection', (socket) => {
 
             Object.values(gameState.players).forEach(player => {
                 if ((player.sessionDamage || 0) >= requiredDamage) {
-                    addExp(player, currentUpperBoss.expReward); // 지정된 상위 던전 보스 EXP 지급
+                    addExp(player, currentUpperBoss.expReward);
                     const artifactKey = getRandomArtifactKey(true);
                     const droppedItem = { ...WEAPON_DB[artifactKey], id: Date.now() + Math.random(), enhance: 0 };
                     
@@ -502,7 +528,7 @@ io.on('connection', (socket) => {
             socket.emit('upperDungeonResult', { success: false, message: '50레벨 이상만 입장 가능합니다!' });
             return;
         }
-        if (p.gold < 600000) { // 입장 골드 600,000로 수정 반영
+        if (p.gold < 600000) {
             socket.emit('upperDungeonResult', { success: false, message: '입장 골드(600,000G)가 부족합니다!' });
             return;
         }
@@ -746,7 +772,7 @@ io.on('connection', (socket) => {
         io.emit('marketListResult', gameState.marketListings);
     });
 
-    socket.on('buyMarketItem', ({ listingId, payWithGold }) => {
+    socket.on('buyMarketItem', async ({ listingId, payWithGold }) => {
         const buyer = gameState.players[socket.id];
         const listing = gameState.marketListings[listingId];
         if (!buyer || !listing) return;
@@ -759,8 +785,12 @@ io.on('connection', (socket) => {
             if (seller) {
                 seller.gold += listing.priceGold;
                 saveAccountState(seller);
-            } else if (gameState.registeredAccounts[listing.sellerName]) {
-                gameState.registeredAccounts[listing.sellerName].gold += listing.priceGold;
+            } else {
+                const { data: offlineSeller } = await supabase.from('accounts').select('*').eq('nickname', listing.sellerName).single();
+                if (offlineSeller) {
+                    offlineSeller.gold += listing.priceGold;
+                    await supabase.from('accounts').update({ gold: offlineSeller.gold }).eq('nickname', listing.sellerName);
+                }
             }
             delete gameState.marketListings[listingId];
             saveAccountState(buyer);
