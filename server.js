@@ -2,7 +2,6 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
-const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 const server = http.createServer(app);
@@ -10,11 +9,6 @@ const io = new Server(server, { cors: { origin: "*", methods: ["GET", "POST"] } 
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
-
-// Supabase 연결 설정 (환경 변수 사용)
-const SUPABASE_URL = 'https://tffkdwjzrxziqxaemwfn.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_KEY;
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const BOSS_LIST = [
     { name: '🐷 꿀신', maxHp: 157500, currentHp: 157500, expReward: 10000, type: 'normal' },
@@ -87,30 +81,24 @@ let gameState = {
     boss: { ...BOSS_LIST[0] },
     upperBoss: { ...UPPER_BOSS_LIST[0] },
     players: {},
+    registeredAccounts: {},
     guilds: {},
     marketListings: {},
     trades: {},
     rankings: { players: [], guilds: [] }
 };
 
-async function saveAccountState(p) {
-    if (!p) return;
-    try {
-        await supabase.from('accounts').upsert({
-            nickname: p.name,
-            gold: p.gold,
-            hp: p.hp,
-            exp: p.exp,
-            level: p.level,
-            maxHp: p.maxHp,
-            inventory: p.inventory || [],
-            equippedIndex: p.equippedIndex !== undefined ? p.equippedIndex : null,
-            totalDamage: p.totalDamage || 0,
-            bonusAtk: p.bonusAtk || 0,
-            guildId: p.guildId || null
-        }, { onConflict: 'nickname' });
-    } catch (err) {
-        console.error('DB 저장 오류:', err);
+function saveAccountState(p) {
+    if (p && gameState.registeredAccounts[p.name]) {
+        gameState.registeredAccounts[p.name].gold = p.gold;
+        gameState.registeredAccounts[p.name].hp = p.hp;
+        gameState.registeredAccounts[p.name].exp = p.exp;
+        gameState.registeredAccounts[p.name].level = p.level;
+        gameState.registeredAccounts[p.name].maxHp = p.maxHp;
+        gameState.registeredAccounts[p.name].inventory = p.inventory;
+        gameState.registeredAccounts[p.name].equippedIndex = p.equippedIndex;
+        gameState.registeredAccounts[p.name].totalDamage = p.totalDamage;
+        gameState.registeredAccounts[p.name].guildId = p.guildId;
     }
 }
 
@@ -141,7 +129,7 @@ function updateRankings() {
 function getRandomArtifactKey(isUpper = false) {
     const tierRand = Math.random() * 100;
     let chosenTier = 'Common';
-    let mythicRate = isUpper ? 4.0 : 1.0;
+    let mythicRate = isUpper ? 3.0 + 1.0 : 1.0;     // 신화 +1% 패시브 반영
     let legendaryRate = isUpper ? 10.0 : 5.0;
     let epicRate = isUpper ? 25.0 : 15.0;
     let rareRate = isUpper ? 60.0 : 45.0;
@@ -160,8 +148,8 @@ function getRandomWeaponKey(isUpper = false) {
     const rand = Math.random() * 100;
     let rarity = 'Common';
 
-    let secretRate = isUpper ? 0.52 : 0.02;
-    let mythicRate = isUpper ? 1.08 : 0.08;
+    let secretRate = isUpper ? 0.02 + 0.5 : 0.02;    // 시크릿 +0.5% 패시브 반영
+    let mythicRate = isUpper ? 0.08 + 1.0 : 0.08;    // 신화 +1% 패시브 반영
 
     if (isUpper && rand < secretRate) {
         rarity = 'Secret';
@@ -196,7 +184,7 @@ function getRarityMultiplier(rarity) {
 }
 
 function calculateDamage(p) {
-    let eq = p.equippedIndex !== null && p.inventory[p.equippedIndex] ? p.inventory[p.equippedIndex] : null;
+    let eq = p.equippedIndex !== null ? p.inventory[p.equippedIndex] : null;
     let baseAtk = 80;
     let rarityMul = 1.0;
     if (eq && eq.type !== 'artifact' && eq.type !== 'box') {
@@ -264,36 +252,25 @@ setInterval(() => {
 }, 10000);
 
 io.on('connection', (socket) => {
-    socket.on('register', async ({ nickname, password }) => {
+    socket.on('register', ({ nickname, password }) => {
         if (!nickname || !password) {
             socket.emit('authResult', { success: false, message: '닉네임과 비밀번호를 입력해주세요.' });
             return;
         }
-
-        const { data: existing } = await supabase.from('accounts').select('nickname').eq('nickname', nickname).maybeSingle();
-        if (existing) {
+        if (gameState.registeredAccounts[nickname]) {
             socket.emit('authResult', { success: false, message: '이미 존재하는 닉네임입니다.' });
             return;
         }
-
-        const newAccount = {
+        gameState.registeredAccounts[nickname] = {
             nickname, password, hp: 100, maxHp: 100, gold: 500, exp: 0, level: 1,
             inventory: [], equippedIndex: null, totalDamage: 0, bonusAtk: 0, guildId: null
         };
-
-        const { error } = await supabase.from('accounts').insert([newAccount]);
-        if (error) {
-            socket.emit('authResult', { success: false, message: '회원가입 중 오류가 발생했습니다.' });
-            return;
-        }
-
         socket.emit('authResult', { success: true, message: '회원가입 성공! 로그인해주세요.' });
     });
 
-    socket.on('login', async ({ nickname, password }) => {
-        const { data: account, error } = await supabase.from('accounts').select('*').eq('nickname', nickname).maybeSingle();
-
-        if (error || !account || account.password !== password) {
+    socket.on('login', ({ nickname, password }) => {
+        const account = gameState.registeredAccounts[nickname];
+        if (!account || account.password !== password) {
             socket.emit('authResult', { success: false, message: '계정 정보가 일치하지 않습니다.' });
             return;
         }
@@ -386,7 +363,7 @@ io.on('connection', (socket) => {
         if (!p || p.hp <= 0) return;
         const now = Date.now();
         
-        let eq = p.equippedIndex !== null && p.inventory[p.equippedIndex] ? p.inventory[p.equippedIndex] : null;
+        let eq = p.equippedIndex !== null ? p.inventory[p.equippedIndex] : null;
         let weaponType = eq ? eq.type : 'none';
         let rarityMul = eq ? getRarityMultiplier(eq.rarity) : 1.0;
         let baseAtk = eq ? eq.atk : 100;
@@ -483,7 +460,7 @@ io.on('connection', (socket) => {
 
             Object.values(gameState.players).forEach(player => {
                 if ((player.sessionDamage || 0) >= requiredDamage) {
-                    addExp(player, currentUpperBoss.expReward);
+                    addExp(player, currentUpperBoss.expReward); // 지정된 상위 던전 보스 EXP 지급
                     const artifactKey = getRandomArtifactKey(true);
                     const droppedItem = { ...WEAPON_DB[artifactKey], id: Date.now() + Math.random(), enhance: 0 };
                     
@@ -525,7 +502,7 @@ io.on('connection', (socket) => {
             socket.emit('upperDungeonResult', { success: false, message: '50레벨 이상만 입장 가능합니다!' });
             return;
         }
-        if (p.gold < 600000) {
+        if (p.gold < 600000) { // 입장 골드 600,000로 수정 반영
             socket.emit('upperDungeonResult', { success: false, message: '입장 골드(600,000G)가 부족합니다!' });
             return;
         }
@@ -769,7 +746,7 @@ io.on('connection', (socket) => {
         io.emit('marketListResult', gameState.marketListings);
     });
 
-    socket.on('buyMarketItem', async ({ listingId, payWithGold }) => {
+    socket.on('buyMarketItem', ({ listingId, payWithGold }) => {
         const buyer = gameState.players[socket.id];
         const listing = gameState.marketListings[listingId];
         if (!buyer || !listing) return;
@@ -782,12 +759,8 @@ io.on('connection', (socket) => {
             if (seller) {
                 seller.gold += listing.priceGold;
                 saveAccountState(seller);
-            } else {
-                const { data: offlineSeller } = await supabase.from('accounts').select('*').eq('nickname', listing.sellerName).maybeSingle();
-                if (offlineSeller) {
-                    offlineSeller.gold += listing.priceGold;
-                    await supabase.from('accounts').update({ gold: offlineSeller.gold }).eq('nickname', listing.sellerName);
-                }
+            } else if (gameState.registeredAccounts[listing.sellerName]) {
+                gameState.registeredAccounts[listing.sellerName].gold += listing.priceGold;
             }
             delete gameState.marketListings[listingId];
             saveAccountState(buyer);
