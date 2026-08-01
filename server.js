@@ -13,7 +13,7 @@ app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'adm
 
 // 1. Supabase 연결 설정 (알려주신 주소와 퍼블리시블 키 적용)
 const SUPABASE_URL = 'https://tffkdwjzrxziqxaemwfn.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_L6DgIxSAH7RryFZnGsFU6A_b_9gWTSF';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRmZmtkd2p6cnh6aXF4YWVtd2ZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1MzU1OTMsImV4cCI6MjEwMTExMTU5M30.FceX4KTi8pSVFiyH1L5mYKZg1QtRaMg-tlKLCJ-wgII';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const BOSS_LIST = [
