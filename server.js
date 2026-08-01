@@ -2,7 +2,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
-const { createClient } = require('@supabase/supabase-js'); // Supabase 모듈 추가
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 const server = http.createServer(app);
@@ -11,7 +11,7 @@ const io = new Server(server, { cors: { origin: "*", methods: ["GET", "POST"] } 
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 
-// 1. Supabase 연결 설정 (알려주신 주소와 퍼블리시블 키 적용)
+// Supabase 연결 설정 (환경 변수 사용)
 const SUPABASE_URL = 'https://tffkdwjzrxziqxaemwfn.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -93,7 +93,6 @@ let gameState = {
     rankings: { players: [], guilds: [] }
 };
 
-// 2. Supabase에 계정 정보를 비동기로 저장하는 함수
 async function saveAccountState(p) {
     if (!p) return;
     try {
@@ -104,11 +103,11 @@ async function saveAccountState(p) {
             exp: p.exp,
             level: p.level,
             maxHp: p.maxHp,
-            inventory: p.inventory,
-            equippedIndex: p.equippedIndex,
-            totalDamage: p.totalDamage,
-            bonusAtk: p.bonusAtk,
-            guildId: p.guildId
+            inventory: p.inventory || [],
+            equippedIndex: p.equippedIndex !== undefined ? p.equippedIndex : null,
+            totalDamage: p.totalDamage || 0,
+            bonusAtk: p.bonusAtk || 0,
+            guildId: p.guildId || null
         }, { onConflict: 'nickname' });
     } catch (err) {
         console.error('DB 저장 오류:', err);
@@ -197,7 +196,7 @@ function getRarityMultiplier(rarity) {
 }
 
 function calculateDamage(p) {
-    let eq = p.equippedIndex !== null ? p.inventory[p.equippedIndex] : null;
+    let eq = p.equippedIndex !== null && p.inventory[p.equippedIndex] ? p.inventory[p.equippedIndex] : null;
     let baseAtk = 80;
     let rarityMul = 1.0;
     if (eq && eq.type !== 'artifact' && eq.type !== 'box') {
@@ -265,14 +264,13 @@ setInterval(() => {
 }, 10000);
 
 io.on('connection', (socket) => {
-    // 3. 회원가입 시 Supabase에 데이터 저장
     socket.on('register', async ({ nickname, password }) => {
         if (!nickname || !password) {
             socket.emit('authResult', { success: false, message: '닉네임과 비밀번호를 입력해주세요.' });
             return;
         }
 
-        const { data: existing } = await supabase.from('accounts').select('nickname').eq('nickname', nickname).single();
+        const { data: existing } = await supabase.from('accounts').select('nickname').eq('nickname', nickname).maybeSingle();
         if (existing) {
             socket.emit('authResult', { success: false, message: '이미 존재하는 닉네임입니다.' });
             return;
@@ -292,9 +290,8 @@ io.on('connection', (socket) => {
         socket.emit('authResult', { success: true, message: '회원가입 성공! 로그인해주세요.' });
     });
 
-    // 4. 로그인 시 Supabase에서 데이터 불러오기
     socket.on('login', async ({ nickname, password }) => {
-        const { data: account, error } = await supabase.from('accounts').select('*').eq('nickname', nickname).single();
+        const { data: account, error } = await supabase.from('accounts').select('*').eq('nickname', nickname).maybeSingle();
 
         if (error || !account || account.password !== password) {
             socket.emit('authResult', { success: false, message: '계정 정보가 일치하지 않습니다.' });
@@ -389,7 +386,7 @@ io.on('connection', (socket) => {
         if (!p || p.hp <= 0) return;
         const now = Date.now();
         
-        let eq = p.equippedIndex !== null ? p.inventory[p.equippedIndex] : null;
+        let eq = p.equippedIndex !== null && p.inventory[p.equippedIndex] ? p.inventory[p.equippedIndex] : null;
         let weaponType = eq ? eq.type : 'none';
         let rarityMul = eq ? getRarityMultiplier(eq.rarity) : 1.0;
         let baseAtk = eq ? eq.atk : 100;
@@ -786,7 +783,7 @@ io.on('connection', (socket) => {
                 seller.gold += listing.priceGold;
                 saveAccountState(seller);
             } else {
-                const { data: offlineSeller } = await supabase.from('accounts').select('*').eq('nickname', listing.sellerName).single();
+                const { data: offlineSeller } = await supabase.from('accounts').select('*').eq('nickname', listing.sellerName).maybeSingle();
                 if (offlineSeller) {
                     offlineSeller.gold += listing.priceGold;
                     await supabase.from('accounts').update({ gold: offlineSeller.gold }).eq('nickname', listing.sellerName);
